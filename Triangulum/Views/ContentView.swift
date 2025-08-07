@@ -14,6 +14,7 @@ struct ContentView: View {
     @Query private var sensorReadings: [SensorReading]
     @StateObject private var barometerManager = BarometerManager()
     @StateObject private var locationManager = LocationManager()
+    @StateObject private var snapshotManager = SnapshotManager()
     @State private var isRecording = false
 
     var body: some View {
@@ -28,18 +29,28 @@ struct ContentView: View {
                 
                 VStack(alignment: .leading) {
                     HStack {
-                        Text("Sensor Readings")
-                            .font(.headline)
-                            .foregroundColor(.prussianBlueDark)
                         Spacer()
-                        Button(action: toggleRecording) {
-                            Text(isRecording ? "Stop" : "Start")
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(isRecording ? Color.prussianError : Color.prussianSuccess)
-                                .cornerRadius(20)
+                        HStack(spacing: 10) {
+                            Button(action: takeSnapshot) {
+                                Text("📸 Snapshot")
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Color.prussianBlue)
+                                    .cornerRadius(20)
+                            }
+                            
+                            NavigationLink(destination: FootprintView(snapshotManager: snapshotManager)) {
+                                Text("👣 Footprints")
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Color.prussianBlueLight)
+                                    .cornerRadius(20)
+                            }
+                            
                         }
                     }
                     
@@ -129,6 +140,14 @@ struct ContentView: View {
                 modelContext.delete(sensorReadings[index])
             }
         }
+    }
+    
+    private func takeSnapshot() {
+        let snapshot = SensorSnapshot(
+            barometerManager: barometerManager,
+            locationManager: locationManager
+        )
+        snapshotManager.addSnapshot(snapshot)
     }
     
     private func toggleRecording() {
