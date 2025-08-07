@@ -13,12 +13,15 @@ struct ContentView: View {
     @Query private var items: [Item]
     @Query private var sensorReadings: [SensorReading]
     @StateObject private var barometerManager = BarometerManager()
+    @StateObject private var locationManager = LocationManager()
     @State private var isRecording = false
 
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 20) {
                 BarometerView(barometerManager: barometerManager)
+                
+                LocationView(locationManager: locationManager)
                 
                 Divider()
                     .background(Color.prussianBlueLight)
@@ -55,6 +58,18 @@ struct ContentView: View {
                                 Text("\(reading.value, specifier: "%.2f") \(reading.unit)")
                                     .font(.body)
                                     .foregroundColor(.prussianBlueDark)
+                                
+                                if let lat = reading.latitude, let lon = reading.longitude {
+                                    Text("📍 \(lat, specifier: "%.4f")°, \(lon, specifier: "%.4f")°")
+                                        .font(.caption2)
+                                        .foregroundColor(.prussianBlueLight)
+                                }
+                                
+                                if let additionalData = reading.additionalData {
+                                    Text(additionalData)
+                                        .font(.caption2)
+                                        .foregroundColor(.prussianBlueLight)
+                                }
                             }
                             .padding(.vertical, 4)
                         }
@@ -78,18 +93,6 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(Color.prussianBlue, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                        .foregroundColor(.white)
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                            .foregroundColor(.white)
-                    }
-                }
-            }
         } detail: {
             Text("Select an item")
                 .foregroundColor(.prussianBlueDark)
@@ -97,9 +100,11 @@ struct ContentView: View {
         }
         .onAppear {
             barometerManager.startBarometerUpdates()
+            locationManager.startLocationUpdates()
         }
         .onDisappear {
             barometerManager.stopBarometerUpdates()
+            locationManager.stopLocationUpdates()
         }
     }
 
@@ -136,12 +141,28 @@ struct ContentView: View {
                     return
                 }
                 
-                let reading = SensorReading(
+                let barometerReading = SensorReading(
                     sensorType: .barometer,
                     value: self.barometerManager.pressure,
-                    unit: "kPa"
+                    unit: "kPa",
+                    latitude: self.locationManager.latitude,
+                    longitude: self.locationManager.longitude,
+                    altitude: self.locationManager.altitude
                 )
-                self.modelContext.insert(reading)
+                self.modelContext.insert(barometerReading)
+                
+                if self.locationManager.isAvailable && (self.locationManager.authorizationStatus == .authorizedWhenInUse || self.locationManager.authorizationStatus == .authorizedAlways) {
+                    let gpsReading = SensorReading(
+                        sensorType: .gps,
+                        value: self.locationManager.accuracy,
+                        unit: "m",
+                        additionalData: "Lat: \(self.locationManager.latitude), Lon: \(self.locationManager.longitude)",
+                        latitude: self.locationManager.latitude,
+                        longitude: self.locationManager.longitude,
+                        altitude: self.locationManager.altitude
+                    )
+                    self.modelContext.insert(gpsReading)
+                }
             }
         }
     }
