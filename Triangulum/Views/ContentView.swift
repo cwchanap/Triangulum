@@ -21,15 +21,22 @@ struct ContentView: View {
                 BarometerView(barometerManager: barometerManager)
                 
                 Divider()
+                    .background(Color.prussianBlueLight)
                 
                 VStack(alignment: .leading) {
                     HStack {
                         Text("Sensor Readings")
                             .font(.headline)
+                            .foregroundColor(.prussianBlueDark)
                         Spacer()
                         Button(action: toggleRecording) {
                             Text(isRecording ? "Stop" : "Start")
-                                .foregroundColor(isRecording ? .red : .green)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(isRecording ? Color.prussianError : Color.prussianSuccess)
+                                .cornerRadius(20)
                         }
                     }
                     
@@ -39,15 +46,17 @@ struct ContentView: View {
                                 HStack {
                                     Text(reading.sensorType.displayName)
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.prussianBlueLight)
                                     Spacer()
                                     Text(reading.timestamp, format: .dateTime.hour().minute().second())
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.prussianBlueLight)
                                 }
                                 Text("\(reading.value, specifier: "%.2f") \(reading.unit)")
                                     .font(.body)
+                                    .foregroundColor(.prussianBlueDark)
                             }
+                            .padding(.vertical, 4)
                         }
                         .onDelete(perform: deleteReadings)
                         
@@ -63,19 +72,28 @@ struct ContentView: View {
                 }
             }
             .padding()
+            .background(Color.prussianSoft.ignoresSafeArea())
             .navigationTitle("Sensor Monitor")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     EditButton()
+                        .foregroundColor(.white)
                 }
                 ToolbarItem {
                     Button(action: addItem) {
                         Label("Add Item", systemImage: "plus")
+                            .foregroundColor(.white)
                     }
                 }
             }
         } detail: {
             Text("Select an item")
+                .foregroundColor(.prussianBlueDark)
+                .background(Color.prussianSoft.ignoresSafeArea())
         }
         .onAppear {
             barometerManager.startBarometerUpdates()

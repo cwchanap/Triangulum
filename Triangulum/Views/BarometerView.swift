@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreMotion
 
 struct BarometerView: View {
     @ObservedObject var barometerManager: BarometerManager
@@ -8,20 +9,21 @@ struct BarometerView: View {
             HStack {
                 Image(systemName: "barometer")
                     .font(.title)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.prussianAccent)
                 Text("Barometer")
                     .font(.title2)
                     .fontWeight(.semibold)
+                    .foregroundColor(.prussianBlueDark)
                 Spacer()
             }
             
             if !barometerManager.isAvailable {
                 Text("Barometer not available on this device")
-                    .foregroundColor(.red)
+                    .foregroundColor(.prussianError)
                     .font(.caption)
             } else if !barometerManager.errorMessage.isEmpty {
                 Text(barometerManager.errorMessage)
-                    .foregroundColor(.red)
+                    .foregroundColor(.prussianError)
                     .font(.caption)
             } else {
                 VStack(spacing: 12) {
@@ -29,21 +31,82 @@ struct BarometerView: View {
                         VStack(alignment: .leading) {
                             Text("Pressure")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.prussianBlueLight)
                             Text("\(barometerManager.pressure, specifier: "%.2f") kPa")
                                 .font(.title3)
                                 .fontWeight(.medium)
+                                .foregroundColor(.prussianBlueDark)
                         }
                         
                         Spacer()
                         
                         VStack(alignment: .trailing) {
+                            Text("Sea Level Pressure")
+                                .font(.caption)
+                                .foregroundColor(.prussianBlueLight)
+                            Text("\(barometerManager.seaLevelPressure, specifier: "%.2f") kPa")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.prussianBlueDark)
+                        }
+                    }
+                    
+                    HStack {
+                        VStack(alignment: .leading) {
                             Text("Relative Altitude")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.prussianBlueLight)
                             Text("\(barometerManager.relativeAltitude, specifier: "%.2f") m")
                                 .font(.title3)
                                 .fontWeight(.medium)
+                                .foregroundColor(.prussianBlueDark)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    if let attitude = barometerManager.attitude {
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("Attitude")
+                                    .font(.caption)
+                                    .foregroundColor(.prussianBlueLight)
+                                Spacer()
+                            }
+                            
+                            HStack(spacing: 16) {
+                                VStack {
+                                    Text("Roll")
+                                        .font(.caption2)
+                                        .foregroundColor(.prussianBlueLight)
+                                    Text("\(attitude.roll * 180 / .pi, specifier: "%.1f")°")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.prussianBlueDark)
+                                }
+                                
+                                VStack {
+                                    Text("Pitch")
+                                        .font(.caption2)
+                                        .foregroundColor(.prussianBlueLight)
+                                    Text("\(attitude.pitch * 180 / .pi, specifier: "%.1f")°")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.prussianBlueDark)
+                                }
+                                
+                                VStack {
+                                    Text("Yaw")
+                                        .font(.caption2)
+                                        .foregroundColor(.prussianBlueLight)
+                                    Text("\(attitude.yaw * 180 / .pi, specifier: "%.1f")°")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.prussianBlueDark)
+                                }
+                                
+                                Spacer()
+                            }
                         }
                     }
                     
@@ -53,18 +116,38 @@ struct BarometerView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [Color.white, Color.prussianSoft]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .cornerRadius(12)
+        .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
     }
     
     private var pressureColor: Color {
         let normalizedPressure = barometerManager.pressure / 101.325
         if normalizedPressure > 1.02 {
-            return .red
+            return .prussianError
         } else if normalizedPressure < 0.98 {
-            return .blue
+            return .prussianAccent
         } else {
-            return .green
+            return .prussianSuccess
         }
     }
+}
+
+#Preview {
+    let manager = BarometerManager()
+    
+    return BarometerView(barometerManager: manager)
+        .onAppear {
+            manager.pressure = 101.325
+            manager.relativeAltitude = 15.5
+            manager.seaLevelPressure = 103.2
+            manager.isAvailable = true
+        }
+        .padding()
 }
