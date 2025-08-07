@@ -16,6 +16,7 @@ struct ContentView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var snapshotManager = SnapshotManager()
     @State private var isRecording = false
+    @State private var showSnapshotDialog = false
 
     var body: some View {
         NavigationSplitView {
@@ -105,9 +106,7 @@ struct ContentView: View {
             .toolbarBackground(Color.prussianBlue, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         } detail: {
-            Text("Select an item")
-                .foregroundColor(.prussianBlueDark)
-                .background(Color.prussianSoft.ignoresSafeArea())
+            Color.prussianSoft.ignoresSafeArea()
         }
         .onAppear {
             barometerManager.startBarometerUpdates()
@@ -116,6 +115,11 @@ struct ContentView: View {
         .onDisappear {
             barometerManager.stopBarometerUpdates()
             locationManager.stopLocationUpdates()
+        }
+        .alert("Snapshot Taken", isPresented: $showSnapshotDialog) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Sensor snapshot has been saved to your footprints.")
         }
     }
 
@@ -148,6 +152,7 @@ struct ContentView: View {
             locationManager: locationManager
         )
         snapshotManager.addSnapshot(snapshot)
+        showSnapshotDialog = true
     }
     
     private func toggleRecording() {

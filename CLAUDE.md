@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Triangulum is an iOS app built with SwiftUI that monitors sensor data, specifically barometric pressure readings. The app provides real-time visualization of barometer data and allows users to record sensor readings to a local database.
+Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types including barometric pressure and GPS location data. The app provides real-time visualization of sensor readings and allows users to record measurements to a local database with location context.
 
 ## Development Commands
 
@@ -24,10 +24,12 @@ Triangulum is an iOS app built with SwiftUI that monitors sensor data, specifica
 
 - **App Entry Point**: `TriangulumApp.swift` - Main app structure with SwiftData ModelContainer setup
 - **Views**: 
-  - `ContentView.swift` - Main navigation interface with sensor readings list
-  - `BarometerView.swift` - Real-time barometer display component
+  - `ContentView.swift` - Main navigation interface with sensor readings list and recording controls
+  - `BarometerView.swift` - Real-time barometer display with pressure, altitude, and attitude data
+  - `LocationView.swift` - GPS location display with coordinates and accuracy
 - **Data Management**: 
-  - `BarometerManager.swift` - CoreMotion wrapper for barometric sensor access
+  - `BarometerManager.swift` - CoreMotion wrapper for barometric sensor and device attitude
+  - `LocationManager.swift` - CoreLocation wrapper with permission handling
   - SwiftData models for persistent storage
 - **Models**:
   - `SensorReading.swift` - Database model for sensor measurements with SensorType enum
@@ -35,30 +37,46 @@ Triangulum is an iOS app built with SwiftUI that monitors sensor data, specifica
 
 ### Data Flow
 
-1. `BarometerManager` uses CoreMotion's `CMAltimeter` to access barometric pressure
-2. Real-time data flows to `BarometerView` via `@ObservedObject`
-3. Recording functionality saves readings to SwiftData via `SensorReading` model
-4. `ContentView` displays stored readings with SwiftData `@Query`
+1. **Sensor Data Collection**:
+   - `BarometerManager` uses CoreMotion's `CMAltimeter` for pressure/altitude and `CMMotionManager` for device attitude
+   - `LocationManager` uses CoreLocation's `CLLocationManager` for GPS coordinates and accuracy
+2. **Real-time Display**: Data flows to views via `@ObservedObject` bindings
+3. **Recording System**: Timer-based recording saves both barometer and GPS readings to SwiftData
+4. **Data Persistence**: `ContentView` displays stored readings via SwiftData `@Query` sorted by timestamp
 
 ### Key Technologies
-- **SwiftUI**: UI framework
-- **SwiftData**: Local persistence layer
-- **CoreMotion**: Hardware sensor access (specifically `CMAltimeter`)
-- **iOS 18.5+**: Minimum deployment target
+- **SwiftUI**: UI framework with modern declarative patterns
+- **SwiftData**: Local persistence layer for sensor readings
+- **CoreMotion**: Hardware sensor access (`CMAltimeter` for pressure, `CMMotionManager` for attitude)
+- **CoreLocation**: GPS and location services with permission handling
+- **iOS 17.0+**: Minimum deployment target (supports SwiftData)
 
 ## Project Structure
 
 ```
 Triangulum/
-├── Views/           # SwiftUI view components
-├── Models/          # SwiftData models and data structures  
-├── Managers/        # Business logic and hardware interface
+├── Views/           # SwiftUI view components (ContentView, BarometerView, LocationView)
+├── Models/          # SwiftData models and data structures (SensorReading, Item)
+├── Managers/        # Business logic and hardware interface (BarometerManager, LocationManager)
+├── Extensions/      # SwiftUI extensions (Color+Theme for Prussian Blue palette)
 └── Assets.xcassets/ # App icons and visual assets
 ```
 
 ## Development Notes
 
+### Architecture Patterns
 - Uses modern SwiftUI patterns with `@StateObject`, `@ObservedObject`, and `@Published`
-- Timer-based recording system for periodic sensor data collection
-- Error handling for device compatibility (barometer not available on all devices)
-- SwiftData queries sorted by timestamp for chronological display
+- ObservableObject pattern for sensor managers with real-time data binding
+- SwiftData `@Query` for reactive database displays sorted by timestamp
+
+### Hardware Integration
+- Timer-based recording system for periodic multi-sensor data collection
+- Comprehensive error handling for device compatibility (barometer/GPS availability)
+- Permission handling for location services with user prompts
+- Device attitude tracking (roll, pitch, yaw) from motion sensors
+
+### UI/UX Features
+- Custom Prussian Blue color theme defined in `Color+Theme.swift`
+- Real-time data visualization with progress indicators
+- Start/Stop recording controls with visual state feedback
+- Location context included in all sensor readings
