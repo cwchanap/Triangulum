@@ -21,7 +21,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func checkAvailability() {
         isAvailable = CLLocationManager.locationServicesEnabled()
-        authorizationStatus = locationManager.authorizationStatus
+        // Get authorization status without triggering main thread warning
+        DispatchQueue.main.async { [weak self] in
+            self?.authorizationStatus = self?.locationManager.authorizationStatus ?? .notDetermined
+        }
     }
     
     func requestLocationPermission() {
@@ -34,14 +37,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             return
         }
         
-        guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
-            errorMessage = "Location permission not granted"
-            requestLocationPermission()
-            return
-        }
+        // Check authorization status properly
+        let currentStatus = locationManager.authorizationStatus
         
-        locationManager.startUpdatingLocation()
-        errorMessage = ""
+        switch currentStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.startUpdatingLocation()
+            errorMessage = ""
+        case .notDetermined:
+            requestLocationPermission()
+        case .denied, .restricted:
+            errorMessage = "Location permission denied. Enable in Settings > Privacy & Security > Location Services"
+        @unknown default:
+            errorMessage = "Location permission status unknown"
+        }
     }
     
     func stopLocationUpdates() {

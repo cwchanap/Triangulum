@@ -7,7 +7,7 @@ struct MagnetometerView: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Image(systemName: "compass")
+                Image(systemName: "location.north.line")
                     .font(.title)
                     .foregroundColor(.prussianAccent)
                 Text("Magnetometer")
