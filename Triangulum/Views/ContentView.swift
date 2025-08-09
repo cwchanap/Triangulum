@@ -65,16 +65,17 @@ struct ContentView: View {
         .onAppear {
             barometerManager.startBarometerUpdates()
             locationManager.startLocationUpdates()
-            accelerometerManager.startAccelerometerUpdates()
-            gyroscopeManager.startGyroscopeUpdates()
-            magnetometerManager.startMagnetometerUpdates()
+            // TODO: Temporarily disabled until privacy permissions are properly configured
+            // accelerometerManager.startAccelerometerUpdates()
+            // gyroscopeManager.startGyroscopeUpdates()
+            // magnetometerManager.startMagnetometerUpdates()
         }
         .onDisappear {
             barometerManager.stopBarometerUpdates()
             locationManager.stopLocationUpdates()
-            accelerometerManager.stopAccelerometerUpdates()
-            gyroscopeManager.stopGyroscopeUpdates()
-            magnetometerManager.stopMagnetometerUpdates()
+            // accelerometerManager.stopAccelerometerUpdates()
+            // gyroscopeManager.stopGyroscopeUpdates()
+            // magnetometerManager.stopMagnetometerUpdates()
         }
         .alert("Snapshot Taken", isPresented: $showSnapshotDialog) {
             Button("OK", role: .cancel) { }

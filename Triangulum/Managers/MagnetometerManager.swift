@@ -26,12 +26,23 @@ class MagnetometerManager: ObservableObject {
             return
         }
         
+        guard motionManager.isMagnetometerAvailable else {
+            errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
+            return
+        }
+        
         motionManager.magnetometerUpdateInterval = 0.1
+        
         motionManager.startMagnetometerUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
             
             if let error = error {
-                self.errorMessage = "Error reading magnetometer: \(error.localizedDescription)"
+                if error.localizedDescription.contains("not authorized") || 
+                   error.localizedDescription.contains("permission") {
+                    self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
+                } else {
+                    self.errorMessage = "Error reading magnetometer: \(error.localizedDescription)"
+                }
                 return
             }
             

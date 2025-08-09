@@ -25,12 +25,23 @@ class GyroscopeManager: ObservableObject {
             return
         }
         
+        guard motionManager.isGyroAvailable else {
+            errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
+            return
+        }
+        
         motionManager.gyroUpdateInterval = 0.1
+        
         motionManager.startGyroUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
             
             if let error = error {
-                self.errorMessage = "Error reading gyroscope: \(error.localizedDescription)"
+                if error.localizedDescription.contains("not authorized") || 
+                   error.localizedDescription.contains("permission") {
+                    self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
+                } else {
+                    self.errorMessage = "Error reading gyroscope: \(error.localizedDescription)"
+                }
                 return
             }
             

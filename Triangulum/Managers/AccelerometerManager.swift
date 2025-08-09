@@ -25,12 +25,25 @@ class AccelerometerManager: ObservableObject {
             return
         }
         
+        // Check if motion permissions are likely denied by testing availability
+        guard motionManager.isAccelerometerAvailable else {
+            errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
+            return
+        }
+        
         motionManager.accelerometerUpdateInterval = 0.1
+        
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
             
             if let error = error {
-                self.errorMessage = "Error reading accelerometer: \(error.localizedDescription)"
+                // Check for permission-related errors
+                if error.localizedDescription.contains("not authorized") || 
+                   error.localizedDescription.contains("permission") {
+                    self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
+                } else {
+                    self.errorMessage = "Error reading accelerometer: \(error.localizedDescription)"
+                }
                 return
             }
             
