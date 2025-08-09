@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(xcodebuild:*)",
-      "Bash(swift build)"
+      "Bash(swift build)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
