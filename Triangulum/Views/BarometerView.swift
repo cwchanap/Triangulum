@@ -141,13 +141,11 @@ struct BarometerView: View {
 
 #Preview {
     let manager = BarometerManager()
+    manager.pressure = 101.325
+    manager.relativeAltitude = 15.5
+    manager.seaLevelPressure = 103.2
+    manager.isAvailable = true
     
     return BarometerView(barometerManager: manager)
-        .onAppear {
-            manager.pressure = 101.325
-            manager.relativeAltitude = 15.5
-            manager.seaLevelPressure = 103.2
-            manager.isAvailable = true
-        }
         .padding()
 }

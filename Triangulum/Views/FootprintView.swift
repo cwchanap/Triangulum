@@ -5,6 +5,20 @@ struct FootprintView: View {
     @ObservedObject var snapshotManager: SnapshotManager
     @State private var showingDeleteAlert = false
     @State private var selectedSnapshot: SensorSnapshot?
+    @State private var currentPage = 0
+    
+    private let itemsPerPage = 10
+    
+    private var totalPages: Int {
+        max(1, (snapshotManager.snapshots.count + itemsPerPage - 1) / itemsPerPage)
+    }
+    
+    private var paginatedSnapshots: [SensorSnapshot] {
+        let reversedSnapshots = Array(snapshotManager.snapshots.reversed())
+        let startIndex = currentPage * itemsPerPage
+        let endIndex = min(startIndex + itemsPerPage, reversedSnapshots.count)
+        return Array(reversedSnapshots[startIndex..<endIndex])
+    }
     
     var body: some View {
         NavigationView {
@@ -28,16 +42,29 @@ struct FootprintView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List {
-                        ForEach(snapshotManager.snapshots.reversed()) { snapshot in
-                            SnapshotRowView(snapshot: snapshot, snapshotManager: snapshotManager)
-                                .onTapGesture {
-                                    selectedSnapshot = snapshot
-                                }
+                    VStack(spacing: 0) {
+                        List {
+                            ForEach(paginatedSnapshots) { snapshot in
+                                SnapshotRowView(snapshot: snapshot, snapshotManager: snapshotManager)
+                                    .onTapGesture {
+                                        selectedSnapshot = snapshot
+                                    }
+                            }
+                            .onDelete(perform: deleteSnapshots)
                         }
-                        .onDelete(perform: deleteSnapshots)
+                        .listStyle(PlainListStyle())
+                        
+                        if totalPages > 1 {
+                            PaginationView(
+                                currentPage: $currentPage,
+                                totalPages: totalPages,
+                                totalItems: snapshotManager.snapshots.count,
+                                itemsPerPage: itemsPerPage
+                            )
+                            .padding()
+                            .background(Color.prussianSoft)
+                        }
                     }
-                    .listStyle(PlainListStyle())
                 }
             }
             .background(Color.prussianSoft.ignoresSafeArea())
@@ -60,6 +87,7 @@ struct FootprintView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Clear All", role: .destructive) {
                     snapshotManager.clearAllSnapshots()
+                    currentPage = 0
                 }
             } message: {
                 Text("This will permanently delete all your sensor snapshots. This action cannot be undone.")
@@ -72,8 +100,15 @@ struct FootprintView: View {
     
     private func deleteSnapshots(offsets: IndexSet) {
         for index in offsets {
-            let reversedIndex = snapshotManager.snapshots.count - 1 - index
-            snapshotManager.deleteSnapshot(at: reversedIndex)
+            let snapshotToDelete = paginatedSnapshots[index]
+            if let originalIndex = snapshotManager.snapshots.firstIndex(where: { $0.id == snapshotToDelete.id }) {
+                snapshotManager.deleteSnapshot(at: originalIndex)
+            }
+        }
+        
+        // Adjust current page if needed
+        if currentPage >= totalPages {
+            currentPage = max(0, totalPages - 1)
         }
     }
 }
@@ -303,6 +338,64 @@ struct SnapshotDetailView: View {
             }
         } message: {
             Text("This will permanently delete this photo from the snapshot.")
+        }
+    }
+}
+
+struct PaginationView: View {
+    @Binding var currentPage: Int
+    let totalPages: Int
+    let totalItems: Int
+    let itemsPerPage: Int
+    
+    private var startItem: Int {
+        currentPage * itemsPerPage + 1
+    }
+    
+    private var endItem: Int {
+        min((currentPage + 1) * itemsPerPage, totalItems)
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Showing \(startItem)-\(endItem) of \(totalItems) snapshots")
+                .font(.caption)
+                .foregroundColor(.prussianBlueLight)
+            
+            HStack(spacing: 20) {
+                Button(action: {
+                    if currentPage > 0 {
+                        currentPage -= 1
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Previous")
+                    }
+                    .font(.body)
+                    .foregroundColor(currentPage > 0 ? .prussianBlue : .prussianBlueLight)
+                }
+                .disabled(currentPage == 0)
+                
+                Text("Page \(currentPage + 1) of \(totalPages)")
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(.prussianBlueDark)
+                
+                Button(action: {
+                    if currentPage < totalPages - 1 {
+                        currentPage += 1
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Text("Next")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.body)
+                    .foregroundColor(currentPage < totalPages - 1 ? .prussianBlue : .prussianBlueLight)
+                }
+                .disabled(currentPage >= totalPages - 1)
+            }
         }
     }
 }

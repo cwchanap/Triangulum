@@ -7,6 +7,9 @@ struct SensorSnapshot: Codable, Identifiable {
     let timestamp: Date
     let barometer: BarometerData
     let location: LocationData
+    let accelerometer: AccelerometerData
+    let gyroscope: GyroscopeData
+    let magnetometer: MagnetometerData
     var photoIDs: [UUID] = []
     
     struct BarometerData: Codable {
@@ -29,7 +32,29 @@ struct SensorSnapshot: Codable, Identifiable {
         let accuracy: Double
     }
     
-    init(barometerManager: BarometerManager, locationManager: LocationManager) {
+    struct AccelerometerData: Codable {
+        let accelerationX: Double
+        let accelerationY: Double
+        let accelerationZ: Double
+        let magnitude: Double
+    }
+    
+    struct GyroscopeData: Codable {
+        let rotationX: Double
+        let rotationY: Double
+        let rotationZ: Double
+        let magnitude: Double
+    }
+    
+    struct MagnetometerData: Codable {
+        let magneticFieldX: Double
+        let magneticFieldY: Double
+        let magneticFieldZ: Double
+        let magnitude: Double
+        let heading: Double
+    }
+    
+    init(barometerManager: BarometerManager, locationManager: LocationManager, accelerometerManager: AccelerometerManager, gyroscopeManager: GyroscopeManager, magnetometerManager: MagnetometerManager) {
         self.timestamp = Date()
         
         self.barometer = BarometerData(
@@ -50,6 +75,28 @@ struct SensorSnapshot: Codable, Identifiable {
             longitude: locationManager.longitude,
             altitude: locationManager.altitude,
             accuracy: locationManager.accuracy
+        )
+        
+        self.accelerometer = AccelerometerData(
+            accelerationX: accelerometerManager.accelerationX,
+            accelerationY: accelerometerManager.accelerationY,
+            accelerationZ: accelerometerManager.accelerationZ,
+            magnitude: accelerometerManager.magnitude
+        )
+        
+        self.gyroscope = GyroscopeData(
+            rotationX: gyroscopeManager.rotationX,
+            rotationY: gyroscopeManager.rotationY,
+            rotationZ: gyroscopeManager.rotationZ,
+            magnitude: gyroscopeManager.magnitude
+        )
+        
+        self.magnetometer = MagnetometerData(
+            magneticFieldX: magnetometerManager.magneticFieldX,
+            magneticFieldY: magnetometerManager.magneticFieldY,
+            magneticFieldZ: magnetometerManager.magneticFieldZ,
+            magnitude: magnetometerManager.magnitude,
+            heading: magnetometerManager.heading
         )
     }
 }
