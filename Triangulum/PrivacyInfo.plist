@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMotionUsageDescription</key>
+	<string>Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.</string>
+</dict>
+</plist>
