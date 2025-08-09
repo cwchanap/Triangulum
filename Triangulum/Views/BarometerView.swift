@@ -51,19 +51,6 @@ struct BarometerView: View {
                         }
                     }
                     
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Relative Altitude")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(barometerManager.relativeAltitude, specifier: "%.2f") m")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-                        
-                        Spacer()
-                    }
                     
                     if let attitude = barometerManager.attitude {
                         VStack(spacing: 8) {

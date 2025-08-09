@@ -20,30 +20,32 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            VStack(spacing: 20) {
-                BarometerView(barometerManager: barometerManager)
-                
-                LocationView(locationManager: locationManager)
-                
-                AccelerometerView(accelerometerManager: accelerometerManager)
-                
-                GyroscopeView(gyroscopeManager: gyroscopeManager)
-                
-                MagnetometerView(magnetometerManager: magnetometerManager)
-                
-                HStack {
-                    Spacer()
-                    Button(action: takeSnapshot) {
-                        Image(systemName: "camera.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(Color.prussianBlue)
-                            .clipShape(Circle())
+            ScrollView {
+                VStack(spacing: 20) {
+                    BarometerView(barometerManager: barometerManager)
+                    
+                    LocationView(locationManager: locationManager)
+                    
+                    AccelerometerView(accelerometerManager: accelerometerManager)
+                    
+                    GyroscopeView(gyroscopeManager: gyroscopeManager)
+                    
+                    MagnetometerView(magnetometerManager: magnetometerManager)
+                    
+                    HStack {
+                        Spacer()
+                        Button(action: takeSnapshot) {
+                            Image(systemName: "camera.fill")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .padding(12)
+                                .background(Color.prussianBlue)
+                                .clipShape(Circle())
+                        }
                     }
                 }
+                .padding()
             }
-            .padding()
             .background(Color.prussianSoft.ignoresSafeArea())
             .navigationTitle("Sensor Monitor")
             .navigationBarTitleDisplayMode(.large)

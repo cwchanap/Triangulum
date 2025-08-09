@@ -84,6 +84,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
+            errorMessage = ""
             startLocationUpdates()
         case .denied, .restricted:
             errorMessage = "Location access denied"

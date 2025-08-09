@@ -18,7 +18,7 @@ struct LocationView: View {
             }
             
             if !locationManager.isAvailable {
-                Text("Location services not available")
+                Text("Location services disabled in system settings")
                     .foregroundColor(.prussianError)
                     .font(.caption)
             } else if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
@@ -75,7 +75,7 @@ struct LocationView: View {
                     
                     HStack {
                         VStack(alignment: .leading) {
-                            Text("Altitude")
+                            Text("Altitude (above sea level)")
                                 .font(.caption)
                                 .foregroundColor(.prussianBlueLight)
                             Text("\(locationManager.altitude, specifier: "%.2f") m")
