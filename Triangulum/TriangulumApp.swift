@@ -20,7 +20,14 @@ struct TriangulumApp: App {
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            print("Failed to create ModelContainer: \(error)")
+            // Try to create an in-memory container as fallback
+            let fallbackConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            do {
+                return try ModelContainer(for: schema, configurations: [fallbackConfiguration])
+            } catch {
+                fatalError("Could not create fallback ModelContainer: \(error)")
+            }
         }
     }()
 

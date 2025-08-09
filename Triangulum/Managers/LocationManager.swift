@@ -20,10 +20,15 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func checkAvailability() {
-        isAvailable = CLLocationManager.locationServicesEnabled()
-        // Get authorization status without triggering main thread warning
-        DispatchQueue.main.async { [weak self] in
-            self?.authorizationStatus = self?.locationManager.authorizationStatus ?? .notDetermined
+        // Check location services availability asynchronously to avoid blocking
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let servicesEnabled = CLLocationManager.locationServicesEnabled()
+            
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isAvailable = servicesEnabled
+                self.authorizationStatus = self.locationManager.authorizationStatus
+            }
         }
     }
     

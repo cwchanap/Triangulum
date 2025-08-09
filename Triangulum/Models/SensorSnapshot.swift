@@ -124,8 +124,11 @@ class SnapshotManager: ObservableObject {
     private let photosKey = "snapshot_photos"
     
     init() {
-        loadSnapshots()
-        loadPhotos()
+        // Load data asynchronously to avoid blocking main thread
+        Task {
+            await loadSnapshotsAsync()
+            await loadPhotosAsync()
+        }
     }
     
     func addSnapshot(_ snapshot: SensorSnapshot) {
@@ -184,12 +187,29 @@ class SnapshotManager: ObservableObject {
         }
     }
     
+    private func loadSnapshotsAsync() async {
+        guard let data = userDefaults.data(forKey: snapshotsKey) else { return }
+        
+        do {
+            let loadedSnapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
+            await MainActor.run {
+                self.snapshots = loadedSnapshots
+            }
+        } catch {
+            print("Failed to load snapshots: \(error)")
+            // Clear corrupted data to prevent future crashes
+            userDefaults.removeObject(forKey: snapshotsKey)
+        }
+    }
+    
     private func loadSnapshots() {
         guard let data = userDefaults.data(forKey: snapshotsKey) else { return }
         do {
             snapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
         } catch {
             print("Failed to load snapshots: \(error)")
+            // Clear corrupted data to prevent future crashes
+            userDefaults.removeObject(forKey: snapshotsKey)
         }
     }
     
@@ -202,12 +222,29 @@ class SnapshotManager: ObservableObject {
         }
     }
     
+    private func loadPhotosAsync() async {
+        guard let data = userDefaults.data(forKey: photosKey) else { return }
+        
+        do {
+            let loadedPhotos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
+            await MainActor.run {
+                self.photos = loadedPhotos
+            }
+        } catch {
+            print("Failed to load photos: \(error)")
+            // Clear corrupted data to prevent future crashes
+            userDefaults.removeObject(forKey: photosKey)
+        }
+    }
+    
     private func loadPhotos() {
         guard let data = userDefaults.data(forKey: photosKey) else { return }
         do {
             photos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
         } catch {
             print("Failed to load photos: \(error)")
+            // Clear corrupted data to prevent future crashes
+            userDefaults.removeObject(forKey: photosKey)
         }
     }
 }
