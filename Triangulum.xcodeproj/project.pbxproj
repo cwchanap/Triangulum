@@ -400,11 +400,11 @@
 				DEVELOPMENT_TEAM = U896CZ5W5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -430,11 +430,11 @@
 				DEVELOPMENT_TEAM = U896CZ5W5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (

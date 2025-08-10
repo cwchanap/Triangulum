@@ -20,14 +20,40 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func checkAvailability() {
-        // Check location services availability asynchronously to avoid blocking
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        // Move system check to background thread to avoid main thread warning
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let servicesEnabled = CLLocationManager.locationServicesEnabled()
             
             DispatchQueue.main.async {
                 guard let self = self else { return }
+                
+                let currentStatus = self.locationManager.authorizationStatus
+                self.authorizationStatus = currentStatus
+                
+                // Available if system-wide location services are enabled
                 self.isAvailable = servicesEnabled
-                self.authorizationStatus = self.locationManager.authorizationStatus
+                
+                // Auto-request permission if services are available but not determined
+                if servicesEnabled && currentStatus == .notDetermined {
+                    self.requestLocationPermission()
+                }
+            }
+        }
+    }
+    
+    private func checkAvailabilityAndStart() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let servicesEnabled = CLLocationManager.locationServicesEnabled()
+            
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                if servicesEnabled {
+                    self.isAvailable = true
+                    self.startLocationUpdates()
+                } else {
+                    self.errorMessage = "Location services not available"
+                }
             }
         }
     }
@@ -37,8 +63,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func startLocationUpdates() {
-        guard isAvailable else {
-            errorMessage = "Location services not available"
+        // If isAvailable is false, it might be due to race condition - check async with completion
+        if !isAvailable {
+            checkAvailabilityAndStart()
             return
         }
         
@@ -89,7 +116,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         case .denied, .restricted:
             errorMessage = "Location access denied"
         case .notDetermined:
-            requestLocationPermission()
+            // Permission request handled automatically in checkAvailability
+            errorMessage = ""
         @unknown default:
             break
         }

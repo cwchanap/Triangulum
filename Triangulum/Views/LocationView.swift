@@ -15,6 +15,12 @@ struct LocationView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
+                
+                NavigationLink(destination: MapView(locationManager: locationManager)) {
+                    Image(systemName: "map")
+                        .font(.title3)
+                        .foregroundColor(.prussianAccent)
+                }
             }
             
             if !locationManager.isAvailable {
@@ -32,21 +38,19 @@ struct LocationView: View {
                     .font(.caption)
                     .foregroundColor(.prussianAccent)
                 }
+            } else if locationManager.authorizationStatus == .notDetermined {
+                VStack(spacing: 8) {
+                    Text("Requesting location permission...")
+                        .foregroundColor(.prussianBlueLight)
+                        .font(.caption)
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .tint(.prussianAccent)
+                }
             } else if !locationManager.errorMessage.isEmpty {
                 Text(locationManager.errorMessage)
                     .foregroundColor(.prussianError)
                     .font(.caption)
-            } else if locationManager.authorizationStatus == .notDetermined {
-                VStack(spacing: 8) {
-                    Text("Location permission required")
-                        .foregroundColor(.prussianBlueLight)
-                        .font(.caption)
-                    Button("Request Permission") {
-                        locationManager.requestLocationPermission()
-                    }
-                    .font(.caption)
-                    .foregroundColor(.prussianAccent)
-                }
             } else {
                 VStack(spacing: 12) {
                     HStack {
