@@ -1,0 +1,49 @@
+//
+//  PreferencesView.swift
+//  Triangulum
+//
+//  Created by Chan Wai Chan on 10/8/2025.
+//
+
+import SwiftUI
+
+struct PreferencesView: View {
+    @AppStorage("showBarometerWidget") private var showBarometerWidget = true
+    @AppStorage("showLocationWidget") private var showLocationWidget = true
+    @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
+    @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
+    @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Sensor Widgets")) {
+                    Toggle("Barometer", isOn: $showBarometerWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                    
+                    Toggle("Location", isOn: $showLocationWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                    
+                    Toggle("Accelerometer", isOn: $showAccelerometerWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                    
+                    Toggle("Gyroscope", isOn: $showGyroscopeWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                    
+                    Toggle("Magnetometer", isOn: $showMagnetometerWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                }
+                .foregroundColor(.primary)
+            }
+            .navigationTitle("Preferences")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+        }
+    }
+}
+
+#Preview {
+    PreferencesView()
+}

@@ -17,20 +17,36 @@ struct ContentView: View {
     @StateObject private var magnetometerManager = MagnetometerManager()
     @StateObject private var snapshotManager = SnapshotManager()
     @State private var showSnapshotDialog = false
+    
+    @AppStorage("showBarometerWidget") private var showBarometerWidget = true
+    @AppStorage("showLocationWidget") private var showLocationWidget = true
+    @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
+    @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
+    @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
 
     var body: some View {
         NavigationSplitView {
             ScrollView {
                 VStack(spacing: 20) {
-                    BarometerView(barometerManager: barometerManager)
+                    if showBarometerWidget {
+                        BarometerView(barometerManager: barometerManager)
+                    }
                     
-                    LocationView(locationManager: locationManager)
+                    if showLocationWidget {
+                        LocationView(locationManager: locationManager)
+                    }
                     
-                    AccelerometerView(accelerometerManager: accelerometerManager)
+                    if showAccelerometerWidget {
+                        AccelerometerView(accelerometerManager: accelerometerManager)
+                    }
                     
-                    GyroscopeView(gyroscopeManager: gyroscopeManager)
+                    if showGyroscopeWidget {
+                        GyroscopeView(gyroscopeManager: gyroscopeManager)
+                    }
                     
-                    MagnetometerView(magnetometerManager: magnetometerManager)
+                    if showMagnetometerWidget {
+                        MagnetometerView(magnetometerManager: magnetometerManager)
+                    }
                     
                     HStack {
                         Spacer()
@@ -53,7 +69,13 @@ struct ContentView: View {
             .toolbarBackground(Color.prussianBlue, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: PreferencesView()) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    
                     NavigationLink(destination: FootprintView(snapshotManager: snapshotManager)) {
                         Image(systemName: "location.fill")
                             .font(.title2)
