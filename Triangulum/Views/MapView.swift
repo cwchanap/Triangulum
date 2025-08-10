@@ -12,7 +12,7 @@ struct MapView: View {
     @State private var isTrackingUser = false
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             HStack {
                 Image(systemName: "map")
                     .font(.title)
@@ -29,6 +29,8 @@ struct MapView: View {
                         .foregroundColor(.prussianAccent)
                 }
             }
+            .padding(.horizontal)
+            .padding(.top)
             
             if !locationManager.isAvailable {
                 Text("Location services disabled in system settings")
@@ -75,7 +77,7 @@ struct MapView: View {
                         }
                     }
                 }
-                .frame(height: 250)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -107,6 +109,9 @@ struct MapView: View {
                             .foregroundColor(accuracyColor)
                     }
                 }
+                .padding(.horizontal)
+                .padding(.bottom)
+                .background(Color.white.opacity(0.9))
             }
         }
         .padding()
@@ -119,6 +124,7 @@ struct MapView: View {
         )
         .cornerRadius(12)
         .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
+        .ignoresSafeArea(.all, edges: .bottom)
         .onChange(of: locationManager.latitude) { _, _ in
             updatePosition()
         }
