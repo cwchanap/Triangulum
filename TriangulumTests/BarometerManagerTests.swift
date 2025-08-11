@@ -87,6 +87,48 @@ struct BarometerManagerTests {
         
         manager.stopBarometerUpdates()
     }
+    
+    @Test func testSeaLevelPressureCalculationExtremeCases() {
+        let manager = BarometerManager()
+        
+        // Test very high altitude
+        let highAltitudePressure = manager.calculateSeaLevelPressure(
+            currentPressure: 500.0,
+            altitude: 8000.0
+        )
+        #expect(highAltitudePressure > 500.0)
+        
+        // Test zero pressure
+        let zeroPressure = manager.calculateSeaLevelPressure(
+            currentPressure: 0.0,
+            altitude: 100.0
+        )
+        #expect(zeroPressure == 0.0)
+    }
+    
+    @Test func testStartBarometerUpdatesWhenAttitudeUnavailable() {
+        let manager = BarometerManager()
+        
+        // This tests the case where barometer is available but attitude is not
+        if manager.isAvailable && !manager.isAttitudeAvailable {
+            manager.startBarometerUpdates()
+            // Should not produce error since attitude updates are optional
+            #expect(manager.errorMessage != "Attitude not available")
+        }
+    }
+    
+    @Test func testBarometerManagerPublishedProperties() {
+        let manager = BarometerManager()
+        
+        // Test that all @Published properties are initially set correctly
+        #expect(manager.pressure == 0.0)
+        #expect(manager.relativeAltitude == 0.0)
+        #expect(manager.seaLevelPressure == 0.0)
+        #expect(manager.attitude == nil)
+        #expect(manager.errorMessage.isEmpty)
+        #expect(manager.isAvailable == CMAltimeter.isRelativeAltitudeAvailable())
+        #expect(manager.isAttitudeAvailable == CMMotionManager().isDeviceMotionAvailable)
+    }
 }
 
 private extension BarometerManager {

