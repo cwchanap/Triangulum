@@ -3,6 +3,7 @@ import MapKit
 
 struct MapView: View {
     @ObservedObject var locationManager: LocationManager
+    @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
     @State private var position: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
@@ -65,15 +66,29 @@ struct MapView: View {
                     .font(.caption)
                     .frame(height: 200)
             } else {
-                Map(position: $position) {
-                    UserAnnotation()
-                    
-                    if userLocation.latitude != 0.0 || userLocation.longitude != 0.0 {
-                        Annotation("Current Location", coordinate: userLocation) {
-                            Circle()
-                                .fill(Color.prussianAccent)
-                                .stroke(Color.white, lineWidth: 2)
-                                .frame(width: 12, height: 12)
+                Group {
+                    if mapProvider == "osm" {
+                        // OpenStreetMap via MKTileOverlay
+                        OSMMapView(
+                            center: userLocation.latitude == 0.0 && userLocation.longitude == 0.0
+                            ? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+                            : userLocation,
+                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01),
+                            isTrackingUser: isTrackingUser
+                        )
+                    } else {
+                        // Apple Maps (SwiftUI Map)
+                        Map(position: $position) {
+                            UserAnnotation()
+
+                            if userLocation.latitude != 0.0 || userLocation.longitude != 0.0 {
+                                Annotation("Current Location", coordinate: userLocation) {
+                                    Circle()
+                                        .fill(Color.prussianAccent)
+                                        .stroke(Color.white, lineWidth: 2)
+                                        .frame(width: 12, height: 12)
+                                }
+                            }
                         }
                     }
                 }
@@ -150,7 +165,8 @@ struct MapView: View {
     private func updatePosition() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
         
-        if isTrackingUser {
+        if isTrackingUser && mapProvider != "osm" {
+            // Only applies to SwiftUI Map; OSMMapView recenters in updateUIView when tracking
             position = .region(
                 MKCoordinateRegion(
                     center: userLocation,
@@ -163,13 +179,15 @@ struct MapView: View {
     private func centerOnUser() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
         
-        withAnimation(.easeInOut(duration: 1.0)) {
-            position = .region(
-                MKCoordinateRegion(
-                    center: userLocation,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        if mapProvider != "osm" {
+            withAnimation(.easeInOut(duration: 1.0)) {
+                position = .region(
+                    MKCoordinateRegion(
+                        center: userLocation,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    )
                 )
-            )
+            }
         }
         
         isTrackingUser.toggle()

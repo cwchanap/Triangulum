@@ -13,6 +13,7 @@ struct PreferencesView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
+    @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
     
     var body: some View {
         NavigationView {
@@ -34,6 +35,14 @@ struct PreferencesView: View {
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
                 }
                 .foregroundColor(.primary)
+
+                Section(header: Text("Map")) {
+                    Picker("Map Provider", selection: $mapProvider) {
+                        Text("Apple Maps").tag("apple")
+                        Text("OpenStreetMap").tag("osm")
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
             }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.large)

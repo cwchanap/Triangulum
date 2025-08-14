@@ -80,3 +80,10 @@ Triangulum/
 - Real-time data visualization with progress indicators
 - Start/Stop recording controls with visual state feedback
 - Location context included in all sensor readings
+
+### Map Provider Preference
+- Map page supports two providers selectable in `Preferences`:
+  - `Apple Maps` (default) using SwiftUI `Map`
+  - `OpenStreetMap` using an `MKMapView` with `MKTileOverlay` (file: `OSMMapView.swift`)
+- Preference is stored in `@AppStorage("mapProvider")` with values `"apple"` or `"osm"`.
+- `MapView.swift` switches rendering based on this preference and preserves the center-on-user behavior.
