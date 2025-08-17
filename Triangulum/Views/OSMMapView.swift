@@ -23,6 +23,9 @@ struct OSMMapView: UIViewRepresentable {
         let region = MKCoordinateRegion(center: center, span: span)
         mapView.setRegion(region, animated: false)
 
+        // Add unobtrusive OSM attribution per tile policy
+        addOSMAttributionOverlay(to: mapView)
+
         return mapView
     }
 
@@ -62,5 +65,62 @@ struct OSMMapView: UIViewRepresentable {
         let spanLonDelta = abs(lhs.span.longitudeDelta - rhs.span.longitudeDelta)
         return latDelta < 1e-6 && lonDelta < 1e-6 && spanLatDelta < 1e-6 && spanLonDelta < 1e-6
     }
+
+    // MARK: - OSM Attribution
+    private func addOSMAttributionOverlay(to mapView: MKMapView) {
+        // Avoid duplicating if called more than once
+        if mapView.viewWithTag(1001) != nil { return }
+
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        blur.clipsToBounds = true
+        blur.layer.cornerRadius = 8
+        blur.tag = 1001 // sentinel to find later if needed
+
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "© OpenStreetMap contributors"
+        label.font = .preferredFont(forTextStyle: .caption2)
+        label.textColor = .label
+        label.adjustsFontForContentSizeCategory = true
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        label.setContentHuggingPriority(.required, for: .horizontal)
+
+        blur.contentView.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: blur.contentView.leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(equalTo: blur.contentView.trailingAnchor, constant: -8),
+            label.topAnchor.constraint(equalTo: blur.contentView.topAnchor, constant: 4),
+            label.bottomAnchor.constraint(equalTo: blur.contentView.bottomAnchor, constant: -4)
+        ])
+
+        mapView.addSubview(blur)
+        NSLayoutConstraint.activate([
+            blur.trailingAnchor.constraint(equalTo: mapView.layoutMarginsGuide.trailingAnchor),
+            blur.bottomAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.bottomAnchor, constant: -4)
+        ])
+
+        // Tapping the attribution opens OSM copyright page
+        let tap = UITapGestureRecognizer(target: contextTarget(), action: #selector(OSMAttributionOpener.openOSMCopyright))
+        blur.addGestureRecognizer(tap)
+        blur.isUserInteractionEnabled = true
+        label.isUserInteractionEnabled = true
+    }
+
+    private func contextTarget() -> OSMAttributionOpener {
+        OSMAttributionOpener.shared
+    }
 }
 
+// Helper singleton to handle link opening without retaining cycles
+final class OSMAttributionOpener: NSObject {
+    static let shared = OSMAttributionOpener()
+    private override init() {}
+
+    @objc func openOSMCopyright() {
+        guard let url = URL(string: "https://www.openstreetmap.org/copyright") else { return }
+        #if os(iOS)
+        UIApplication.shared.open(url)
+        #endif
+    }
+}

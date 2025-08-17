@@ -156,10 +156,10 @@ struct SnapshotRowView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Altitude")
+                    Text("GPS Altitude")
                         .font(.caption)
                         .foregroundColor(.prussianBlueLight)
-                    Text(String(format: "%.1f m", snapshot.barometer.relativeAltitude))
+                    Text(String(format: "%.1f m", snapshot.location.altitude))
                         .font(.body)
                         .fontWeight(.medium)
                         .foregroundColor(.prussianBlueDark)
@@ -252,7 +252,6 @@ struct SnapshotDetailView: View {
                             .foregroundColor(.prussianBlueDark)
                         
                         DetailRowView(label: "Pressure", value: String(format: "%.2f kPa", snapshot.barometer.pressure))
-                        DetailRowView(label: "Relative Altitude", value: String(format: "%.2f m", snapshot.barometer.relativeAltitude))
                         DetailRowView(label: "Sea Level Pressure", value: String(format: "%.2f kPa", snapshot.barometer.seaLevelPressure))
                         
                         if let attitude = snapshot.barometer.attitude {

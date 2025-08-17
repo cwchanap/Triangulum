@@ -240,15 +240,14 @@ struct TriangulumTests {
     // MARK: - SensorSnapshot Tests
     
     @Test func testSensorSnapshotInitialization() {
-        let barometerManager = BarometerManager()
         let locationManager = LocationManager()
+        let barometerManager = BarometerManager(locationManager: locationManager)
         let accelerometerManager = AccelerometerManager()
         let gyroscopeManager = GyroscopeManager()
         let magnetometerManager = MagnetometerManager()
         
         // Set some test values
         barometerManager.pressure = 101.325
-        barometerManager.relativeAltitude = 15.0
         barometerManager.seaLevelPressure = 103.2
         
         locationManager.latitude = 37.7749
@@ -282,7 +281,6 @@ struct TriangulumTests {
         
         // Test barometer data
         #expect(snapshot.barometer.pressure == 101.325)
-        #expect(snapshot.barometer.relativeAltitude == 15.0)
         #expect(snapshot.barometer.seaLevelPressure == 103.2)
         
         // Test location data
@@ -316,8 +314,8 @@ struct TriangulumTests {
     }
     
     @Test func testSensorSnapshotCodable() throws {
-        let barometerManager = BarometerManager()
         let locationManager = LocationManager()
+        let barometerManager = BarometerManager(locationManager: locationManager)
         let accelerometerManager = AccelerometerManager()
         let gyroscopeManager = GyroscopeManager()
         let magnetometerManager = MagnetometerManager()
@@ -355,13 +353,11 @@ struct TriangulumTests {
         let attitudeData = SensorSnapshot.BarometerData.AttitudeData(roll: 0.1, pitch: 0.2, yaw: 0.3)
         let barometerData = SensorSnapshot.BarometerData(
             pressure: 101.325,
-            relativeAltitude: 50.0,
             seaLevelPressure: 102.0,
             attitude: attitudeData
         )
         
         #expect(barometerData.pressure == 101.325)
-        #expect(barometerData.relativeAltitude == 50.0)
         #expect(barometerData.seaLevelPressure == 102.0)
         #expect(barometerData.attitude?.roll == 0.1)
         #expect(barometerData.attitude?.pitch == 0.2)

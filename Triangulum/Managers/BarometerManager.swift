@@ -4,16 +4,17 @@ import CoreMotion
 class BarometerManager: ObservableObject {
     private let altimeter = CMAltimeter()
     private let motionManager = CMMotionManager()
+    private let locationManager: LocationManager
     
     @Published var pressure: Double = 0.0
-    @Published var relativeAltitude: Double = 0.0
     @Published var attitude: CMAttitude?
     @Published var seaLevelPressure: Double = 0.0
     @Published var isAvailable: Bool = false
     @Published var isAttitudeAvailable: Bool = false
     @Published var errorMessage: String = ""
     
-    init() {
+    init(locationManager: LocationManager) {
+        self.locationManager = locationManager
         checkAvailability()
     }
     
@@ -39,10 +40,9 @@ class BarometerManager: ObservableObject {
             guard let data = data else { return }
             
             self.pressure = data.pressure.doubleValue
-            self.relativeAltitude = data.relativeAltitude.doubleValue
             self.seaLevelPressure = self.calculateSeaLevelPressure(
                 currentPressure: data.pressure.doubleValue,
-                altitude: data.relativeAltitude.doubleValue
+                altitude: self.locationManager.altitude
             )
             self.errorMessage = ""
         }
@@ -65,9 +65,8 @@ class BarometerManager: ObservableObject {
         }
     }
     
-    private func calculateSeaLevelPressure(currentPressure: Double, altitude: Double) -> Double {
+    public func calculateSeaLevelPressure(currentPressure: Double, altitude: Double) -> Double {
         let temperatureK = 288.15
-        let lapseRate = 0.0065
         let gasConstant = 287.053
         let gravity = 9.80665
         

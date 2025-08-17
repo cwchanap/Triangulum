@@ -127,9 +127,8 @@ struct BarometerView: View {
 }
 
 #Preview {
-    let manager = BarometerManager()
+    let manager = BarometerManager(locationManager: LocationManager())
     manager.pressure = 101.325
-    manager.relativeAltitude = 15.5
     manager.seaLevelPressure = 103.2
     manager.isAvailable = true
     

@@ -14,7 +14,6 @@ struct SensorSnapshot: Codable, Identifiable {
     
     struct BarometerData: Codable {
         let pressure: Double
-        let relativeAltitude: Double
         let seaLevelPressure: Double
         let attitude: AttitudeData?
         
@@ -59,7 +58,6 @@ struct SensorSnapshot: Codable, Identifiable {
         
         self.barometer = BarometerData(
             pressure: barometerManager.pressure,
-            relativeAltitude: barometerManager.relativeAltitude,
             seaLevelPressure: barometerManager.seaLevelPressure,
             attitude: barometerManager.attitude.map { attitude in
                 BarometerData.AttitudeData(

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types including barometric pressure and GPS location data. The app provides real-time visualization of sensor readings and allows users to record measurements to a local database with location context.
+Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types including barometric pressure, GPS location, accelerometer, gyroscope, and magnetometer data. The app provides real-time visualization of sensor readings, allows users to take sensor snapshots with photo attachments, and includes configurable widget preferences with multiple map provider options.
 
 ## Development Commands
 

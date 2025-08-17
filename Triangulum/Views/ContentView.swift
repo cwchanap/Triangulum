@@ -10,8 +10,8 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var barometerManager = BarometerManager()
-    @StateObject private var locationManager = LocationManager()
+    @StateObject private var locationManager: LocationManager
+    @StateObject private var barometerManager: BarometerManager
     @StateObject private var accelerometerManager = AccelerometerManager()
     @StateObject private var gyroscopeManager = GyroscopeManager()
     @StateObject private var magnetometerManager = MagnetometerManager()
@@ -23,6 +23,12 @@ struct ContentView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
+
+    init() {
+        let lm = LocationManager()
+        _locationManager = StateObject(wrappedValue: lm)
+        _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: lm))
+    }
 
     var body: some View {
         NavigationSplitView {

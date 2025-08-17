@@ -13,31 +13,33 @@ import CoreMotion
 struct BarometerManagerTests {
     
     @Test func testBarometerManagerInitialization() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         #expect(manager.pressure == 0.0)
-        #expect(manager.relativeAltitude == 0.0)
         #expect(manager.attitude == nil)
         #expect(manager.seaLevelPressure == 0.0)
         #expect(manager.errorMessage == "")
     }
     
     @Test func testAvailabilityCheck() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         #expect(manager.isAvailable == CMAltimeter.isRelativeAltitudeAvailable())
         #expect(manager.isAttitudeAvailable == CMMotionManager().isDeviceMotionAvailable)
     }
     
     @Test func testSeaLevelPressureCalculation() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         let currentPressure = 1013.25
-        let altitude = 100.0
+        locationManager.altitude = 100.0
         
         let seaLevelPressure = manager.calculateSeaLevelPressure(
             currentPressure: currentPressure,
-            altitude: altitude
+            altitude: locationManager.altitude
         )
         
         #expect(seaLevelPressure > currentPressure)
@@ -46,35 +48,38 @@ struct BarometerManagerTests {
     }
     
     @Test func testSeaLevelPressureCalculationAtSeaLevel() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         let currentPressure = 1013.25
-        let altitude = 0.0
+        locationManager.altitude = 0.0
         
         let seaLevelPressure = manager.calculateSeaLevelPressure(
             currentPressure: currentPressure,
-            altitude: altitude
+            altitude: locationManager.altitude
         )
         
         #expect(abs(seaLevelPressure - currentPressure) < 0.01)
     }
     
     @Test func testSeaLevelPressureCalculationNegativeAltitude() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         let currentPressure = 1013.25
-        let altitude = -100.0
+        locationManager.altitude = -100.0
         
         let seaLevelPressure = manager.calculateSeaLevelPressure(
             currentPressure: currentPressure,
-            altitude: altitude
+            altitude: locationManager.altitude
         )
         
         #expect(seaLevelPressure > currentPressure)
     }
     
     @Test func testBarometerUnavailableError() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         if !manager.isAvailable {
             manager.startBarometerUpdates()
@@ -83,31 +88,36 @@ struct BarometerManagerTests {
     }
     
     @Test func testStopBarometerUpdates() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         manager.stopBarometerUpdates()
     }
     
     @Test func testSeaLevelPressureCalculationExtremeCases() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         // Test very high altitude
+        locationManager.altitude = 8000.0
         let highAltitudePressure = manager.calculateSeaLevelPressure(
             currentPressure: 500.0,
-            altitude: 8000.0
+            altitude: locationManager.altitude
         )
         #expect(highAltitudePressure > 500.0)
         
         // Test zero pressure
+        locationManager.altitude = 100.0
         let zeroPressure = manager.calculateSeaLevelPressure(
             currentPressure: 0.0,
-            altitude: 100.0
+            altitude: locationManager.altitude
         )
         #expect(zeroPressure == 0.0)
     }
     
     @Test func testStartBarometerUpdatesWhenAttitudeUnavailable() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         // This tests the case where barometer is available but attitude is not
         if manager.isAvailable && !manager.isAttitudeAvailable {
@@ -118,11 +128,11 @@ struct BarometerManagerTests {
     }
     
     @Test func testBarometerManagerPublishedProperties() {
-        let manager = BarometerManager()
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
         
         // Test that all @Published properties are initially set correctly
         #expect(manager.pressure == 0.0)
-        #expect(manager.relativeAltitude == 0.0)
         #expect(manager.seaLevelPressure == 0.0)
         #expect(manager.attitude == nil)
         #expect(manager.errorMessage.isEmpty)
@@ -131,16 +141,3 @@ struct BarometerManagerTests {
     }
 }
 
-private extension BarometerManager {
-    func calculateSeaLevelPressure(currentPressure: Double, altitude: Double) -> Double {
-        let temperatureK = 288.15
-        let lapseRate = 0.0065
-        let gasConstant = 287.053
-        let gravity = 9.80665
-        
-        let exponent = (gravity * abs(altitude)) / (gasConstant * temperatureK)
-        let pressureRatio = exp(exponent)
-        
-        return currentPressure * pressureRatio
-    }
-}
