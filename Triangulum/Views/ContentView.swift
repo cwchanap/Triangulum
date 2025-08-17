@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import UIKit
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -143,6 +144,10 @@ struct SnapshotCreationView: View {
     
     @State private var tempSelectedPhotos: [PhotosPickerItem] = []
     @State private var isProcessingPhotos = false
+    @State private var showingImagePicker = false
+    @State private var showingCamera = false
+    @State private var capturedImages: [UIImage] = []
+    @State private var photoPreviewImages: [UIImage] = []
     
     var body: some View {
         NavigationView {
@@ -167,8 +172,9 @@ struct SnapshotCreationView: View {
                         .padding(.horizontal)
                 }
                 
-                // Photo Section
+                // Enhanced Photo Section
                 VStack(spacing: 16) {
+                    // Header with photo count
                     HStack {
                         Text("📷 Add Photos (Optional)")
                             .font(.headline)
@@ -176,33 +182,117 @@ struct SnapshotCreationView: View {
                         
                         Spacer()
                         
-                        PhotosPicker(
-                            selection: $tempSelectedPhotos,
-                            maxSelectionCount: 5,
-                            matching: .images
-                        ) {
-                            HStack {
-                                Image(systemName: "plus")
-                                Text("Select Photos")
-                            }
-                            .font(.callout)
-                            .foregroundColor(.prussianBlue)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.prussianBlueLight.opacity(0.1))
-                            .cornerRadius(8)
+                        if !capturedImages.isEmpty || !photoPreviewImages.isEmpty {
+                            let totalPhotos = capturedImages.count + photoPreviewImages.count
+                            Text("\(totalPhotos)/5")
+                                .font(.caption)
+                                .foregroundColor(.prussianBlueLight)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.prussianBlueLight.opacity(0.1))
+                                .cornerRadius(6)
                         }
                     }
                     
-                    if !tempSelectedPhotos.isEmpty {
-                        Text("\(tempSelectedPhotos.count) photo(s) selected")
-                            .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                    // Photo Action Buttons
+                    HStack(spacing: 12) {
+                        // Camera Button
+                        Button(action: {
+                            showingCamera = true
+                        }) {
+                            HStack {
+                                Image(systemName: "camera")
+                                Text("Camera")
+                            }
+                            .font(.callout)
+                            .foregroundColor(.prussianBlue)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.prussianBlueLight.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        .disabled(capturedImages.count + photoPreviewImages.count >= 5)
+                        
+                        // Photo Library Button
+                        PhotosPicker(
+                            selection: $tempSelectedPhotos,
+                            maxSelectionCount: max(0, 5 - capturedImages.count),
+                            matching: .images
+                        ) {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                Text("Library")
+                            }
+                            .font(.callout)
+                            .foregroundColor(.prussianBlue)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.prussianBlueLight.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        .disabled(capturedImages.count + photoPreviewImages.count >= 5)
+                        
+                        Spacer()
+                    }
+                    
+                    // Photo Preview Grid
+                    if !capturedImages.isEmpty || !photoPreviewImages.isEmpty {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                            // Show captured images first
+                            ForEach(Array(capturedImages.enumerated()), id: \.offset) { index, image in
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 80, height: 80)
+                                        .clipped()
+                                        .cornerRadius(8)
+                                    
+                                    Button(action: {
+                                        capturedImages.remove(at: index)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .background(Circle().fill(Color.black.opacity(0.6)))
+                                            .font(.caption)
+                                    }
+                                    .offset(x: 5, y: -5)
+                                }
+                            }
+                            
+                            // Show library photos
+                            ForEach(Array(photoPreviewImages.enumerated()), id: \.offset) { index, image in
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 80, height: 80)
+                                        .clipped()
+                                        .cornerRadius(8)
+                                    
+                                    Button(action: {
+                                        photoPreviewImages.remove(at: index)
+                                        if index < tempSelectedPhotos.count {
+                                            tempSelectedPhotos.remove(at: index)
+                                        }
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .background(Circle().fill(Color.black.opacity(0.6)))
+                                            .font(.caption)
+                                    }
+                                    .offset(x: 5, y: -5)
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
                     } else {
-                        Text("You can add photos from your library to this snapshot")
+                        Text("Take photos with camera or select from your photo library")
                             .font(.caption)
                             .foregroundColor(.prussianBlueLight)
                             .italic()
+                            .multilineTextAlignment(.center)
+                            .padding(.vertical, 8)
                     }
                     
                     if isProcessingPhotos {
@@ -219,6 +309,13 @@ struct SnapshotCreationView: View {
                 .background(Color.white.opacity(0.8))
                 .cornerRadius(12)
                 .padding(.horizontal)
+                .sheet(isPresented: $showingCamera) {
+                    ImagePicker(sourceType: .camera) { image in
+                        if capturedImages.count < 5 {
+                            capturedImages.append(image)
+                        }
+                    }
+                }
                 
                 Spacer()
                 
@@ -264,6 +361,13 @@ struct SnapshotCreationView: View {
         .onChange(of: tempSelectedPhotos) { newPhotos in
             if !newPhotos.isEmpty {
                 isProcessingPhotos = true
+                // Process selected photos and create preview images
+                Task {
+                    await loadPhotoPreviewImages(from: newPhotos)
+                    await MainActor.run {
+                        isProcessingPhotos = false
+                    }
+                }
             }
         }
     }
@@ -274,7 +378,12 @@ struct SnapshotCreationView: View {
         // Add the snapshot first
         snapshotManager.addSnapshot(snapshot)
         
-        // Then process photos if any
+        // Process captured images directly
+        for image in capturedImages {
+            snapshotManager.addPhoto(to: snapshot.id, image: image)
+        }
+        
+        // Then process photos from library if any
         if !tempSelectedPhotos.isEmpty {
             Task {
                 await processSelectedPhotos(for: snapshot.id)
@@ -311,6 +420,78 @@ struct SnapshotCreationView: View {
             } catch {
                 print("Failed to process photo: \(error)")
             }
+        }
+    }
+    
+    private func loadPhotoPreviewImages(from photoItems: [PhotosPickerItem]) async {
+        var newPreviewImages: [UIImage] = []
+        
+        for photoItem in photoItems {
+            do {
+                if let data = try await photoItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    newPreviewImages.append(image)
+                }
+            } catch {
+                print("Failed to load preview image: \(error)")
+            }
+        }
+        
+        await MainActor.run {
+            photoPreviewImages = newPreviewImages
+        }
+    }
+}
+
+// MARK: - ImagePicker Component
+struct ImagePicker: UIViewControllerRepresentable {
+    enum SourceType {
+        case camera
+        case photoLibrary
+        
+        var uiImagePickerSourceType: UIImagePickerController.SourceType {
+            switch self {
+            case .camera:
+                return .camera
+            case .photoLibrary:
+                return .photoLibrary
+            }
+        }
+    }
+    
+    let sourceType: SourceType
+    let onImagePicked: (UIImage) -> Void
+    @Environment(\.presentationMode) var presentationMode
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType.uiImagePickerSourceType
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onImagePicked(image)
+            }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
         }
     }
 }
