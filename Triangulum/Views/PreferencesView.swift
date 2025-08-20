@@ -13,7 +13,9 @@ struct PreferencesView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
+    @AppStorage("showMapWidget") private var showMapWidget = true
     @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
+    @StateObject private var locationManager = LocationManager()
     
     var body: some View {
         NavigationView {
@@ -33,6 +35,9 @@ struct PreferencesView: View {
                     
                     Toggle("Magnetometer", isOn: $showMagnetometerWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                    
+                    Toggle("Map", isOn: $showMapWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
                 }
                 .foregroundColor(.primary)
 
@@ -42,6 +47,23 @@ struct PreferencesView: View {
                         Text("OpenStreetMap").tag("osm")
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    
+                    if mapProvider == "osm" {
+                        NavigationLink(destination: MapCacheView(locationManager: locationManager)) {
+                            HStack {
+                                Image(systemName: "externaldrive")
+                                    .font(.caption)
+                                    .foregroundColor(.prussianBlueLight)
+                                Text("Advanced Cache Settings")
+                                    .font(.caption)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                                    .foregroundColor(.prussianBlueLight.opacity(0.6))
+                            }
+                        }
+                        .foregroundColor(.prussianBlueLight)
+                    }
                 }
             }
             .navigationTitle("Preferences")

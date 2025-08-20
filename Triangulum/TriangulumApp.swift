@@ -14,6 +14,7 @@ struct TriangulumApp: App {
         let schema = Schema([
             Item.self,
             SensorReading.self,
+            MapTile.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

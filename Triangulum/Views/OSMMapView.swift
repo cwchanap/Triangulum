@@ -9,10 +9,17 @@ struct OSMMapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView(frame: .zero)
 
-        // Configure OpenStreetMap tile overlay
-        let template = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        // Configure OpenStreetMap tile overlay (basic, no caching)
+        // Using alternative tile server that might be more reliable
+        let template = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
         let overlay = MKTileOverlay(urlTemplate: template)
         overlay.canReplaceMapContent = true
+        overlay.maximumZ = 19
+        overlay.minimumZ = 0
+        
+        // Add debugging
+        print("OSMMapView: Adding tile overlay with template: \(template)")
+        
         mapView.addOverlay(overlay, level: .aboveLabels)
 
         mapView.showsUserLocation = true
@@ -51,10 +58,18 @@ struct OSMMapView: UIViewRepresentable {
 
     final class Coordinator: NSObject, MKMapViewDelegate {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            print("OSMMapView: rendererFor overlay called: \(type(of: overlay))")
             if let tileOverlay = overlay as? MKTileOverlay {
-                return MKTileOverlayRenderer(tileOverlay: tileOverlay)
+                let renderer = MKTileOverlayRenderer(tileOverlay: tileOverlay)
+                print("OSMMapView: Created tile overlay renderer")
+                return renderer
             }
+            print("OSMMapView: Using default overlay renderer")
             return MKOverlayRenderer(overlay: overlay)
+        }
+        
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            print("OSMMapView: Region changed to: \(mapView.region)")
         }
     }
 
