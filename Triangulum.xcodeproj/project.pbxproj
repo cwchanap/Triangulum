@@ -400,6 +400,7 @@
 				DEVELOPMENT_TEAM = U896CZ5W5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Triangulum uses the camera to attach photos to sensor snapshots, allowing you to document the environment and conditions when measurements were taken.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -430,6 +431,7 @@
 				DEVELOPMENT_TEAM = U896CZ5W5N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Triangulum uses the camera to attach photos to sensor snapshots, allowing you to document the environment and conditions when measurements were taken.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Triangulum uses motion sensors (accelerometer, gyroscope, and magnetometer) to provide real-time sensor data visualization and recording for scientific and educational purposes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -8,5 +8,7 @@
 	<string>Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Triangulum uses location services to provide GPS coordinates and altitude information alongside sensor readings for comprehensive environmental monitoring.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Triangulum uses the camera to attach photos to sensor snapshots, allowing you to document the environment and conditions when measurements were taken.</string>
 </dict>
 </plist>

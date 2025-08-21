@@ -54,7 +54,7 @@ struct PreferencesView: View {
                                 Image(systemName: "externaldrive")
                                     .font(.caption)
                                     .foregroundColor(.prussianBlueLight)
-                                Text("Advanced Cache Settings")
+                                Text("Cache Management")
                                     .font(.caption)
                                 Spacer()
                                 Image(systemName: "chevron.right")

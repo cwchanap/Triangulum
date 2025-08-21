@@ -11,10 +11,6 @@ import MapKit
 struct MapCacheView: View {
     @StateObject private var cacheManager = TileCacheManager.shared
     @ObservedObject var locationManager: LocationManager
-    @State private var downloadRadius: Double = 1000 // meters
-    @State private var minZoom: Int = 10
-    @State private var maxZoom: Int = 16
-    @State private var showingDownloadAlert = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -65,91 +61,20 @@ struct MapCacheView: View {
                 )
             }
             
-            // Download Controls
-            VStack(spacing: 16) {
-                Text("Download Tiles for Current Area")
+            // Note about download location
+            VStack(spacing: 8) {
+                Text("Download Tiles")
                     .font(.headline)
                     .foregroundColor(.prussianBlueDark)
                 
-                VStack(spacing: 12) {
-                    HStack {
-                        Text("Radius:")
-                            .font(.subheadline)
-                            .foregroundColor(.prussianBlueLight)
-                        Spacer()
-                        Text("\(Int(downloadRadius)) meters")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueDark)
-                    }
-                    
-                    Slider(value: $downloadRadius, in: 500...10000, step: 500)
-                        .tint(.prussianAccent)
-                }
-                
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Min Zoom")
-                            .font(.subheadline)
-                            .foregroundColor(.prussianBlueLight)
-                        Picker("Min Zoom", selection: $minZoom) {
-                            ForEach(8...18, id: \.self) { zoom in
-                                Text("\(zoom)").tag(zoom)
-                            }
-                        }
-                        .pickerStyle(MenuPickerStyle())
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 8) {
-                        Text("Max Zoom")
-                            .font(.subheadline)
-                            .foregroundColor(.prussianBlueLight)
-                        Picker("Max Zoom", selection: $maxZoom) {
-                            ForEach(8...18, id: \.self) { zoom in
-                                Text("\(zoom)").tag(zoom)
-                            }
-                        }
-                        .pickerStyle(MenuPickerStyle())
-                    }
-                }
-                
-                if cacheManager.isDownloading {
-                    VStack(spacing: 8) {
-                        ProgressView(value: cacheManager.downloadProgress)
-                            .tint(.prussianAccent)
-                        Text("Downloading... \(Int(cacheManager.downloadProgress * 100))%")
-                            .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
-                    }
-                } else {
-                    Button(action: {
-                        showingDownloadAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.down.circle")
-                            Text("Download Tiles")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [.prussianAccent, .prussianBlue]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(8)
-                    }
-                    .disabled(locationManager.latitude == 0.0 && locationManager.longitude == 0.0)
-                }
+                Text("Use the Map view to download tiles for specific areas. Toggle the cache mode button in the Map view to access download controls.")
+                    .font(.callout)
+                    .foregroundColor(.prussianBlueLight)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
             .padding()
-            .background(Color.white.opacity(0.8))
+            .background(Color.prussianSoft.opacity(0.3))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -198,32 +123,8 @@ struct MapCacheView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .alert("Download Tiles", isPresented: $showingDownloadAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Download") {
-                downloadTiles()
-            }
-        } message: {
-            Text("This will download map tiles for a \(Int(downloadRadius))m radius around your current location. This may use significant data and storage.")
-        }
         .onAppear {
             cacheManager.updateCacheStats()
-        }
-    }
-    
-    private func downloadTiles() {
-        let center = CLLocationCoordinate2D(
-            latitude: locationManager.latitude,
-            longitude: locationManager.longitude
-        )
-        
-        Task {
-            await cacheManager.downloadTilesForRegion(
-                center: center,
-                radius: downloadRadius,
-                minZoom: minZoom,
-                maxZoom: maxZoom
-            )
         }
     }
 }
