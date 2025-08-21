@@ -12,6 +12,7 @@ struct SimpleOSMMapView: UIViewRepresentable {
     var center: CLLocationCoordinate2D
     var span: MKCoordinateSpan
     var enableCaching: Bool = false
+    var shouldCenterOnUser: Bool = false
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -32,9 +33,9 @@ struct SimpleOSMMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        // Update region if needed
-        let newRegion = MKCoordinateRegion(center: center, span: span)
-        if !regionsEqual(lhs: uiView.region, rhs: newRegion) {
+        // Only update region when explicitly requested via shouldCenterOnUser
+        if shouldCenterOnUser {
+            let newRegion = MKCoordinateRegion(center: center, span: span)
             uiView.setRegion(newRegion, animated: true)
         }
     }

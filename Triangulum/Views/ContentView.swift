@@ -28,7 +28,6 @@ struct ContentView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
-    @AppStorage("showMapWidget") private var showMapWidget = true
 
     init() {
         let lm = LocationManager()
@@ -58,10 +57,6 @@ struct ContentView: View {
                     
                     if showMagnetometerWidget {
                         MagnetometerView(magnetometerManager: magnetometerManager)
-                    }
-                    
-                    if showMapWidget {
-                        MapView(locationManager: locationManager)
                     }
                     
                     HStack {

@@ -12,6 +12,7 @@ struct MapView: View {
     )
     @State private var isTrackingUser = false
     @State private var isCacheMode = false
+    @State private var shouldCenterOSMOnUser = false
     @State private var cacheRadius: Double = 1000.0
     @State private var minZoom = 10
     @State private var maxZoom = 16
@@ -154,7 +155,8 @@ struct MapView: View {
                             ? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
                             : userLocation,
                             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01),
-                            enableCaching: isCacheMode
+                            enableCaching: isCacheMode,
+                            shouldCenterOnUser: shouldCenterOSMOnUser
                         )
                         .overlay(
                             // Cache mode overlay
@@ -319,8 +321,8 @@ struct MapView: View {
     private func updatePosition() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
         
+        // Only auto-update position for Apple Maps, and only when tracking is enabled
         if isTrackingUser && mapProvider != "osm" {
-            // Only applies to SwiftUI Map; OSMMapView recenters in updateUIView when tracking
             position = .region(
                 MKCoordinateRegion(
                     center: userLocation,
@@ -333,7 +335,14 @@ struct MapView: View {
     private func centerOnUser() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
         
-        if mapProvider != "osm" {
+        if mapProvider == "osm" {
+            // Trigger manual centering for OSM
+            shouldCenterOSMOnUser = true
+            DispatchQueue.main.async {
+                shouldCenterOSMOnUser = false
+            }
+        } else {
+            // Handle Apple Maps centering
             withAnimation(.easeInOut(duration: 1.0)) {
                 position = .region(
                     MKCoordinateRegion(
