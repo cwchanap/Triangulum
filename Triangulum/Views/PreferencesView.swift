@@ -57,9 +57,6 @@ struct PreferencesView: View {
                                 Text("Cache Management")
                                     .font(.caption)
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption2)
-                                    .foregroundColor(.prussianBlueLight.opacity(0.6))
                             }
                         }
                         .foregroundColor(.prussianBlueLight)
