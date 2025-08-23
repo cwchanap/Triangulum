@@ -23,6 +23,9 @@ struct MapView: View {
     @State private var minZoom = 10
     @State private var maxZoom = 16
     @StateObject private var cacheManager = TileCacheManager.shared
+    @StateObject private var appleCompleter = AppleSearchCompleter()
+    @State private var osmSuggestions: [OSMGeocoder.Result] = []
+    @State private var osmAutocompleteTask: Task<Void, Never>? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -63,6 +66,16 @@ struct MapView: View {
                             .textInputAutocapitalization(.words)
                             .disableAutocorrection(true)
                             .onSubmit { performSearch() }
+                        if !searchText.isEmpty {
+                            Button(action: {
+                                searchText = ""
+                                searchMessage = nil
+                                osmSuggestions = []
+                                appleCompleter.results = []
+                            }) {
+                                Image(systemName: "xmark.circle.fill").foregroundColor(.prussianBlueLight)
+                            }
+                        }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
@@ -86,6 +99,58 @@ struct MapView: View {
                 .padding(.bottom, 6)
             }
             
+            // Autocomplete suggestions (provider-specific)
+            if mapProvider == "osm" && !osmSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(0..<min(osmSuggestions.count, 6), id: \.self) { idx in
+                        let item = osmSuggestions[idx]
+                        Button(action: { selectOSMSuggestion(item) }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.display_name)
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                                    .foregroundColor(.prussianBlueDark)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                    }
+                }
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .padding(.bottom, 6)
+            } else if mapProvider != "osm" && !appleCompleter.results.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(0..<min(appleCompleter.results.count, 6), id: \.self) { idx in
+                        let comp = appleCompleter.results[idx]
+                        Button(action: { selectAppleCompletion(comp) }) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(comp.title).font(.subheadline).foregroundColor(.prussianBlueDark)
+                                if !comp.subtitle.isEmpty {
+                                    Text(comp.subtitle).font(.caption).foregroundColor(.prussianBlueLight)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal)
+                        }
+                        .buttonStyle(.plain)
+                        Divider()
+                    }
+                }
+                .background(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                )
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .padding(.bottom, 6)
+            }
             // Cache controls when in cache mode
             if isCacheMode && mapProvider == "osm" {
                 VStack(spacing: 8) {
@@ -352,6 +417,14 @@ struct MapView: View {
                 cacheManager.updateCacheStats()
             }
         }
+        .onChange(of: searchText) { _, newValue in
+            handleAutocomplete(for: newValue)
+        }
+        .onChange(of: mapProvider) { _, _ in
+            // Clear suggestions when switching providers
+            osmSuggestions = []
+            appleCompleter.results = []
+        }
     }
     
     private var userLocation: CLLocationCoordinate2D {
@@ -485,6 +558,60 @@ extension MapView {
                     )
                 }
                 searchMessage = item.name ?? "Found location"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+            }
+        }
+    }
+
+    private func handleAutocomplete(for text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count < 2 {
+            osmSuggestions = []
+            appleCompleter.results = []
+            return
+        }
+
+        if mapProvider == "osm" {
+            // Debounce OSM calls
+            osmAutocompleteTask?.cancel()
+            osmAutocompleteTask = Task { [trimmed] in
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                let results = try await OSMGeocoder.search(query: trimmed, limit: 6)
+                await MainActor.run { osmSuggestions = results }
+            }
+        } else {
+            if locationManager.latitude != 0.0 || locationManager.longitude != 0.0 {
+                appleCompleter.region = MKCoordinateRegion(
+                    center: userLocation,
+                    span: MKCoordinateSpan(latitudeDelta: 0.3, longitudeDelta: 0.3)
+                )
+            }
+            appleCompleter.queryFragment = trimmed
+        }
+    }
+
+    private func selectOSMSuggestion(_ result: OSMGeocoder.Result) {
+        osmCenter = result.coordinate
+        osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+        osmRecenterToken = UUID()
+        searchMessage = result.display_name
+        osmSuggestions = []
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+    }
+
+    private func selectAppleCompletion(_ completion: MKLocalSearchCompletion) {
+        let req = MKLocalSearch.Request(completion: completion)
+        let search = MKLocalSearch(request: req)
+        isSearching = true
+        search.start { response, _ in
+            isSearching = false
+            if let item = response?.mapItems.first {
+                let coord = item.placemark.coordinate
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    position = .region(MKCoordinateRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)))
+                }
+                searchMessage = item.name ?? completion.title
+                appleCompleter.results = []
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
             }
         }
