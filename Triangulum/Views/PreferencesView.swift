@@ -10,12 +10,17 @@ import SwiftUI
 struct PreferencesView: View {
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
+    @AppStorage("showWeatherWidget") private var showWeatherWidget = true
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
     @AppStorage("showMapWidget") private var showMapWidget = true
     @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
     @StateObject private var locationManager = LocationManager()
+    
+    @State private var apiKeyInput = ""
+    @State private var showingAPIKeyAlert = false
+    @State private var apiKeyStatus = "Not Set"
     
     var body: some View {
         NavigationView {
@@ -25,6 +30,9 @@ struct PreferencesView: View {
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
                     
                     Toggle("Location", isOn: $showLocationWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+                    
+                    Toggle("Weather", isOn: $showWeatherWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
                     
                     Toggle("Accelerometer", isOn: $showAccelerometerWidget)
@@ -62,6 +70,54 @@ struct PreferencesView: View {
                         .foregroundColor(.prussianBlueLight)
                     }
                 }
+                
+                Section(header: Text("Weather Configuration")) {
+                    HStack {
+                        Text("API Key Status:")
+                            .font(.caption)
+                            .foregroundColor(.prussianBlueLight)
+                        Spacer()
+                        Text(apiKeyStatus)
+                            .font(.caption)
+                            .foregroundColor(Config.hasValidAPIKey ? .green : .red)
+                    }
+                    
+                    Button(action: {
+                        showingAPIKeyAlert = true
+                        apiKeyInput = "" // Clear input field
+                    }) {
+                        HStack {
+                            Image(systemName: "key")
+                                .font(.caption)
+                                .foregroundColor(.prussianAccent)
+                            Text(Config.hasValidAPIKey ? "Update API Key" : "Set API Key")
+                                .font(.caption)
+                                .foregroundColor(.prussianAccent)
+                        }
+                    }
+                    
+                    if Config.hasValidAPIKey {
+                        Button(action: {
+                            if Config.deleteAPIKey() {
+                                updateAPIKeyStatus()
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                Text("Remove API Key")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                    
+                    Text("Get your free API key from openweathermap.org")
+                        .font(.caption2)
+                        .foregroundColor(.prussianBlueLight)
+                        .multilineTextAlignment(.leading)
+                }
             }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.large)
@@ -69,6 +125,27 @@ struct PreferencesView: View {
             .toolbarBackground(Color.prussianBlue, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
+        .onAppear {
+            updateAPIKeyStatus()
+        }
+        .alert("Enter OpenWeatherMap API Key", isPresented: $showingAPIKeyAlert) {
+            TextField("API Key", text: $apiKeyInput)
+            Button("Save") {
+                if Config.storeAPIKey(apiKeyInput) {
+                    updateAPIKeyStatus()
+                    apiKeyInput = "" // Clear the input
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                apiKeyInput = ""
+            }
+        } message: {
+            Text("Enter your API key from openweathermap.org. It will be stored securely in the Keychain.")
+        }
+    }
+    
+    private func updateAPIKeyStatus() {
+        apiKeyStatus = Config.hasValidAPIKey ? "✓ Set" : "Not Set"
     }
 }
 

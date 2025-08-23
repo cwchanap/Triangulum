@@ -10,6 +10,7 @@ struct SensorSnapshot: Codable, Identifiable {
     let accelerometer: AccelerometerData
     let gyroscope: GyroscopeData
     let magnetometer: MagnetometerData
+    let weather: WeatherData?
     var photoIDs: [UUID] = []
     
     struct BarometerData: Codable {
@@ -53,7 +54,18 @@ struct SensorSnapshot: Codable, Identifiable {
         let heading: Double
     }
     
-    init(barometerManager: BarometerManager, locationManager: LocationManager, accelerometerManager: AccelerometerManager, gyroscopeManager: GyroscopeManager, magnetometerManager: MagnetometerManager) {
+    struct WeatherData: Codable {
+        let temperature: Double
+        let feelsLike: Double
+        let humidity: Int
+        let pressure: Int
+        let windSpeed: Double?
+        let condition: String
+        let description: String
+        let locationName: String
+    }
+    
+    init(barometerManager: BarometerManager, locationManager: LocationManager, accelerometerManager: AccelerometerManager, gyroscopeManager: GyroscopeManager, magnetometerManager: MagnetometerManager, weatherManager: WeatherManager?) {
         self.timestamp = Date()
         
         self.barometer = BarometerData(
@@ -96,6 +108,19 @@ struct SensorSnapshot: Codable, Identifiable {
             magnitude: magnetometerManager.magnitude,
             heading: magnetometerManager.heading
         )
+        
+        self.weather = weatherManager?.currentWeather.map { weather in
+            WeatherData(
+                temperature: weather.temperature,
+                feelsLike: weather.feelsLike,
+                humidity: weather.humidity,
+                pressure: weather.pressure,
+                windSpeed: weather.windSpeed,
+                condition: weather.condition,
+                description: weather.description,
+                locationName: weather.locationName
+            )
+        }
     }
 }
 

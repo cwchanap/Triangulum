@@ -14,6 +14,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var locationManager: LocationManager
     @StateObject private var barometerManager: BarometerManager
+    @StateObject private var weatherManager: WeatherManager
     @StateObject private var accelerometerManager = AccelerometerManager()
     @StateObject private var gyroscopeManager = GyroscopeManager()
     @StateObject private var magnetometerManager = MagnetometerManager()
@@ -25,6 +26,7 @@ struct ContentView: View {
     
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
+    @AppStorage("showWeatherWidget") private var showWeatherWidget = true
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
@@ -33,6 +35,7 @@ struct ContentView: View {
         let lm = LocationManager()
         _locationManager = StateObject(wrappedValue: lm)
         _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: lm))
+        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: lm))
     }
 
     var body: some View {
@@ -45,6 +48,10 @@ struct ContentView: View {
                     
                     if showLocationWidget {
                         LocationView(locationManager: locationManager)
+                    }
+                    
+                    if showWeatherWidget {
+                        WeatherView(weatherManager: weatherManager)
                     }
                     
                     if showAccelerometerWidget {
@@ -129,7 +136,8 @@ struct ContentView: View {
             locationManager: locationManager,
             accelerometerManager: accelerometerManager,
             gyroscopeManager: gyroscopeManager,
-            magnetometerManager: magnetometerManager
+            magnetometerManager: magnetometerManager,
+            weatherManager: weatherManager
         )
         currentSnapshot = snapshot
         showEnhancedSnapshotDialog = true

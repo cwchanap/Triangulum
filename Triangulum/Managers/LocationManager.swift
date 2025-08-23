@@ -30,14 +30,35 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 let currentStatus = self.locationManager.authorizationStatus
                 self.authorizationStatus = currentStatus
                 
+                print("DEBUG: Location services enabled system-wide: \(servicesEnabled)")
+                print("DEBUG: Current authorization status: \(currentStatus.rawValue)")
+                print("DEBUG: Authorization status description: \(self.authorizationStatusDescription)")
+                
                 // Available if system-wide location services are enabled
                 self.isAvailable = servicesEnabled
                 
+                print("DEBUG: Location manager isAvailable: \(self.isAvailable)")
+                
                 // Auto-request permission if services are available but not determined
                 if servicesEnabled && currentStatus == .notDetermined {
+                    print("DEBUG: Auto-requesting location permission")
                     self.requestLocationPermission()
+                } else if servicesEnabled && (currentStatus == .authorizedWhenInUse || currentStatus == .authorizedAlways) {
+                    print("DEBUG: Starting location updates - already authorized")
+                    self.startLocationUpdates()
                 }
             }
+        }
+    }
+    
+    private var authorizationStatusDescription: String {
+        switch authorizationStatus {
+        case .notDetermined: return "notDetermined"
+        case .restricted: return "restricted"
+        case .denied: return "denied"
+        case .authorizedAlways: return "authorizedAlways"
+        case .authorizedWhenInUse: return "authorizedWhenInUse"
+        @unknown default: return "unknown(\(authorizationStatus.rawValue))"
         }
     }
     
