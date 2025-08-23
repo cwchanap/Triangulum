@@ -19,6 +19,8 @@ struct MapView: View {
     @State private var searchText: String = ""
     @State private var isSearching: Bool = false
     @State private var searchMessage: String? = nil
+    @State private var selectedResultCoordinate: CLLocationCoordinate2D? = nil
+    @State private var selectedResultTitle: String? = nil
     @State private var cacheRadius: Double = 1000.0
     @State private var minZoom = 10
     @State private var maxZoom = 16
@@ -26,6 +28,8 @@ struct MapView: View {
     @StateObject private var appleCompleter = AppleSearchCompleter()
     @State private var osmSuggestions: [OSMGeocoder.Result] = []
     @State private var osmAutocompleteTask: Task<Void, Never>? = nil
+    @State private var osmVisibleRegion: MKCoordinateRegion? = nil
+    @State private var limitToView: Bool = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -94,6 +98,12 @@ struct MapView: View {
                     .background(isSearching ? Color.prussianSoft : Color.prussianAccent)
                     .cornerRadius(10)
                     .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    // Limit to visible region toggle (applies to OSM strictly; Apple is a bias)
+                    HStack(spacing: 6) {
+                        Toggle("", isOn: $limitToView).labelsHidden()
+                        Text("Limit to View").font(.caption2).foregroundColor(.prussianBlueDark)
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 6)
@@ -258,7 +268,13 @@ struct MapView: View {
                             center: osmCenter,
                             span: osmSpan,
                             enableCaching: isCacheMode,
-                            recenterToken: osmRecenterToken
+                            recenterToken: osmRecenterToken,
+                            annotationCoordinate: selectedResultCoordinate,
+                            annotationTitle: selectedResultTitle,
+                            annotationSubtitle: nil,
+                            onRegionChanged: { region in
+                                osmVisibleRegion = region
+                            }
                         )
                         .overlay(
                             // Cache mode overlay
@@ -353,6 +369,15 @@ struct MapView: View {
                                         .fill(Color.prussianAccent)
                                         .stroke(Color.white, lineWidth: 2)
                                         .frame(width: 12, height: 12)
+                                }
+                            }
+
+                            if let sel = selectedResultCoordinate {
+                                Annotation(selectedResultTitle ?? "Result", coordinate: sel) {
+                                    Image(systemName: "mappin.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.prussianAccent)
+                                        .shadow(radius: 2)
                                 }
                             }
                         }
@@ -505,7 +530,8 @@ extension MapView {
         if mapProvider == "osm" {
             // Use OSM Nominatim for OSM map provider
             Task {
-                let results = try await OSMGeocoder.search(query: query, limit: 1)
+                let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
+                let results = try await OSMGeocoder.search(query: query, limit: 1, region: region, bounded: limitToView)
                 await MainActor.run {
                     isSearching = false
                     guard let first = results.first else {
@@ -517,6 +543,8 @@ extension MapView {
                     osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                     osmRecenterToken = UUID()
                     searchMessage = first.display_name
+                    selectedResultCoordinate = first.coordinate
+                    selectedResultTitle = first.display_name
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
                 }
             }
@@ -558,6 +586,8 @@ extension MapView {
                     )
                 }
                 searchMessage = item.name ?? "Found location"
+                selectedResultCoordinate = coord
+                selectedResultTitle = item.name ?? "Result"
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
             }
         }
@@ -576,7 +606,8 @@ extension MapView {
             osmAutocompleteTask?.cancel()
             osmAutocompleteTask = Task { [trimmed] in
                 try? await Task.sleep(nanoseconds: 350_000_000)
-                let results = try await OSMGeocoder.search(query: trimmed, limit: 6)
+                let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
+                let results = try await OSMGeocoder.search(query: trimmed, limit: 6, region: region, bounded: limitToView)
                 await MainActor.run { osmSuggestions = results }
             }
         } else {
@@ -596,6 +627,8 @@ extension MapView {
         osmRecenterToken = UUID()
         searchMessage = result.display_name
         osmSuggestions = []
+        selectedResultCoordinate = result.coordinate
+        selectedResultTitle = result.display_name
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
     }
 
@@ -611,6 +644,8 @@ extension MapView {
                     position = .region(MKCoordinateRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)))
                 }
                 searchMessage = item.name ?? completion.title
+                selectedResultCoordinate = coord
+                selectedResultTitle = item.name ?? completion.title
                 appleCompleter.results = []
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
             }

@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import MapKit
 
 // Lightweight OSM (Nominatim) geocoder for place search in OSM mode.
 // It uses the public Nominatim service with polite headers.
@@ -14,15 +15,31 @@ enum OSMGeocoder {
         }
     }
 
-    static func search(query: String, limit: Int = 5) async throws -> [Result] {
+    static func search(query: String, limit: Int = 5, region: MKCoordinateRegion? = nil, bounded: Bool = false) async throws -> [Result] {
         guard var components = URLComponents(string: "https://nominatim.openstreetmap.org/search") else {
             return []
         }
-        components.queryItems = [
+        var items: [URLQueryItem] = [
             URLQueryItem(name: "format", value: "jsonv2"),
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "limit", value: String(limit))
         ]
+
+        if let region {
+            // Build viewbox from region (left,top,right,bottom) = (minLon, maxLat, maxLon, minLat)
+            let latDelta = region.span.latitudeDelta
+            let lonDelta = region.span.longitudeDelta
+            let top = region.center.latitude + latDelta / 2.0
+            let bottom = region.center.latitude - latDelta / 2.0
+            let left = region.center.longitude - lonDelta / 2.0
+            let right = region.center.longitude + lonDelta / 2.0
+            let viewbox = "\(left),\(top),\(right),\(bottom)"
+            items.append(URLQueryItem(name: "viewbox", value: viewbox))
+            if bounded {
+                items.append(URLQueryItem(name: "bounded", value: "1"))
+            }
+        }
+        components.queryItems = items
         guard let url = components.url else { return [] }
 
         var request = URLRequest(url: url)
@@ -44,4 +61,3 @@ enum OSMGeocoder {
         }
     }
 }
-

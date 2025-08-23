@@ -14,6 +14,10 @@ struct SimpleOSMMapView: UIViewRepresentable {
     var enableCaching: Bool = false
     // Recenter token triggers animated recenter to `center` whenever it changes
     var recenterToken: UUID = UUID()
+    var annotationCoordinate: CLLocationCoordinate2D? = nil
+    var annotationTitle: String? = nil
+    var annotationSubtitle: String? = nil
+    var onRegionChanged: ((MKCoordinateRegion) -> Void)? = nil
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -29,6 +33,15 @@ struct SimpleOSMMapView: UIViewRepresentable {
         
         // Add OSM tile overlay
         setupOSMTileOverlay(on: mapView)
+
+        // Add initial annotation if provided
+        if let annotationCoordinate {
+            let pin = MKPointAnnotation()
+            pin.coordinate = annotationCoordinate
+            pin.title = annotationTitle
+            pin.subtitle = annotationSubtitle
+            mapView.addAnnotation(pin)
+        }
         
         return mapView
     }
@@ -40,10 +53,13 @@ struct SimpleOSMMapView: UIViewRepresentable {
             let newRegion = MKCoordinateRegion(center: center, span: span)
             uiView.setRegion(newRegion, animated: true)
         }
+
+        // Update annotations to reflect selection state
+        updateAnnotations(on: uiView)
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(parent: self)
     }
     
     private func setupOSMTileOverlay(on mapView: MKMapView) {
@@ -108,6 +124,12 @@ struct SimpleOSMMapView: UIViewRepresentable {
     }
     
     final class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: SimpleOSMMapView
+        var lastRecenterToken: UUID?
+
+        init(parent: SimpleOSMMapView) {
+            self.parent = parent
+        }
         var lastRecenterToken: UUID?
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let cachedTileOverlay = overlay as? CachedTileOverlay {
@@ -128,6 +150,26 @@ struct SimpleOSMMapView: UIViewRepresentable {
         
         func mapView(_ mapView: MKMapView, didFailToLocateUserWithError error: Error) {
             print("SimpleOSMMapView: Failed to locate user: \(error)")
+        }
+
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            parent.onRegionChanged?(mapView.region)
+        }
+    }
+
+    // MARK: - Annotations
+    private func updateAnnotations(on mapView: MKMapView) {
+        // Remove existing non-user annotations
+        let toRemove = mapView.annotations.filter { !($0 is MKUserLocation) }
+        if !toRemove.isEmpty { mapView.removeAnnotations(toRemove) }
+
+        // Add new annotation if available
+        if let annotationCoordinate {
+            let pin = MKPointAnnotation()
+            pin.coordinate = annotationCoordinate
+            pin.title = annotationTitle
+            pin.subtitle = annotationSubtitle
+            mapView.addAnnotation(pin)
         }
     }
 }
