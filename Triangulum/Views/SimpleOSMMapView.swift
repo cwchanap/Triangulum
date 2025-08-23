@@ -12,7 +12,8 @@ struct SimpleOSMMapView: UIViewRepresentable {
     var center: CLLocationCoordinate2D
     var span: MKCoordinateSpan
     var enableCaching: Bool = false
-    var shouldCenterOnUser: Bool = false
+    // Recenter token triggers animated recenter to `center` whenever it changes
+    var recenterToken: UUID = UUID()
     
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -33,8 +34,9 @@ struct SimpleOSMMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        // Only update region when explicitly requested via shouldCenterOnUser
-        if shouldCenterOnUser {
+        // Recenter only when the token changes to avoid fighting user pans/zooms
+        if context.coordinator.lastRecenterToken != recenterToken {
+            context.coordinator.lastRecenterToken = recenterToken
             let newRegion = MKCoordinateRegion(center: center, span: span)
             uiView.setRegion(newRegion, animated: true)
         }
@@ -106,6 +108,7 @@ struct SimpleOSMMapView: UIViewRepresentable {
     }
     
     final class Coordinator: NSObject, MKMapViewDelegate {
+        var lastRecenterToken: UUID?
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let cachedTileOverlay = overlay as? CachedTileOverlay {
                 let renderer = CachedTileOverlayRenderer(tileOverlay: cachedTileOverlay)
@@ -132,6 +135,8 @@ struct SimpleOSMMapView: UIViewRepresentable {
 #Preview {
     SimpleOSMMapView(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
-        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01),
+        enableCaching: false,
+        recenterToken: UUID()
     )
 }

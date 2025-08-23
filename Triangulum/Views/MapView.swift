@@ -12,7 +12,13 @@ struct MapView: View {
     )
     @State private var isTrackingUser = false
     @State private var isCacheMode = false
-    @State private var shouldCenterOSMOnUser = false
+    // OSM-specific centering and search state
+    @State private var osmCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+    @State private var osmSpan: MKCoordinateSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+    @State private var osmRecenterToken: UUID = UUID()
+    @State private var searchText: String = ""
+    @State private var isSearching: Bool = false
+    @State private var searchMessage: String? = nil
     @State private var cacheRadius: Double = 1000.0
     @State private var minZoom = 10
     @State private var maxZoom = 16
@@ -31,6 +37,7 @@ struct MapView: View {
                 Spacer()
                 
                 if mapProvider == "osm" {
+                    // Toggle cache mode
                     Button(action: { isCacheMode.toggle() }) {
                         Image(systemName: isCacheMode ? "externaldrive.fill" : "externaldrive")
                             .font(.title3)
@@ -46,6 +53,38 @@ struct MapView: View {
             }
             .padding(.horizontal)
             .padding(.top)
+
+            // Search bar: OSM uses Nominatim, Apple uses MKLocalSearch
+            if true {
+                HStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundColor(.prussianBlueLight)
+                        TextField("Search places", text: $searchText)
+                            .textInputAutocapitalization(.words)
+                            .disableAutocorrection(true)
+                            .onSubmit { performSearch() }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.prussianSoft.opacity(0.4))
+                    .cornerRadius(10)
+
+                    Button(action: performSearch) {
+                        if isSearching {
+                            ProgressView().scaleEffect(0.7).tint(.prussianAccent)
+                        } else {
+                            Text("Search").font(.subheadline).foregroundColor(.white)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(isSearching ? Color.prussianSoft : Color.prussianAccent)
+                    .cornerRadius(10)
+                    .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 6)
+            }
             
             // Cache controls when in cache mode
             if isCacheMode && mapProvider == "osm" {
@@ -151,12 +190,10 @@ struct MapView: View {
                     if mapProvider == "osm" {
                         // OpenStreetMap with optional caching
                         SimpleOSMMapView(
-                            center: userLocation.latitude == 0.0 && userLocation.longitude == 0.0
-                            ? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
-                            : userLocation,
-                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01),
+                            center: osmCenter,
+                            span: osmSpan,
                             enableCaching: isCacheMode,
-                            shouldCenterOnUser: shouldCenterOSMOnUser
+                            recenterToken: osmRecenterToken
                         )
                         .overlay(
                             // Cache mode overlay
@@ -227,6 +264,19 @@ struct MapView: View {
                                 }
                             } : nil
                         )
+                        // Optional: brief search message overlay
+                        .overlay(alignment: .top) {
+                            if let message = searchMessage {
+                                Text(message)
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color.black.opacity(0.6))
+                                    .cornerRadius(8)
+                                    .padding(.top, 8)
+                            }
+                        }
                     } else {
                         // Apple Maps (SwiftUI Map)
                         Map(position: $position) {
@@ -336,11 +386,10 @@ struct MapView: View {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
         
         if mapProvider == "osm" {
-            // Trigger manual centering for OSM
-            shouldCenterOSMOnUser = true
-            DispatchQueue.main.async {
-                shouldCenterOSMOnUser = false
-            }
+            // Recenter OSM to current user location without toggling on every location update
+            osmCenter = userLocation
+            osmSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            osmRecenterToken = UUID()
         } else {
             // Handle Apple Maps centering
             withAnimation(.easeInOut(duration: 1.0)) {
@@ -368,6 +417,76 @@ struct MapView: View {
                 minZoom: minZoom,
                 maxZoom: maxZoom
             )
+        }
+    }
+}
+
+// MARK: - OSM Search
+extension MapView {
+    private func performSearch() {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        isSearching = true
+        searchMessage = nil
+
+        if mapProvider == "osm" {
+            // Use OSM Nominatim for OSM map provider
+            Task {
+                let results = try await OSMGeocoder.search(query: query, limit: 1)
+                await MainActor.run {
+                    isSearching = false
+                    guard let first = results.first else {
+                        searchMessage = "No results for ‘\(query)’"
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                        return
+                    }
+                    osmCenter = first.coordinate
+                    osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                    osmRecenterToken = UUID()
+                    searchMessage = first.display_name
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                }
+            }
+        } else {
+            // Use Apple MKLocalSearch for Apple Maps provider
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = query
+            // Bias search near current known location if available
+            if locationManager.latitude != 0.0 || locationManager.longitude != 0.0 {
+                request.region = MKCoordinateRegion(
+                    center: userLocation,
+                    span: MKCoordinateSpan(latitudeDelta: 0.2, longitudeDelta: 0.2)
+                )
+            }
+
+            let search = MKLocalSearch(request: request)
+            search.start { response, error in
+                isSearching = false
+                if let error = error {
+                    searchMessage = "Search error: \(error.localizedDescription)"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { searchMessage = nil }
+                    return
+                }
+
+                guard let response = response, !response.mapItems.isEmpty else {
+                    searchMessage = "No results for ‘\(query)’"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                    return
+                }
+
+                let item = response.mapItems[0]
+                let coord = item.placemark.coordinate
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    position = .region(
+                        MKCoordinateRegion(
+                            center: coord,
+                            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                        )
+                    )
+                }
+                searchMessage = item.name ?? "Found location"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+            }
         }
     }
 }
