@@ -450,6 +450,10 @@ struct MapView: View {
             osmSuggestions = []
             appleCompleter.results = []
         }
+        .onAppear {
+            // Auto-center on user location when view appears if location is available
+            centerOnUserLocationIfAvailable()
+        }
     }
     
     private var userLocation: CLLocationCoordinate2D {
@@ -469,14 +473,61 @@ struct MapView: View {
     private func updatePosition() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
         
-        // Only auto-update position for Apple Maps, and only when tracking is enabled
-        if isTrackingUser && mapProvider != "osm" {
-            position = .region(
-                MKCoordinateRegion(
-                    center: userLocation,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        // Auto-center on first valid location update, or when tracking is enabled
+        let shouldCenter = isTrackingUser || isFirstLocationUpdate()
+        
+        if shouldCenter {
+            if mapProvider == "osm" {
+                osmCenter = userLocation
+                osmSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                osmRecenterToken = UUID()
+            } else {
+                position = .region(
+                    MKCoordinateRegion(
+                        center: userLocation,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    )
                 )
-            )
+            }
+        }
+    }
+    
+    private func isFirstLocationUpdate() -> Bool {
+        // Check if we're still showing the default San Francisco location
+        let defaultLat = 37.7749
+        let defaultLon = -122.4194
+        
+        if mapProvider == "osm" {
+            return abs(osmCenter.latitude - defaultLat) < 0.0001 && 
+                   abs(osmCenter.longitude - defaultLon) < 0.0001
+        } else {
+            // For Apple Maps, always auto-center on first valid location
+            // This is simpler and ensures the map centers on user location
+            return true
+        }
+    }
+    
+    private func centerOnUserLocationIfAvailable() {
+        // Only auto-center if we have a valid location and are still showing default location
+        guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0,
+              locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways else {
+            return
+        }
+        
+        // Center on user location without enabling tracking mode
+        if mapProvider == "osm" {
+            osmCenter = userLocation
+            osmSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            osmRecenterToken = UUID()
+        } else {
+            withAnimation(.easeInOut(duration: 1.0)) {
+                position = .region(
+                    MKCoordinateRegion(
+                        center: userLocation,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    )
+                )
+            }
         }
     }
     

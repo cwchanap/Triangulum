@@ -29,6 +29,11 @@ struct OSMMapView: UIViewRepresentable {
         // Initial region
         let region = MKCoordinateRegion(center: center, span: span)
         mapView.setRegion(region, animated: false)
+        
+        // Enable user location to automatically center when available
+        if !isTrackingUser {
+            mapView.userTrackingMode = .none
+        }
 
         // Add unobtrusive OSM attribution per tile policy
         addOSMAttributionOverlay(to: mapView)
