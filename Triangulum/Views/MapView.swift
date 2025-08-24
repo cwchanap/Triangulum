@@ -27,7 +27,7 @@ struct MapView: View {
     @StateObject private var cacheManager = TileCacheManager.shared
     @StateObject private var appleCompleter = AppleSearchCompleter()
     @State private var osmSuggestions: [OSMGeocoder.Result] = []
-    @State private var osmAutocompleteTask: Task<Void, Never>? = nil
+    @State private var osmAutocompleteTask: Task<Void, Error>? = nil
     @State private var osmVisibleRegion: MKCoordinateRegion? = nil
     @State private var limitToView: Bool = false
     
@@ -604,7 +604,7 @@ extension MapView {
         if mapProvider == "osm" {
             // Debounce OSM calls
             osmAutocompleteTask?.cancel()
-            osmAutocompleteTask = Task { [trimmed] in
+            osmAutocompleteTask = Task {
                 try? await Task.sleep(nanoseconds: 350_000_000)
                 let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
                 let results = try await OSMGeocoder.search(query: trimmed, limit: 6, region: region, bounded: limitToView)

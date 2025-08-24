@@ -130,7 +130,6 @@ struct SimpleOSMMapView: UIViewRepresentable {
         init(parent: SimpleOSMMapView) {
             self.parent = parent
         }
-        var lastRecenterToken: UUID?
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let cachedTileOverlay = overlay as? CachedTileOverlay {
                 let renderer = CachedTileOverlayRenderer(tileOverlay: cachedTileOverlay)
