@@ -273,7 +273,9 @@ struct MapView: View {
                             annotationTitle: selectedResultTitle,
                             annotationSubtitle: nil,
                             onRegionChanged: { region in
-                                osmVisibleRegion = region
+                                Task { @MainActor in
+                                    osmVisibleRegion = region
+                                }
                             }
                         )
                         .overlay(
