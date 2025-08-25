@@ -20,6 +20,7 @@ struct PreferencesView: View {
     
     @State private var apiKeyInput = ""
     @State private var showingAPIKeyAlert = false
+    @State private var showingViewAPIKeyAlert = false
     @State private var apiKeyStatus = "Not Set"
     
     var body: some View {
@@ -98,6 +99,21 @@ struct PreferencesView: View {
                     
                     if Config.hasValidAPIKey {
                         Button(action: {
+                            showingViewAPIKeyAlert = true
+                        }) {
+                            HStack {
+                                Image(systemName: "eye")
+                                    .font(.caption)
+                                    .foregroundColor(.prussianBlueLight)
+                                Text("View API Key")
+                                    .font(.caption)
+                                    .foregroundColor(.prussianBlueLight)
+                            }
+                        }
+                    }
+                    
+                    if Config.hasValidAPIKey {
+                        Button(action: {
                             if Config.deleteAPIKey() {
                                 updateAPIKeyStatus()
                             }
@@ -141,6 +157,17 @@ struct PreferencesView: View {
             }
         } message: {
             Text("Enter your API key from openweathermap.org. It will be stored securely in the Keychain.")
+        }
+        .alert("Your OpenWeatherMap API Key", isPresented: $showingViewAPIKeyAlert) {
+            Button("Copy to Clipboard") {
+                let apiKey = Config.openWeatherAPIKey
+                if !apiKey.isEmpty {
+                    UIPasteboard.general.string = apiKey
+                }
+            }
+            Button("Close", role: .cancel) { }
+        } message: {
+            Text(Config.openWeatherAPIKey.isEmpty ? "No API key found" : Config.openWeatherAPIKey)
         }
     }
     
