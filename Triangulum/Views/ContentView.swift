@@ -19,6 +19,7 @@ struct ContentView: View {
     @StateObject private var gyroscopeManager = GyroscopeManager()
     @StateObject private var magnetometerManager = MagnetometerManager()
     @StateObject private var snapshotManager = SnapshotManager()
+    @StateObject private var widgetOrderManager = WidgetOrderManager()
     @State private var showSnapshotDialog = false
     @State private var showEnhancedSnapshotDialog = false
     @State private var currentSnapshot: SensorSnapshot?
@@ -30,6 +31,8 @@ struct ContentView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
+    @AppStorage("showMapWidget") private var showMapWidget = true
+    @AppStorage("mapProvider") private var mapProvider = "apple"
 
     init() {
         let lm = LocationManager()
@@ -41,30 +44,13 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             ScrollView {
-                VStack(spacing: 20) {
-                    if showBarometerWidget {
-                        BarometerView(barometerManager: barometerManager)
+                LazyVStack(spacing: 20) {
+                    ForEach(widgetOrderManager.widgetOrder, id: \.id) { widgetType in
+                        if isWidgetVisible(widgetType) {
+                            widgetView(for: widgetType)
+                        }
                     }
-                    
-                    if showLocationWidget {
-                        LocationView(locationManager: locationManager)
-                    }
-                    
-                    if showWeatherWidget {
-                        WeatherView(weatherManager: weatherManager)
-                    }
-                    
-                    if showAccelerometerWidget {
-                        AccelerometerView(accelerometerManager: accelerometerManager)
-                    }
-                    
-                    if showGyroscopeWidget {
-                        GyroscopeView(gyroscopeManager: gyroscopeManager)
-                    }
-                    
-                    if showMagnetometerWidget {
-                        MagnetometerView(magnetometerManager: magnetometerManager)
-                    }
+                    .onMove(perform: widgetOrderManager.moveWidget)
                     
                     HStack {
                         Spacer()
@@ -88,6 +74,9 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    EditButton()
+                        .foregroundColor(.white)
+                    
                     NavigationLink(destination: PreferencesView()) {
                         Image(systemName: "gearshape.fill")
                             .font(.title2)
@@ -126,6 +115,40 @@ struct ContentView: View {
                 selectedPhotos: $selectedPhotos,
                 isPresented: $showEnhancedSnapshotDialog
             )
+        }
+    }
+    
+    // MARK: - Widget Management
+    
+    private func isWidgetVisible(_ widgetType: WidgetType) -> Bool {
+        switch widgetType {
+        case .barometer: return showBarometerWidget
+        case .location: return showLocationWidget
+        case .weather: return showWeatherWidget
+        case .accelerometer: return showAccelerometerWidget
+        case .gyroscope: return showGyroscopeWidget
+        case .magnetometer: return showMagnetometerWidget
+        case .map: return showMapWidget
+        }
+    }
+    
+    @ViewBuilder
+    private func widgetView(for widgetType: WidgetType) -> some View {
+        switch widgetType {
+        case .barometer:
+            BarometerView(barometerManager: barometerManager)
+        case .location:
+            LocationView(locationManager: locationManager)
+        case .weather:
+            WeatherView(weatherManager: weatherManager)
+        case .accelerometer:
+            AccelerometerView(accelerometerManager: accelerometerManager)
+        case .gyroscope:
+            GyroscopeView(gyroscopeManager: gyroscopeManager)
+        case .magnetometer:
+            MagnetometerView(magnetometerManager: magnetometerManager)
+        case .map:
+            MapView(locationManager: locationManager, mapProvider: mapProvider)
         }
     }
 
