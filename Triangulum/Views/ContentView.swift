@@ -32,7 +32,6 @@ struct ContentView: View {
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
     @AppStorage("showMapWidget") private var showMapWidget = true
-    @AppStorage("mapProvider") private var mapProvider = "apple"
 
     init() {
         let lm = LocationManager()
@@ -148,7 +147,7 @@ struct ContentView: View {
         case .magnetometer:
             MagnetometerView(magnetometerManager: magnetometerManager)
         case .map:
-            MapView(locationManager: locationManager, mapProvider: mapProvider)
+            MapView(locationManager: locationManager)
         }
     }
 
