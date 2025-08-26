@@ -20,136 +20,8 @@ struct WeatherSearchView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Search Bar
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.prussianBlueLight)
-                            
-                            TextField("Search city (e.g., London, Paris, Tokyo)", text: $searchText)
-                                .textInputAutocapitalization(.words)
-                                .onSubmit {
-                                    searchWeather()
-                                }
-                            
-                            if !searchText.isEmpty {
-                                Button(action: {
-                                    searchText = ""
-                                    errorMessage = ""
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.prussianBlueLight)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(Color.prussianSoft.opacity(0.3))
-                        .cornerRadius(10)
-                        
-                        Button(action: searchWeather) {
-                            if isSearching {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .tint(.white)
-                            } else {
-                                Text("Search")
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(isSearching ? Color.prussianBlueLight : Color.prussianAccent)
-                        .cornerRadius(10)
-                        .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    
-                    if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.horizontal)
-                    }
-                }
-                .padding()
-                .background(Color.white)
-                .shadow(color: .prussianBlue.opacity(0.1), radius: 2, x: 0, y: 2)
-                
-                // Content
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        // Search Results
-                        if !searchResults.isEmpty {
-                            Section {
-                                ForEach(searchResults, id: \.cityName) { weather in
-                                    WeatherSearchResultCard(weather: weather) {
-                                        addToHistory(weather)
-                                    }
-                                }
-                            } header: {
-                                HStack {
-                                    Text("Search Results")
-                                        .font(.headline)
-                                        .foregroundColor(.prussianBlueDark)
-                                    Spacer()
-                                }
-                                .padding(.horizontal)
-                                .padding(.top)
-                            }
-                        }
-                        
-                        // Search History
-                        if !searchHistory.isEmpty {
-                            Section {
-                                ForEach(searchHistory, id: \.id) { city in
-                                    WeatherHistoryCard(city: city) {
-                                        searchWeatherForCity(city.name)
-                                    } onDelete: {
-                                        removeFromHistory(city)
-                                    }
-                                }
-                            } header: {
-                                HStack {
-                                    Text("Recent Searches")
-                                        .font(.headline)
-                                        .foregroundColor(.prussianBlueDark)
-                                    Spacer()
-                                    Button("Clear All") {
-                                        clearHistory()
-                                    }
-                                    .font(.caption)
-                                    .foregroundColor(.prussianAccent)
-                                }
-                                .padding(.horizontal)
-                                .padding(.top)
-                            }
-                        }
-                        
-                        // Empty State
-                        if searchResults.isEmpty && searchHistory.isEmpty && !isSearching {
-                            VStack(spacing: 16) {
-                                Image(systemName: "globe.americas.fill")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.prussianBlueLight)
-                                
-                                Text("Search Weather Worldwide")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.prussianBlueDark)
-                                
-                                Text("Enter any city name to get current weather conditions from around the world")
-                                    .font(.body)
-                                    .foregroundColor(.prussianBlueLight)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 32)
-                            }
-                            .padding(.top, 80)
-                        }
-                    }
-                }
-                .background(Color.prussianSoft.ignoresSafeArea())
+                searchBarSection
+                contentSection
             }
             .navigationTitle("Weather Search")
             .navigationBarTitleDisplayMode(.large)
@@ -160,6 +32,150 @@ struct WeatherSearchView: View {
         .onAppear {
             loadSearchHistory()
         }
+    }
+    
+    private var searchBarSection: some View {
+        VStack(spacing: 12) {
+            searchBarContent
+            
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .shadow(color: .prussianBlue.opacity(0.1), radius: 2, x: 0, y: 2)
+    }
+    
+    private var searchBarContent: some View {
+        HStack(spacing: 12) {
+            searchTextField
+            searchButton
+        }
+    }
+    
+    private var searchTextField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.prussianBlueLight)
+            
+            TextField("Search city (e.g., London, Paris, Tokyo)", text: $searchText)
+                .textInputAutocapitalization(.words)
+                .onSubmit {
+                    searchWeather()
+                }
+            
+            if !searchText.isEmpty {
+                Button(action: {
+                    searchText = ""
+                    errorMessage = ""
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.prussianBlueLight)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.prussianSoft.opacity(0.3))
+        .cornerRadius(10)
+    }
+    
+    private var searchButton: some View {
+        Button(action: searchWeather) {
+            if isSearching {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .tint(.white)
+            } else {
+                Text("Search")
+                    .fontWeight(.medium)
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(isSearching ? Color.prussianBlueLight : Color.prussianAccent)
+        .cornerRadius(10)
+        .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+    
+    private var contentSection: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                // Search Results
+                if !searchResults.isEmpty {
+                    Section {
+                        ForEach(searchResults, id: \.locationName) { weather in
+                            WeatherSearchResultCard(weather: weather) {
+                                addToHistory(weather)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Text("Search Results")
+                                .font(.headline)
+                                .foregroundColor(.prussianBlueDark)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top)
+                    }
+                }
+                
+                // Search History
+                if !searchHistory.isEmpty {
+                    Section {
+                        ForEach(searchHistory, id: \.id) { city in
+                            WeatherHistoryCard(city: city) {
+                                searchWeatherForCity(city.name)
+                            } onDelete: {
+                                removeFromHistory(city)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Text("Recent Searches")
+                                .font(.headline)
+                                .foregroundColor(.prussianBlueDark)
+                            Spacer()
+                            Button("Clear All") {
+                                clearHistory()
+                            }
+                            .font(.caption)
+                            .foregroundColor(.prussianAccent)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top)
+                    }
+                }
+                
+                // Empty State
+                if searchResults.isEmpty && searchHistory.isEmpty && !isSearching {
+                    VStack(spacing: 16) {
+                        Image(systemName: "globe.americas.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.prussianBlueLight)
+                        
+                        Text("Search Weather Worldwide")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.prussianBlueDark)
+                        
+                        Text("Enter any city name to get current weather conditions from around the world")
+                            .font(.body)
+                            .foregroundColor(.prussianBlueLight)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    .padding(.top, 80)
+                }
+            }
+        }
+        .background(Color.prussianSoft.ignoresSafeArea())
     }
     
     // MARK: - Search Functions
@@ -195,7 +211,7 @@ struct WeatherSearchView: View {
     // MARK: - History Management
     
     private func addToHistory(_ weather: Weather) {
-        let city = SearchedCity(name: weather.cityName, country: weather.country)
+        let city = SearchedCity(name: weather.locationName, country: "")
         
         // Remove if already exists to avoid duplicates
         searchHistory.removeAll { $0.name.lowercased() == city.name.lowercased() }
@@ -245,16 +261,10 @@ struct WeatherSearchResultCard: View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(weather.cityName)
+                    Text(weather.locationName)
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(.prussianBlueDark)
-                    
-                    if !weather.country.isEmpty {
-                        Text(weather.country)
-                            .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
-                    }
                 }
                 
                 Spacer()
@@ -272,7 +282,7 @@ struct WeatherSearchResultCard: View {
                     Text("Temperature")
                         .font(.caption)
                         .foregroundColor(.prussianBlueLight)
-                    Text("\(weather.temperature, specifier: "%.1f")°C")
+                    Text("\(weather.temperatureCelsius, specifier: "%.1f")°C")
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.prussianBlueDark)
@@ -295,7 +305,7 @@ struct WeatherSearchResultCard: View {
             
             // Additional Info
             HStack(spacing: 16) {
-                WeatherInfoItem(title: "Feels Like", value: "\(weather.feelsLike, specifier: "%.1f")°C")
+                WeatherInfoItem(title: "Feels Like", value: "\(weather.feelsLike - 273.15, specifier: "%.1f")°C")
                 WeatherInfoItem(title: "Humidity", value: "\(weather.humidity)%")
                 WeatherInfoItem(title: "Pressure", value: "\(weather.pressure, specifier: "%.0f") hPa")
             }
