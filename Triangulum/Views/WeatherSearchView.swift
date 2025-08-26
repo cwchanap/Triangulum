@@ -395,7 +395,7 @@ class WeatherSearchManager {
         
         let apiKey = Config.openWeatherAPIKey
         let encodedCity = city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city
-        let urlString = "\(baseURL)?q=\(encodedCity)&appid=\(apiKey)&units=metric"
+        let urlString = "\(baseURL)?q=\(encodedCity)&appid=\(apiKey)"
         
         guard let url = URL(string: urlString) else {
             throw WeatherSearchError.invalidURL
