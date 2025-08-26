@@ -282,7 +282,7 @@ struct WeatherSearchResultCard: View {
                     Text("Temperature")
                         .font(.caption)
                         .foregroundColor(.prussianBlueLight)
-                    Text("\(weather.temperatureCelsius, specifier: "%.1f")°C")
+                    Text(String(format: "%.1f°C", weather.temperatureCelsius))
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.prussianBlueDark)
@@ -305,7 +305,7 @@ struct WeatherSearchResultCard: View {
             
             // Additional Info
             HStack(spacing: 16) {
-                WeatherInfoItem(title: "Feels Like", value: "\(weather.feelsLike - 273.15, specifier: "%.1f")°C")
+                WeatherInfoItem(title: "Feels Like", value: String(format: "%.1f°C", weather.feelsLike - 273.15))
                 WeatherInfoItem(title: "Humidity", value: "\(weather.humidity)%")
                 WeatherInfoItem(title: "Pressure", value: "\(weather.pressure) hPa")
             }
