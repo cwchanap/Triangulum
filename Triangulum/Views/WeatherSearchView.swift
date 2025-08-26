@@ -307,7 +307,7 @@ struct WeatherSearchResultCard: View {
             HStack(spacing: 16) {
                 WeatherInfoItem(title: "Feels Like", value: "\(weather.feelsLike - 273.15, specifier: "%.1f")°C")
                 WeatherInfoItem(title: "Humidity", value: "\(weather.humidity)%")
-                WeatherInfoItem(title: "Pressure", value: "\(weather.pressure, specifier: "%.0f") hPa")
+                WeatherInfoItem(title: "Pressure", value: "\(weather.pressure) hPa")
             }
         }
         .padding()
