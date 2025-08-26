@@ -88,18 +88,17 @@ struct WeatherSearchView: View {
         Button(action: searchWeather) {
             if isSearching {
                 ProgressView()
-                    .scaleEffect(0.8)
+                    .scaleEffect(0.7)
                     .tint(.white)
             } else {
-                Text("Search")
-                    .fontWeight(.medium)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
             }
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .frame(width: 40, height: 40)
         .background(isSearching ? Color.prussianBlueLight : Color.prussianAccent)
-        .cornerRadius(10)
+        .cornerRadius(8)
         .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     
