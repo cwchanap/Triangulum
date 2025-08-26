@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var showEnhancedSnapshotDialog = false
     @State private var currentSnapshot: SensorSnapshot?
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var isEditMode = false
     
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
@@ -78,10 +79,18 @@ struct ContentView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(Color.prussianBlue, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .environment(\.editMode, .constant(isEditMode ? EditMode.active : EditMode.inactive))
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    EditButton()
-                        .foregroundColor(.white)
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isEditMode.toggle()
+                        }
+                    }) {
+                        Image(systemName: isEditMode ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
                     
                     NavigationLink(destination: PreferencesView()) {
                         Image(systemName: "gearshape.fill")
