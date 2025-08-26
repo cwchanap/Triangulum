@@ -41,15 +41,19 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            ScrollView {
-                LazyVStack(spacing: 20) {
-                    ForEach(widgetOrderManager.widgetOrder, id: \.id) { widgetType in
-                        if isWidgetVisible(widgetType) {
-                            widgetView(for: widgetType)
-                        }
+            List {
+                ForEach(widgetOrderManager.widgetOrder, id: \.id) { widgetType in
+                    if isWidgetVisible(widgetType) {
+                        widgetView(for: widgetType)
+                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
-                    .onMove(perform: widgetOrderManager.moveWidget)
-                    
+                }
+                .onMove(perform: widgetOrderManager.moveWidget)
+                
+                // Camera button as a separate section
+                Section {
                     HStack {
                         Spacer()
                         Button(action: takeSnapshot) {
@@ -60,10 +64,14 @@ struct ContentView: View {
                                 .background(Color.prussianBlue)
                                 .clipShape(Circle())
                         }
+                        Spacer()
                     }
+                    .listRowInsets(EdgeInsets(top: 20, leading: 16, bottom: 20, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                 }
-                .padding()
             }
+            .listStyle(PlainListStyle())
             .background(Color.prussianSoft.ignoresSafeArea())
             .navigationTitle("Sensor Monitor")
             .navigationBarTitleDisplayMode(.large)
