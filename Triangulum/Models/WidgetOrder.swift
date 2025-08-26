@@ -14,7 +14,6 @@ enum WidgetType: String, CaseIterable, Identifiable {
     case accelerometer = "accelerometer"
     case gyroscope = "gyroscope"
     case magnetometer = "magnetometer"
-    case map = "map"
     
     var id: String { rawValue }
     
@@ -26,7 +25,6 @@ enum WidgetType: String, CaseIterable, Identifiable {
         case .accelerometer: return "Accelerometer"
         case .gyroscope: return "Gyroscope"
         case .magnetometer: return "Magnetometer"
-        case .map: return "Map"
         }
     }
     
@@ -38,7 +36,6 @@ enum WidgetType: String, CaseIterable, Identifiable {
         case .accelerometer: return "gyroscope"
         case .gyroscope: return "gyroscope"
         case .magnetometer: return "magnet.fill"
-        case .map: return "map.fill"
         }
     }
 }

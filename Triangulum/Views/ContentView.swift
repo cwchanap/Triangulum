@@ -31,7 +31,6 @@ struct ContentView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
-    @AppStorage("showMapWidget") private var showMapWidget = true
 
     init() {
         let lm = LocationManager()
@@ -127,7 +126,6 @@ struct ContentView: View {
         case .accelerometer: return showAccelerometerWidget
         case .gyroscope: return showGyroscopeWidget
         case .magnetometer: return showMagnetometerWidget
-        case .map: return showMapWidget
         }
     }
     
@@ -146,8 +144,6 @@ struct ContentView: View {
             GyroscopeView(gyroscopeManager: gyroscopeManager)
         case .magnetometer:
             MagnetometerView(magnetometerManager: magnetometerManager)
-        case .map:
-            MapView(locationManager: locationManager)
         }
     }
 
