@@ -15,6 +15,12 @@ struct WeatherView: View {
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
                 
+                NavigationLink(destination: WeatherSearchView()) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.title3)
+                        .foregroundColor(.prussianAccent)
+                }
+                
                 Button(action: {
                     print("DEBUG: Manual refresh button pressed")
                     weatherManager.refreshWeather()
