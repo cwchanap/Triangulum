@@ -20,6 +20,7 @@ struct WeatherView: View {
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 Button(action: {
                     print("DEBUG: Manual refresh button pressed")
