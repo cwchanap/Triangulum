@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WeatherView: View {
     @ObservedObject var weatherManager: WeatherManager
+    @State private var showingWeatherSearch = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -15,12 +16,13 @@ struct WeatherView: View {
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
                 
-                NavigationLink(destination: WeatherSearchView()) {
+                Button(action: {
+                    showingWeatherSearch = true
+                }) {
                     Image(systemName: "magnifyingglass")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
                 }
-                .buttonStyle(PlainButtonStyle())
                 
                 Button(action: {
                     print("DEBUG: Manual refresh button pressed")
@@ -226,6 +228,9 @@ struct WeatherView: View {
         )
         .cornerRadius(12)
         .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
+        .sheet(isPresented: $showingWeatherSearch) {
+            WeatherSearchView()
+        }
         .onAppear {
             if weatherManager.currentWeather == nil && weatherManager.isAvailable {
                 weatherManager.fetchWeather()
