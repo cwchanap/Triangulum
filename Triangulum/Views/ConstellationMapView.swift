@@ -5,6 +5,7 @@ struct ConstellationMapView: View {
     @ObservedObject var locationManager: LocationManager
     @State private var now: Date = Date()
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("nightVisionMode") private var nightVisionMode = false
 
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -43,39 +44,43 @@ struct ConstellationMapView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Observer")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
                     Text(String(format: "%.4f, %.4f", locationManager.latitude, locationManager.longitude))
                         .font(.headline)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(nightVisionMode ? Color.red : .prussianBlueDark)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("Time (UTC)")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
                     Text(Self.utcFormatter.string(from: now))
                         .font(.headline)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(nightVisionMode ? Color.red : .prussianBlueDark)
                 }
             }
             .padding(.horizontal)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(0.85))
+            .background((nightVisionMode ? Color.red.opacity(0.08) : Color.white.opacity(0.85)))
         }
     }
 
     private var footer: some View {
         HStack(spacing: 16) {
-            LegendDot(color: .white, label: "Star")
-            LegendLine(color: .white.opacity(0.8), label: "Constellation")
+            LegendDot(color: nightVisionMode ? .red : .white, label: "Star")
+            LegendLine(color: (nightVisionMode ? Color.red : Color.white).opacity(0.8), label: "Constellation")
+            LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
+            LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
             Spacer()
             Text("Up = North  •  Right = East")
                 .font(.caption2)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
+            Toggle("Night Vision", isOn: $nightVisionMode)
+                .labelsHidden()
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(Color.white.opacity(0.85))
+        .background(nightVisionMode ? Color.red.opacity(0.08) : Color.white.opacity(0.85))
     }
 
     // MARK: - Drawing
@@ -91,8 +96,8 @@ struct ConstellationMapView: View {
         // Night-sky gradient fill inside the dome
         context.clip(to: dome)
         let gradient = Gradient(stops: [
-            .init(color: Color(red: 0.02, green: 0.04, blue: 0.10), location: 0.0),
-            .init(color: Color(red: 0.00, green: 0.00, blue: 0.00), location: 1.0)
+            .init(color: nightVisionMode ? Color(red: 0.12, green: 0.02, blue: 0.02) : Color(red: 0.02, green: 0.04, blue: 0.10), location: 0.0),
+            .init(color: Color.black, location: 1.0)
         ])
         context.fill(dome, with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius))
 
@@ -109,15 +114,19 @@ struct ConstellationMapView: View {
         // Milky Way soft band along galactic plane
         drawMilkyWay(context: &context, center: center, radius: radius, observer: observer, nightFactor: nightFactor)
 
+        // Sun and Moon markers
+        drawSunAndMoon(context: &context, center: center, radius: radius, observer: observer)
+
         // Outline after fill so it stays crisp
-        context.stroke(dome, with: .color(Color.white.opacity(0.25)), lineWidth: 1)
+        let fg = nightVisionMode ? Color.red : Color.white
+        context.stroke(dome, with: .color(fg.opacity(0.25)), lineWidth: 1)
 
         // Altitude rings (30°, 60°)
         for alt in stride(from: 30.0, through: 60.0, by: 30.0) {
             let r = radius * (1 - alt / 90.0)
             let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
             let path = Path(ellipseIn: rect)
-            context.stroke(path, with: .color(Color.white.opacity(0.15)), lineWidth: 0.8)
+            context.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
         }
 
         // Cardinal directions
@@ -125,7 +134,7 @@ struct ConstellationMapView: View {
         for (text, az) in labels {
             let theta = az * .pi / 180
             let point = pointOnDome(center: center, radius: radius, azimuthRad: theta, altitudeDeg: 0)
-            var resolved = context.resolve(Text(text).font(.caption).foregroundColor(.white))
+            var resolved = context.resolve(Text(text).font(.caption).foregroundColor(fg))
             context.draw(resolved, at: point, anchor: .center)
         }
 
@@ -142,7 +151,7 @@ struct ConstellationMapView: View {
                     var path = Path()
                     path.move(to: pa)
                     path.addLine(to: pb)
-                    context.stroke(path, with: .color(Color.white.opacity(0.5 * nightFactor)), lineWidth: 0.7)
+                    context.stroke(path, with: .color(fg.opacity(0.5 * nightFactor)), lineWidth: 0.7)
                 }
             }
         }
@@ -152,10 +161,10 @@ struct ConstellationMapView: View {
             if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, returnAlt: false) {
                 let size = max(1.5, 5.2 - 0.8 * star.mag)
                 let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
-                context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(nightFactor)))
+                context.fill(Path(ellipseIn: rect), with: .color(fg.opacity(nightFactor)))
 
                 if star.mag < 1.0 { // label brighter stars
-                    let label = Text(star.name).font(.system(size: 8)).foregroundColor(Color.white.opacity(nightFactor))
+                    let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(nightFactor))
                     context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
                 }
             }
@@ -183,7 +192,8 @@ struct ConstellationMapView: View {
             let s = 0.4 + 1.2 * prand(Double(i) * 5.11 + 0.09) // 0.4 - 1.6 px
 
             let rect = CGRect(x: x - s/2, y: y - s/2, width: s, height: s)
-            context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(alpha)))
+            let starColor = nightVisionMode ? Color.red : Color.white
+            context.fill(Path(ellipseIn: rect), with: .color(starColor.opacity(alpha)))
         }
     }
 
@@ -220,7 +230,40 @@ struct ConstellationMapView: View {
                     started = false
                 }
             }
-            context.stroke(path, with: .color(Color.white.opacity(alpha)), lineWidth: 3)
+            let color = nightVisionMode ? Color.red : Color.white
+            context.stroke(path, with: .color(color.opacity(alpha)), lineWidth: 3)
+        }
+    }
+
+    private func drawSunAndMoon(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer) {
+        let lstHours = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+        // Sun
+        let sunEq = Astronomer.sunEquatorial(date: now)
+        let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
+        if sunAltAz.altDeg > 0 {
+            let az = sunAltAz.azDeg * .pi / 180.0
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: az, altitudeDeg: sunAltAz.altDeg)
+            let s: CGFloat = 8
+            let rect = CGRect(x: p.x - s/2, y: p.y - s/2, width: s, height: s)
+            let color = nightVisionMode ? Color.red : Color.yellow
+            context.fill(Path(ellipseIn: rect), with: .color(color))
+            let label = Text("Sun").font(.system(size: 8)).foregroundColor(color)
+            context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
+        }
+
+        // Moon
+        let moonEq = Astronomer.moonEquatorial(date: now)
+        let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
+        if moonAltAz.altDeg > 0 {
+            let az = moonAltAz.azDeg * .pi / 180.0
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: az, altitudeDeg: moonAltAz.altDeg)
+            let s: CGFloat = 7
+            let rect = CGRect(x: p.x - s/2, y: p.y - s/2, width: s, height: s)
+            let color = nightVisionMode ? Color.red : Color.white
+            context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.2)
+            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.7)))
+            let label = Text("Moon").font(.system(size: 8)).foregroundColor(color)
+            context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
         }
     }
 
@@ -338,6 +381,51 @@ struct ConstellationMapView: View {
             var ra = atan2(ye, xe)
             if ra < 0 { ra += 2 * Double.pi }
             let dec = asin(ze)
+            let raHours = ra * 12.0 / Double.pi
+            let decDeg = dec * 180.0 / Double.pi
+            return Equatorial(raHours: raHours, decDeg: decDeg)
+        }
+
+        static func moonEquatorial(date: Date) -> Equatorial {
+            // Low-order lunar position sufficient for drawing
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+
+            // Mean elements (deg)
+            let Lp = (218.3164477 + 13.17639648 * d).truncatingRemainder(dividingBy: 360)
+            let D  = (297.8501921 + 12.19074912 * d).truncatingRemainder(dividingBy: 360) // elongation Sun-Moon
+            let M  = (357.5291092 + 0.98560028  * d).truncatingRemainder(dividingBy: 360) // Sun anomaly
+            let Mp = (134.9633964 + 13.06499295 * d).truncatingRemainder(dividingBy: 360) // Moon anomaly
+            let F  = (93.2720950  + 13.22935024 * d).truncatingRemainder(dividingBy: 360) // Moon lat argument
+
+            // Ecliptic longitude (deg), major terms
+            var lon = Lp
+            lon += 6.289 * sin(Mp * rad)
+            lon += 1.274 * sin((2*D - Mp) * rad)
+            lon += 0.658 * sin(2*D * rad)
+            lon += 0.214 * sin((2*Mp) * rad)
+            lon += 0.110 * sin(D * rad)
+            lon -= 0.186 * sin(M * rad) // solar equation of center
+
+            // Ecliptic latitude (deg), major terms
+            var lat = 5.128 * sin(F * rad)
+            lat += 0.280 * sin((Mp + F) * rad)
+            lat += 0.277 * sin((Mp - F) * rad)
+            lat += 0.173 * sin((2*D - F) * rad)
+
+            let epsilon = (23.439 - 0.0000004 * d) * rad
+            let lambda = lon * rad
+            let beta = lat * rad
+
+            // Ecliptic -> Equatorial
+            let sinDec = sin(beta) * cos(epsilon) + cos(beta) * sin(epsilon) * sin(lambda)
+            let dec = asin(sinDec)
+            let y = sin(lambda) * cos(epsilon) - tan(beta) * sin(epsilon)
+            let x = cos(lambda)
+            var ra = atan2(y, x)
+            if ra < 0 { ra += 2 * Double.pi }
+
             let raHours = ra * 12.0 / Double.pi
             let decDeg = dec * 180.0 / Double.pi
             return Equatorial(raHours: raHours, decDeg: decDeg)
