@@ -14,8 +14,10 @@ struct ConstellationMapView: View {
         VStack(spacing: 0) {
             header
             GeometryReader { geo in
-                Canvas { context, size in
-                    drawSky(context: &context, size: size)
+                TimelineView(.animation) { timeline in
+                    Canvas { context, size in
+                        drawSky(context: &context, size: size, current: timeline.date)
+                    }
                 }
                 .background(colorScheme == .dark ? Color.black : Color.prussianSoft)
             }
@@ -49,6 +51,18 @@ struct ConstellationMapView: View {
                     Text(String(format: "%.4f, %.4f", locationManager.latitude, locationManager.longitude))
                         .font(.headline)
                         .foregroundColor(nightVisionMode ? Color.red : .prussianBlueDark)
+                    // Moon info row
+                    let sunEq = Astronomer.sunEquatorial(date: now)
+                    let moonEq = Astronomer.moonEquatorial(date: now)
+                    let k = Astronomer.illuminationFraction(sunEq: sunEq, moonEq: moonEq)
+                    let age = Astronomer.moonAgeDays(date: now)
+                    HStack(spacing: 8) {
+                        MoonPhaseGlyph(k: k, redMode: nightVisionMode)
+                            .frame(width: 14, height: 14)
+                        Text(String(format: "Moon: %.1f d · %d%%", age, Int((k*100).rounded())))
+                            .font(.caption2)
+                            .foregroundColor(nightVisionMode ? Color.red.opacity(0.85) : .prussianBlueLight)
+                    }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
@@ -86,7 +100,7 @@ struct ConstellationMapView: View {
 
     // MARK: - Drawing
 
-    private func drawSky(context: inout GraphicsContext, size: CGSize) {
+    private func drawSky(context: inout GraphicsContext, size: CGSize, current: Date) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let radius = min(size.width, size.height) * 0.48
 
@@ -104,19 +118,19 @@ struct ConstellationMapView: View {
 
         // Sun altitude drives day/night visibility
         let observer = Observer(lat: locationManager.latitude, lon: locationManager.longitude)
-        let sunEq = Astronomer.sunEquatorial(date: now)
-        let lstHoursForSun = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+        let sunEq = Astronomer.sunEquatorial(date: current)
+        let lstHoursForSun = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
         let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHoursForSun, latDeg: observer.lat)
         let nightFactor = Self.visibilityFactor(sunAltitudeDeg: sunAltAz.altDeg)
 
         // Procedural faint starfield (twinkling)
-        drawBackgroundStars(context: &context, center: center, radius: radius, nightFactor: nightFactor)
+        drawBackgroundStars(context: &context, center: center, radius: radius, nightFactor: nightFactor, current: current)
 
         // Milky Way soft band along galactic plane
-        drawMilkyWay(context: &context, center: center, radius: radius, observer: observer, nightFactor: nightFactor)
+        drawMilkyWay(context: &context, center: center, radius: radius, observer: observer, nightFactor: nightFactor, current: current)
 
         // Sun and Moon markers
-        drawSunAndMoon(context: &context, center: center, radius: radius, observer: observer)
+        drawSunAndMoon(context: &context, center: center, radius: radius, observer: observer, current: current)
 
         // Outline after fill so it stays crisp
         let fg = nightVisionMode ? Color.red : Color.white
@@ -142,7 +156,7 @@ struct ConstellationMapView: View {
         guard locationManager.isAvailable else { return }
 
         // Compute star positions
-        let lstHours = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+        let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
 
         // Constellation lines first (so stars draw over them)
         for line in ConstellationData.lines {
@@ -172,10 +186,10 @@ struct ConstellationMapView: View {
         }
     }
 
-    private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, nightFactor: Double) {
+    private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, nightFactor: Double, current: Date) {
         // Number scales with area; cap for performance
         let n = min(1000, max(250, Int((radius * radius) / 6)))
-        let t = now.timeIntervalSince1970
+        let t = current.timeIntervalSince1970
         for i in 0..<n {
             let u1 = prand(Double(i) * 12.3 + 1.2345)
             let u2 = prand(Double(i) * 78.9 + 4.321)
@@ -204,9 +218,9 @@ struct ConstellationMapView: View {
     }
 
     // MARK: - Milky Way rendering
-    private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double) {
+    private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double, current: Date) {
         guard nightFactor > 0.02 else { return }
-        let lstHours = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+        let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
 
         // Draw multiple belts at galactic latitude offsets to create a soft band
         let latitudes = [-10.0, -6.0, -3.0, 0.0, 3.0, 6.0, 10.0]
@@ -236,10 +250,10 @@ struct ConstellationMapView: View {
         }
     }
 
-    private func drawSunAndMoon(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer) {
-        let lstHours = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+    private func drawSunAndMoon(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, current: Date) {
+        let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
         // Sun
-        let sunEq = Astronomer.sunEquatorial(date: now)
+        let sunEq = Astronomer.sunEquatorial(date: current)
         let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if sunAltAz.altDeg > 0 {
             let az = sunAltAz.azDeg * .pi / 180.0
@@ -253,7 +267,7 @@ struct ConstellationMapView: View {
         }
 
         // Moon
-        let moonEq = Astronomer.moonEquatorial(date: now)
+        let moonEq = Astronomer.moonEquatorial(date: current)
         let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if moonAltAz.altDeg > 0 {
             let azMoon = moonAltAz.azDeg * .pi / 180.0
@@ -492,6 +506,47 @@ struct ConstellationMapView: View {
             let k = 0.5 * (1.0 + cos(psi)) // illuminated fraction [0,1]
             return k
         }
+
+        static func sunEclipticLongitude(date: Date) -> Double { // degrees 0..360
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let L = (280.460 + 0.9856474 * d).truncatingRemainder(dividingBy: 360)
+            let g = (357.528 + 0.9856003 * d) * Double.pi / 180.0
+            var lambda = L + 1.915 * sin(g) + 0.020 * sin(2 * g)
+            lambda = lambda.truncatingRemainder(dividingBy: 360)
+            if lambda < 0 { lambda += 360 }
+            return lambda
+        }
+
+        static func moonEclipticLongitude(date: Date) -> Double { // degrees 0..360
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let Lp = (218.3164477 + 13.17639648 * d).truncatingRemainder(dividingBy: 360)
+            let D  = (297.8501921 + 12.19074912 * d).truncatingRemainder(dividingBy: 360)
+            let M  = (357.5291092 + 0.98560028  * d).truncatingRemainder(dividingBy: 360)
+            let Mp = (134.9633964 + 13.06499295 * d).truncatingRemainder(dividingBy: 360)
+            var lon = Lp
+            lon += 6.289 * sin(Mp * rad)
+            lon += 1.274 * sin((2*D - Mp) * rad)
+            lon += 0.658 * sin(2*D * rad)
+            lon += 0.214 * sin((2*Mp) * rad)
+            lon += 0.110 * sin(D * rad)
+            lon -= 0.186 * sin(M * rad)
+            lon = lon.truncatingRemainder(dividingBy: 360)
+            if lon < 0 { lon += 360 }
+            return lon
+        }
+
+        static func moonAgeDays(date: Date) -> Double {
+            let sunLon = sunEclipticLongitude(date: date)
+            let moonLon = moonEclipticLongitude(date: date)
+            var diff = moonLon - sunLon
+            diff = diff.truncatingRemainder(dividingBy: 360)
+            if diff < 0 { diff += 360 }
+            let synodic = 29.53058867
+            return (diff / 360.0) * synodic
+        }
     }
 
     enum ConstellationData {
@@ -591,6 +646,37 @@ private struct LegendLine: View {
         }
     }
 }
+
+#if canImport(SwiftUI)
+private struct MoonPhaseGlyph: View {
+    let k: Double // illuminated fraction [0,1]
+    let redMode: Bool
+    var body: some View {
+        Canvas { context, size in
+            let s = min(size.width, size.height)
+            let r = s / 2
+            let rect = CGRect(x: (size.width - s)/2, y: (size.height - s)/2, width: s, height: s)
+            let color = redMode ? Color.red : Color.white
+            // Outline
+            context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: max(0.8, s * 0.08))
+            context.clip(to: Path(ellipseIn: rect))
+            if k >= 0.5 {
+                let d = 2 * r * (1 - k)
+                let shifted = rect.offsetBy(dx: d, dy: 0)
+                context.clip(to: Path(ellipseIn: shifted))
+                context.fill(Path(ellipseIn: rect), with: .color(color))
+            } else {
+                let d = 2 * r * k
+                let shifted = rect.offsetBy(dx: d, dy: 0)
+                var crescent = Path()
+                crescent.addEllipse(in: rect)
+                crescent.addEllipse(in: shifted)
+                context.fill(crescent, with: .color(color), style: FillStyle(eoFill: true))
+            }
+        }
+    }
+}
+#endif
 
 #Preview {
     ConstellationMapView(locationManager: LocationManager())
