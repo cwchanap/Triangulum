@@ -86,7 +86,20 @@ struct ConstellationMapView: View {
 
         // Background dome circle
         let domeRect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
-        var dome = Path(ellipseIn: domeRect)
+        let dome = Path(ellipseIn: domeRect)
+
+        // Night-sky gradient fill inside the dome
+        context.clip(to: dome)
+        let gradient = Gradient(stops: [
+            .init(color: Color(red: 0.02, green: 0.04, blue: 0.10), location: 0.0),
+            .init(color: Color(red: 0.00, green: 0.00, blue: 0.00), location: 1.0)
+        ])
+        context.fill(dome, with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius))
+
+        // Procedural faint starfield (twinkling)
+        drawBackgroundStars(context: &context, center: center, radius: radius)
+
+        // Outline after fill so it stays crisp
         context.stroke(dome, with: .color(Color.white.opacity(0.25)), lineWidth: 1)
 
         // Altitude rings (30°, 60°)
@@ -138,6 +151,36 @@ struct ConstellationMapView: View {
                 }
             }
         }
+    }
+
+    private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat) {
+        // Number scales with area; cap for performance
+        let n = min(1000, max(250, Int((radius * radius) / 6)))
+        let t = now.timeIntervalSince1970
+        for i in 0..<n {
+            let u1 = prand(Double(i) * 12.3 + 1.2345)
+            let u2 = prand(Double(i) * 78.9 + 4.321)
+            // Uniform in disk
+            let r = Double(radius) * sqrt(u1)
+            let ang = 2.0 * Double.pi * u2
+            let x = center.x + CGFloat(r * cos(ang))
+            let y = center.y + CGFloat(r * sin(ang))
+
+            // Base brightness and size
+            let base = 0.08 + 0.20 * prand(Double(i) * 9.73 + 0.17) // 0.08 - 0.28
+            let phase = 2.0 * Double.pi * prand(Double(i) * 3.37 + 0.71)
+            let twinkle = 0.7 + 0.3 * sin(1.4 * t + phase)
+            let alpha = base * twinkle
+            let s = 0.4 + 1.2 * prand(Double(i) * 5.11 + 0.09) // 0.4 - 1.6 px
+
+            let rect = CGRect(x: x - s/2, y: y - s/2, width: s, height: s)
+            context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(alpha)))
+        }
+    }
+
+    private func prand(_ n: Double) -> Double {
+        let s = sin(n) * 43758.5453
+        return s - floor(s)
     }
 
     private func project(star: Star, lstHours: Double, observer: Observer, center: CGPoint, radius: CGFloat, returnAlt: Bool = false) -> CGPoint? {
@@ -309,4 +352,3 @@ private struct LegendLine: View {
 #Preview {
     ConstellationMapView(locationManager: LocationManager())
 }
-
