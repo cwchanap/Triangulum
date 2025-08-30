@@ -92,6 +92,12 @@ struct ContentView: View {
                             .foregroundColor(.white)
                     }
                     
+                    NavigationLink(destination: ConstellationMapView(locationManager: locationManager)) {
+                        Image(systemName: "star.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    
                     NavigationLink(destination: PreferencesView()) {
                         Image(systemName: "gearshape.fill")
                             .font(.title2)
