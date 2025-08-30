@@ -96,8 +96,18 @@ struct ConstellationMapView: View {
         ])
         context.fill(dome, with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius))
 
+        // Sun altitude drives day/night visibility
+        let observer = Observer(lat: locationManager.latitude, lon: locationManager.longitude)
+        let sunEq = Astronomer.sunEquatorial(date: now)
+        let lstHoursForSun = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+        let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHoursForSun, latDeg: observer.lat)
+        let nightFactor = Self.visibilityFactor(sunAltitudeDeg: sunAltAz.altDeg)
+
         // Procedural faint starfield (twinkling)
-        drawBackgroundStars(context: &context, center: center, radius: radius)
+        drawBackgroundStars(context: &context, center: center, radius: radius, nightFactor: nightFactor)
+
+        // Milky Way soft band along galactic plane
+        drawMilkyWay(context: &context, center: center, radius: radius, observer: observer, nightFactor: nightFactor)
 
         // Outline after fill so it stays crisp
         context.stroke(dome, with: .color(Color.white.opacity(0.25)), lineWidth: 1)
@@ -122,7 +132,6 @@ struct ConstellationMapView: View {
         guard locationManager.isAvailable else { return }
 
         // Compute star positions
-        let observer = Observer(lat: locationManager.latitude, lon: locationManager.longitude)
         let lstHours = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
 
         // Constellation lines first (so stars draw over them)
@@ -133,7 +142,7 @@ struct ConstellationMapView: View {
                     var path = Path()
                     path.move(to: pa)
                     path.addLine(to: pb)
-                    context.stroke(path, with: .color(Color.white.opacity(0.5)), lineWidth: 0.7)
+                    context.stroke(path, with: .color(Color.white.opacity(0.5 * nightFactor)), lineWidth: 0.7)
                 }
             }
         }
@@ -143,17 +152,17 @@ struct ConstellationMapView: View {
             if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, returnAlt: false) {
                 let size = max(1.5, 5.2 - 0.8 * star.mag)
                 let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
-                context.fill(Path(ellipseIn: rect), with: .color(.white))
+                context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(nightFactor)))
 
                 if star.mag < 1.0 { // label brighter stars
-                    let label = Text(star.name).font(.system(size: 8)).foregroundColor(.white)
+                    let label = Text(star.name).font(.system(size: 8)).foregroundColor(Color.white.opacity(nightFactor))
                     context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
                 }
             }
         }
     }
 
-    private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat) {
+    private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, nightFactor: Double) {
         // Number scales with area; cap for performance
         let n = min(1000, max(250, Int((radius * radius) / 6)))
         let t = now.timeIntervalSince1970
@@ -170,7 +179,7 @@ struct ConstellationMapView: View {
             let base = 0.08 + 0.20 * prand(Double(i) * 9.73 + 0.17) // 0.08 - 0.28
             let phase = 2.0 * Double.pi * prand(Double(i) * 3.37 + 0.71)
             let twinkle = 0.7 + 0.3 * sin(1.4 * t + phase)
-            let alpha = base * twinkle
+            let alpha = base * twinkle * nightFactor
             let s = 0.4 + 1.2 * prand(Double(i) * 5.11 + 0.09) // 0.4 - 1.6 px
 
             let rect = CGRect(x: x - s/2, y: y - s/2, width: s, height: s)
@@ -181,6 +190,46 @@ struct ConstellationMapView: View {
     private func prand(_ n: Double) -> Double {
         let s = sin(n) * 43758.5453
         return s - floor(s)
+    }
+
+    // MARK: - Milky Way rendering
+    private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double) {
+        guard nightFactor > 0.02 else { return }
+        let lstHours = Astronomer.localSiderealTime(date: now, longitude: observer.lon)
+
+        // Draw multiple belts at galactic latitude offsets to create a soft band
+        let latitudes = [-10.0, -6.0, -3.0, 0.0, 3.0, 6.0, 10.0]
+        let alphas: [Double] = [0.02, 0.035, 0.05, 0.07, 0.05, 0.035, 0.02]
+        for (idx, b) in latitudes.enumerated() {
+            var path = Path()
+            var started = false
+            let alpha = alphas[min(idx, alphas.count-1)] * nightFactor
+            for l in stride(from: 0.0, through: 360.0, by: 3.0) {
+                let eq = Astronomer.galacticToEquatorial(lDeg: l, bDeg: b)
+                let altaz = Astronomer.altAz(eq: Equatorial(raHours: eq.raHours, decDeg: eq.decDeg), lstHours: lstHours, latDeg: observer.lat)
+                if altaz.altDeg > 0 {
+                    let az = altaz.azDeg * .pi / 180.0
+                    let p = pointOnDome(center: center, radius: radius, azimuthRad: az, altitudeDeg: altaz.altDeg)
+                    if !started {
+                        path.move(to: p)
+                        started = true
+                    } else {
+                        path.addLine(to: p)
+                    }
+                } else {
+                    started = false
+                }
+            }
+            context.stroke(path, with: .color(Color.white.opacity(alpha)), lineWidth: 3)
+        }
+    }
+
+    // Day-night transition factor based on Sun altitude (deg)
+    private static func visibilityFactor(sunAltitudeDeg: Double) -> Double {
+        // 0 at 0° (day), 1 at -18° (astronomical night)
+        let t = min(max((-sunAltitudeDeg) / 18.0, 0.0), 1.0)
+        // Smoothstep for gentle transition
+        return t * t * (3 - 2 * t)
     }
 
     private func project(star: Star, lstHours: Double, observer: Observer, center: CGPoint, radius: CGFloat, returnAlt: Bool = false) -> CGPoint? {
@@ -248,6 +297,50 @@ struct ConstellationMapView: View {
             if azRad < 0 { azRad += 2 * Double.pi }
 
             return AltAz(altDeg: altRad * 180.0 / Double.pi, azDeg: azRad * 180.0 / Double.pi)
+        }
+
+        static func sunEquatorial(date: Date) -> Equatorial {
+            // Simplified solar position (sufficient for visibility factor and general orientation)
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let L = (280.460 + 0.9856474 * d).truncatingRemainder(dividingBy: 360)
+            let g = (357.528 + 0.9856003 * d) * Double.pi / 180.0 // rad
+            let lambda = (L + 1.915 * sin(g) + 0.020 * sin(2 * g)) * Double.pi / 180.0 // rad
+            let epsilon = (23.439 - 0.0000004 * d) * Double.pi / 180.0 // rad
+
+            let alpha = atan2(cos(epsilon) * sin(lambda), cos(lambda)) // rad
+            let delta = asin(sin(epsilon) * sin(lambda)) // rad
+
+            var raHours = (alpha >= 0 ? alpha : (alpha + 2 * Double.pi)) * 12.0 / Double.pi
+            if raHours < 0 { raHours += 24 }
+            if raHours >= 24 { raHours -= 24 }
+            let decDeg = delta * 180.0 / Double.pi
+            return Equatorial(raHours: raHours, decDeg: decDeg)
+        }
+
+        static func galacticToEquatorial(lDeg: Double, bDeg: Double) -> Equatorial {
+            // Use J2000 rotation matrix inverse (transpose of EQ->GAL matrix)
+            let l = lDeg * Double.pi / 180.0
+            let b = bDeg * Double.pi / 180.0
+            let xg = cos(b) * cos(l)
+            let yg = cos(b) * sin(l)
+            let zg = sin(b)
+
+            // Transpose of equatorial->galactic matrix (J2000)
+            let r11 = -0.0548755604, r12 = 0.4941094279,  r13 = -0.8676661490
+            let r21 = -0.8734370902, r22 = -0.4448296300, r23 = -0.1980763734
+            let r31 = -0.4838350155, r32 = 0.7469822445,  r33 = 0.4559837762
+
+            let xe = r11 * xg + r12 * yg + r13 * zg
+            let ye = r21 * xg + r22 * yg + r23 * zg
+            let ze = r31 * xg + r32 * yg + r33 * zg
+
+            var ra = atan2(ye, xe)
+            if ra < 0 { ra += 2 * Double.pi }
+            let dec = asin(ze)
+            let raHours = ra * 12.0 / Double.pi
+            let decDeg = dec * 180.0 / Double.pi
+            return Equatorial(raHours: raHours, decDeg: decDeg)
         }
     }
 
