@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import simd
 
 struct ConstellationMapView: View {
     @ObservedObject var locationManager: LocationManager
@@ -255,14 +256,52 @@ struct ConstellationMapView: View {
         let moonEq = Astronomer.moonEquatorial(date: now)
         let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if moonAltAz.altDeg > 0 {
-            let az = moonAltAz.azDeg * .pi / 180.0
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: az, altitudeDeg: moonAltAz.altDeg)
-            let s: CGFloat = 7
-            let rect = CGRect(x: p.x - s/2, y: p.y - s/2, width: s, height: s)
+            let azMoon = moonAltAz.azDeg * .pi / 180.0
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon, altitudeDeg: moonAltAz.altDeg)
+
+            // Phase and orientation
+            let k = Astronomer.illuminationFraction(sunEq: sunEq, moonEq: moonEq)
+            let azSun = sunAltAz.azDeg * .pi / 180.0
+            // Canvas vector for azimuth a is (sin a, -cos a)
+            let vx = sin(azSun)
+            let vy = -cos(azSun)
+            let theta = atan2(vy, vx)
+
+            // Draw moon with crescent/gibbous shading
             let color = nightVisionMode ? Color.red : Color.white
-            context.stroke(Path(ellipseIn: rect), with: .color(color), lineWidth: 1.2)
-            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.7)))
-            let label = Text("Moon").font(.system(size: 8)).foregroundColor(color)
+            let s: CGFloat = 10
+            let r = s / 2
+            let baseRect = CGRect(x: -r, y: -r, width: s, height: s)
+
+            context.drawLayer { layer in
+                layer.translateBy(x: p.x, y: p.y)
+                layer.rotate(by: Angle(radians: theta))
+
+                // Base: dark outline to enhance legibility
+                layer.stroke(Path(ellipseIn: baseRect), with: .color(color), lineWidth: 1)
+
+                if k >= 0.5 {
+                    // Bright gibbous/full: intersection of two discs
+                    let d = 2 * r * (1 - k)
+                    let shifted = baseRect.offsetBy(dx: d, dy: 0)
+                    layer.clip(to: Path(ellipseIn: baseRect))
+                    layer.clip(to: Path(ellipseIn: shifted)) // intersection
+                    layer.fill(Path(ellipseIn: baseRect), with: .color(color))
+                } else {
+                    // Bright crescent: base minus shifted disc (within base)
+                    let d = 2 * r * k
+                    let shifted = baseRect.offsetBy(dx: d, dy: 0)
+                    layer.clip(to: Path(ellipseIn: baseRect))
+                    var crescent = Path()
+                    crescent.addEllipse(in: baseRect)
+                    crescent.addEllipse(in: shifted)
+                    layer.fill(crescent, with: .color(color), style: FillStyle(eoFill: true))
+                }
+            }
+
+            // Label with illumination percent
+            let percent = Int((k * 100).rounded())
+            let label = Text("Moon \(percent)%").font(.system(size: 8)).foregroundColor(color)
             context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
         }
     }
@@ -429,6 +468,29 @@ struct ConstellationMapView: View {
             let raHours = ra * 12.0 / Double.pi
             let decDeg = dec * 180.0 / Double.pi
             return Equatorial(raHours: raHours, decDeg: decDeg)
+        }
+
+        static func illuminationFraction(sunEq: Equatorial, moonEq: Equatorial) -> Double {
+            // Convert to unit vectors in equatorial frame
+            let raS = sunEq.raHours / 24.0 * 2 * Double.pi
+            let decS = sunEq.decDeg * Double.pi / 180.0
+            let raM = moonEq.raHours / 24.0 * 2 * Double.pi
+            let decM = moonEq.decDeg * Double.pi / 180.0
+
+            let s = SIMD3(
+                cos(decS) * cos(raS),
+                cos(decS) * sin(raS),
+                sin(decS)
+            )
+            let m = SIMD3(
+                cos(decM) * cos(raM),
+                cos(decM) * sin(raM),
+                sin(decM)
+            )
+            let dot = max(-1.0, min(1.0, Double(simd_dot(s, m))))
+            let psi = acos(dot) // elongation
+            let k = 0.5 * (1.0 + cos(psi)) // illuminated fraction [0,1]
+            return k
         }
     }
 
