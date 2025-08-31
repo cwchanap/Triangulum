@@ -7,6 +7,9 @@ struct ConstellationMapView: View {
     @State private var now: Date = Date()
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("nightVisionMode") private var nightVisionMode = false
+    @AppStorage("skyShowStarLabels") private var skyShowStarLabels = true
+    @AppStorage("skyShowConstellationLabels") private var skyShowConstellationLabels = true
+    @AppStorage("skyCatalog") private var skyCatalog = "bright" // bright | extended
 
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -90,8 +93,19 @@ struct ConstellationMapView: View {
             Text("Up = North  •  Right = East")
                 .font(.caption2)
                 .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
-            Toggle("Night Vision", isOn: $nightVisionMode)
-                .labelsHidden()
+            Menu {
+                Toggle("Night Vision", isOn: $nightVisionMode)
+                Toggle("Star Labels", isOn: $skyShowStarLabels)
+                Toggle("Constellation Labels", isOn: $skyShowConstellationLabels)
+                Picker("Catalog", selection: $skyCatalog) {
+                    Text("Bright").tag("bright")
+                    Text("Extended").tag("extended")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundColor(nightVisionMode ? .red : .white)
+                    .font(.title3)
+            }
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -144,11 +158,12 @@ struct ConstellationMapView: View {
             context.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
         }
 
-        // Cardinal directions
+        // Cardinal directions (rotated by heading)
         let labels = [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]
+        let headingRad = locationManager.heading * .pi / 180.0
         for (text, az) in labels {
             let theta = az * .pi / 180
-            let point = pointOnDome(center: center, radius: radius, azimuthRad: theta, altitudeDeg: 0)
+            let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad, altitudeDeg: 0)
             var resolved = context.resolve(Text(text).font(.caption).foregroundColor(fg))
             context.draw(resolved, at: point, anchor: .center)
         }
@@ -157,12 +172,13 @@ struct ConstellationMapView: View {
 
         // Compute star positions
         let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
+        let headingRad = locationManager.heading * .pi / 180.0
 
         // Constellation lines first (so stars draw over them)
         for line in ConstellationData.lines {
             if let a = ConstellationData.star(named: line.0), let b = ConstellationData.star(named: line.1) {
-                if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius),
-                   let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius) {
+                if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad),
+                   let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
                     var path = Path()
                     path.move(to: pa)
                     path.addLine(to: pb)
@@ -172,17 +188,22 @@ struct ConstellationMapView: View {
         }
 
         // Draw stars
-        for star in ConstellationData.stars {
-            if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, returnAlt: false) {
+        let starsToUse: [Star] = skyCatalog == "extended" ? ConstellationData.starsExtended : ConstellationData.stars
+        for star in starsToUse {
+            if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
                 let size = max(1.5, 5.2 - 0.8 * star.mag)
                 let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
                 context.fill(Path(ellipseIn: rect), with: .color(fg.opacity(nightFactor)))
 
-                if star.mag < 1.0 { // label brighter stars
+                if skyShowStarLabels && star.mag < 1.0 { // label brighter stars
                     let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(nightFactor))
                     context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
                 }
             }
+        }
+
+        if skyShowConstellationLabels {
+            drawConstellationLabels(context: &context, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, fg: fg.opacity(nightFactor))
         }
     }
 
@@ -250,6 +271,34 @@ struct ConstellationMapView: View {
         }
     }
 
+    private func drawConstellationLabels(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, lstHours: Double, observer: Observer, headingRad: Double, fg: Color) {
+        // Define label groups
+        let orion = ["Betelgeuse","Bellatrix","Rigel","Saiph","Alnilam","Alnitak","Mintaka"]
+        let dipper = ["Dubhe","Merak","Phecda","Megrez","Alioth","Mizar","Alkaid"]
+        func centroid(for names: [String]) -> CGPoint? {
+            var pts: [CGPoint] = []
+            for n in names {
+                if let s = ConstellationData.star(named: n) {
+                    if let p = project(star: s, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
+                        pts.append(p)
+                    }
+                }
+            }
+            guard !pts.isEmpty else { return nil }
+            let sx = pts.reduce(0) { $0 + $1.x }
+            let sy = pts.reduce(0) { $0 + $1.y }
+            return CGPoint(x: sx / CGFloat(pts.count), y: sy / CGFloat(pts.count))
+        }
+        if let c = centroid(for: orion) {
+            let label = Text("Orion").font(.system(size: 10, weight: .semibold)).foregroundColor(fg)
+            context.draw(context.resolve(label), at: c, anchor: .center)
+        }
+        if let c = centroid(for: dipper) {
+            let label = Text("Ursa Major").font(.system(size: 10, weight: .semibold)).foregroundColor(fg)
+            context.draw(context.resolve(label), at: c, anchor: .center)
+        }
+    }
+
     private func drawSunAndMoon(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, current: Date) {
         let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
         // Sun
@@ -257,7 +306,8 @@ struct ConstellationMapView: View {
         let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if sunAltAz.altDeg > 0 {
             let az = sunAltAz.azDeg * .pi / 180.0
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: az, altitudeDeg: sunAltAz.altDeg)
+            let headingRad = locationManager.heading * .pi / 180.0
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: az - headingRad, altitudeDeg: sunAltAz.altDeg)
             let s: CGFloat = 8
             let rect = CGRect(x: p.x - s/2, y: p.y - s/2, width: s, height: s)
             let color = nightVisionMode ? Color.red : Color.yellow
@@ -271,7 +321,8 @@ struct ConstellationMapView: View {
         let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if moonAltAz.altDeg > 0 {
             let azMoon = moonAltAz.azDeg * .pi / 180.0
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon, altitudeDeg: moonAltAz.altDeg)
+            let headingRad = locationManager.heading * .pi / 180.0
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon - headingRad, altitudeDeg: moonAltAz.altDeg)
 
             // Phase and orientation
             let k = Astronomer.illuminationFraction(sunEq: sunEq, moonEq: moonEq)
@@ -328,12 +379,12 @@ struct ConstellationMapView: View {
         return t * t * (3 - 2 * t)
     }
 
-    private func project(star: Star, lstHours: Double, observer: Observer, center: CGPoint, radius: CGFloat, returnAlt: Bool = false) -> CGPoint? {
+    private func project(star: Star, lstHours: Double, observer: Observer, center: CGPoint, radius: CGFloat, headingRad: Double) -> CGPoint? {
         let eq = Equatorial(raHours: star.raHours, decDeg: star.decDeg)
         let altaz = Astronomer.altAz(eq: eq, lstHours: lstHours, latDeg: observer.lat)
         guard altaz.altDeg > 0 else { return nil } // only plot above horizon
         let azRad = altaz.azDeg * .pi / 180
-        let pt = pointOnDome(center: center, radius: radius, azimuthRad: azRad, altitudeDeg: altaz.altDeg)
+        let pt = pointOnDome(center: center, radius: radius, azimuthRad: azRad - headingRad, altitudeDeg: altaz.altDeg)
         return pt
     }
 
@@ -590,6 +641,26 @@ struct ConstellationMapView: View {
             Star(name: "Mizar", raHours: 13.3988, decDeg: 54.9254, mag: 2.27),
             Star(name: "Alkaid", raHours: 13.7923, decDeg: 49.3133, mag: 1.85)
         ]
+
+        static let moreStars: [Star] = [
+            Star(name: "Sadr", raHours: 20.3705, decDeg: 40.2567, mag: 2.23),
+            Star(name: "Kochab", raHours: 14.8451, decDeg: 74.1555, mag: 2.08),
+            Star(name: "Schedar", raHours: 0.6751, decDeg: 56.5373, mag: 2.24),
+            Star(name: "Caph", raHours: 0.1529, decDeg: 59.1498, mag: 2.27),
+            Star(name: "Alpheratz", raHours: 0.1398, decDeg: 29.0904, mag: 2.06),
+            Star(name: "Mirfak", raHours: 3.4054, decDeg: 49.8612, mag: 1.79),
+            Star(name: "Algol", raHours: 3.1361, decDeg: 40.9556, mag: 2.1),
+            Star(name: "Denebola", raHours: 11.8177, decDeg: 14.5719, mag: 2.14),
+            Star(name: "Markab", raHours: 23.0794, decDeg: 15.2053, mag: 2.49),
+            Star(name: "Enif", raHours: 21.7364, decDeg: 9.875, mag: 2.38),
+            Star(name: "Rasalhague", raHours: 17.5822, decDeg: 12.5606, mag: 2.08),
+            Star(name: "Atria", raHours: 16.8111, decDeg: -69.0278, mag: 1.91),
+            Star(name: "Peacock", raHours: 20.4275, decDeg: -56.735, mag: 1.94),
+            Star(name: "Alhena", raHours: 6.6285, decDeg: 16.3993, mag: 1.93),
+            Star(name: "Bellatrix", raHours: 5.4189, decDeg: 6.3497, mag: 1.64)
+        ]
+
+        static let starsExtended: [Star] = stars + moreStars
 
         // Simple line segments for Orion and Big Dipper
         static let lines: [(String, String)] = [

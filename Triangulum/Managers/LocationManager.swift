@@ -9,6 +9,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var altitude: Double = 0.0
     @Published var accuracy: Double = 0.0
     @Published var isAvailable: Bool = false
+    @Published var heading: Double = 0.0
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var errorMessage: String = ""
     
@@ -96,6 +97,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         switch currentStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()
+            if CLLocationManager.headingAvailable() {
+                locationManager.startUpdatingHeading()
+            }
             errorMessage = ""
         case .notDetermined:
             requestLocationPermission()
@@ -108,6 +112,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func stopLocationUpdates() {
         locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
     }
     
     // MARK: - CLLocationManagerDelegate
@@ -142,5 +147,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         @unknown default:
             break
         }
+    }
+
+    // Heading updates
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        // Use trueHeading if valid, else magneticHeading
+        let h = newHeading.trueHeading > 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        heading = h
+    }
+
+    func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
+        // Allow system to show calibration when needed
+        return true
     }
 }
