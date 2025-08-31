@@ -10,6 +10,11 @@ struct ConstellationMapView: View {
     @AppStorage("skyShowStarLabels") private var skyShowStarLabels = true
     @AppStorage("skyShowConstellationLabels") private var skyShowConstellationLabels = true
     @AppStorage("skyCatalog") private var skyCatalog = "bright" // bright | extended
+    @State private var zoom: CGFloat = 1.0
+    @GestureState private var pinch: CGFloat = 1.0
+
+    private let minZoom: CGFloat = 0.6
+    private let maxZoom: CGFloat = 3.0
 
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -18,9 +23,22 @@ struct ConstellationMapView: View {
             header
             GeometryReader { geo in
                 TimelineView(.animation) { timeline in
+                    let currentZoom = max(min(zoom * pinch, maxZoom), minZoom)
+                    let magnify = MagnificationGesture()
+                        .updating($pinch) { value, state, _ in
+                            state = value
+                        }
+                        .onEnded { value in
+                            zoom = clampZoom(zoom * value)
+                        }
+                    let doubleTap = TapGesture(count: 2)
+                        .onEnded { withAnimation(.easeInOut) { zoom = 1.0 } }
+
                     Canvas { context, size in
-                        drawSky(context: &context, size: size, current: timeline.date)
+                        drawSky(context: &context, size: size, current: timeline.date, zoom: currentZoom)
                     }
+                    .gesture(magnify)
+                    .gesture(doubleTap)
                 }
                 .background(colorScheme == .dark ? Color.black : Color.prussianSoft)
             }
@@ -90,6 +108,31 @@ struct ConstellationMapView: View {
             LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
             LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
             Spacer()
+            // Zoom controls
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut) { zoom = clampZoom(zoom / 1.15) }
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .foregroundColor(nightVisionMode ? .red : .white)
+                }
+                Text("\(Int((zoom * 100).rounded()))%")
+                    .font(.caption2)
+                    .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
+                    .frame(minWidth: 36)
+                Button {
+                    withAnimation(.easeInOut) { zoom = clampZoom(zoom * 1.15) }
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .foregroundColor(nightVisionMode ? .red : .white)
+                }
+                Button {
+                    withAnimation(.easeInOut) { zoom = 1.0 }
+                } label: {
+                    Image(systemName: "arrow.counterclockwise.circle")
+                        .foregroundColor(nightVisionMode ? .red : .white)
+                }
+            }
             Text("Up = North  •  Right = East")
                 .font(.caption2)
                 .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
@@ -114,7 +157,7 @@ struct ConstellationMapView: View {
 
     // MARK: - Drawing
 
-    private func drawSky(context: inout GraphicsContext, size: CGSize, current: Date) {
+    private func drawSky(context: inout GraphicsContext, size: CGSize, current: Date, zoom: CGFloat) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let radius = min(size.width, size.height) * 0.48
 
@@ -122,88 +165,96 @@ struct ConstellationMapView: View {
         let domeRect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
         let dome = Path(ellipseIn: domeRect)
 
-        // Night-sky gradient fill inside the dome
+        // Clip to dome then draw all content in a scaled layer around center
         context.clip(to: dome)
-        let gradient = Gradient(stops: [
-            .init(color: nightVisionMode ? Color(red: 0.12, green: 0.02, blue: 0.02) : Color(red: 0.02, green: 0.04, blue: 0.10), location: 0.0),
-            .init(color: Color.black, location: 1.0)
-        ])
-        context.fill(dome, with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius))
+        context.drawLayer { layer in
+            layer.translateBy(x: center.x, y: center.y)
+            layer.scaleBy(x: zoom, y: zoom)
+            layer.translateBy(x: -center.x, y: -center.y)
 
-        // Sun altitude drives day/night visibility
-        let observer = Observer(lat: locationManager.latitude, lon: locationManager.longitude)
-        let sunEq = Astronomer.sunEquatorial(date: current)
-        let lstHoursForSun = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
-        let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHoursForSun, latDeg: observer.lat)
-        let nightFactor = Self.visibilityFactor(sunAltitudeDeg: sunAltAz.altDeg)
+            // Night-sky gradient fill inside the dome
+            let gradient = Gradient(stops: [
+                .init(color: nightVisionMode ? Color(red: 0.12, green: 0.02, blue: 0.02) : Color(red: 0.02, green: 0.04, blue: 0.10), location: 0.0),
+                .init(color: Color.black, location: 1.0)
+            ])
+            layer.fill(dome, with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius))
 
-        // Procedural faint starfield (twinkling)
-        drawBackgroundStars(context: &context, center: center, radius: radius, nightFactor: nightFactor, current: current)
+            // Sun altitude drives day/night visibility
+            let observer = Observer(lat: locationManager.latitude, lon: locationManager.longitude)
+            let sunEq = Astronomer.sunEquatorial(date: current)
+            let lstHoursForSun = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
+            let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHoursForSun, latDeg: observer.lat)
+            let nightFactor = Self.visibilityFactor(sunAltitudeDeg: sunAltAz.altDeg)
 
-        // Milky Way soft band along galactic plane
-        drawMilkyWay(context: &context, center: center, radius: radius, observer: observer, nightFactor: nightFactor, current: current)
+            // Procedural faint starfield (twinkling)
+            drawBackgroundStars(context: &layer, center: center, radius: radius, nightFactor: nightFactor, current: current)
 
-        // Sun and Moon markers
-        drawSunAndMoon(context: &context, center: center, radius: radius, observer: observer, current: current)
+            // Milky Way soft band along galactic plane
+            drawMilkyWay(context: &layer, center: center, radius: radius, observer: observer, nightFactor: nightFactor, current: current)
+
+            // Sun and Moon markers
+            drawSunAndMoon(context: &layer, center: center, radius: radius, observer: observer, current: current)
+
+            // Altitude rings (30°, 60°)
+            let fg = nightVisionMode ? Color.red : Color.white
+            for alt in stride(from: 30.0, through: 60.0, by: 30.0) {
+                let r = radius * (1 - alt / 90.0)
+                let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+                let path = Path(ellipseIn: rect)
+                layer.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
+            }
+
+            // Cardinal directions (rotated by heading)
+            let labels = [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]
+            let headingRad = locationManager.heading * .pi / 180.0
+            for (text, az) in labels {
+                let theta = az * .pi / 180
+                let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad, altitudeDeg: 0)
+                var resolved = layer.resolve(Text(text).font(.caption).foregroundColor(fg))
+                layer.draw(resolved, at: point, anchor: .center)
+            }
+
+            guard locationManager.isAvailable else { return }
+
+            // Compute star positions
+            let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
+            // Constellation lines first (so stars draw over them)
+            for line in ConstellationData.lines {
+                if let a = ConstellationData.star(named: line.0), let b = ConstellationData.star(named: line.1) {
+                    if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad),
+                       let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
+                        var path = Path()
+                        path.move(to: pa)
+                        path.addLine(to: pb)
+                        layer.stroke(path, with: .color(fg.opacity(0.5 * nightFactor)), lineWidth: 0.7)
+                    }
+                }
+            }
+
+            // Draw stars
+            let starsToUse: [Star] = skyCatalog == "extended" ? ConstellationData.starsExtended : ConstellationData.stars
+            for star in starsToUse {
+                if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
+                    let size = max(1.5, 5.2 - 0.8 * star.mag)
+                    let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
+                    layer.fill(Path(ellipseIn: rect), with: .color(fg.opacity(nightFactor)))
+
+                    if skyShowStarLabels && star.mag < 1.0 { // label brighter stars
+                        let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(nightFactor))
+                        layer.draw(layer.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
+                    }
+                }
+            }
+
+            if skyShowConstellationLabels {
+                drawConstellationLabels(context: &layer, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, fg: fg.opacity(nightFactor))
+            }
+        }
 
         // Outline after fill so it stays crisp
         let fg = nightVisionMode ? Color.red : Color.white
         context.stroke(dome, with: .color(fg.opacity(0.25)), lineWidth: 1)
 
-        // Altitude rings (30°, 60°)
-        for alt in stride(from: 30.0, through: 60.0, by: 30.0) {
-            let r = radius * (1 - alt / 90.0)
-            let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
-            let path = Path(ellipseIn: rect)
-            context.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
-        }
-
-        // Cardinal directions (rotated by heading)
-        let labels = [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]
-        let headingRad = locationManager.heading * .pi / 180.0
-        for (text, az) in labels {
-            let theta = az * .pi / 180
-            let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad, altitudeDeg: 0)
-            var resolved = context.resolve(Text(text).font(.caption).foregroundColor(fg))
-            context.draw(resolved, at: point, anchor: .center)
-        }
-
-        guard locationManager.isAvailable else { return }
-
-        // Compute star positions
-        let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
-
-        // Constellation lines first (so stars draw over them)
-        for line in ConstellationData.lines {
-            if let a = ConstellationData.star(named: line.0), let b = ConstellationData.star(named: line.1) {
-                if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad),
-                   let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
-                    var path = Path()
-                    path.move(to: pa)
-                    path.addLine(to: pb)
-                    context.stroke(path, with: .color(fg.opacity(0.5 * nightFactor)), lineWidth: 0.7)
-                }
-            }
-        }
-
-        // Draw stars
-        let starsToUse: [Star] = skyCatalog == "extended" ? ConstellationData.starsExtended : ConstellationData.stars
-        for star in starsToUse {
-            if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
-                let size = max(1.5, 5.2 - 0.8 * star.mag)
-                let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
-                context.fill(Path(ellipseIn: rect), with: .color(fg.opacity(nightFactor)))
-
-                if skyShowStarLabels && star.mag < 1.0 { // label brighter stars
-                    let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(nightFactor))
-                    context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
-                }
-            }
-        }
-
-        if skyShowConstellationLabels {
-            drawConstellationLabels(context: &context, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, fg: fg.opacity(nightFactor))
-        }
     }
 
     private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, nightFactor: Double, current: Date) {
@@ -236,6 +287,8 @@ struct ConstellationMapView: View {
         let s = sin(n) * 43758.5453
         return s - floor(s)
     }
+
+    private func clampZoom(_ z: CGFloat) -> CGFloat { max(minZoom, min(maxZoom, z)) }
 
     // MARK: - Milky Way rendering
     private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double, current: Date) {
