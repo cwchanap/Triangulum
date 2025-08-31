@@ -12,6 +12,8 @@ struct ConstellationMapView: View {
     @AppStorage("skyCatalog") private var skyCatalog = "bright" // bright | extended
     @State private var zoom: CGFloat = 1.0
     @GestureState private var pinch: CGFloat = 1.0
+    @State private var pan: CGSize = .zero
+    @GestureState private var drag: CGSize = .zero
 
     private let minZoom: CGFloat = 0.6
     private let maxZoom: CGFloat = 3.0
@@ -24,6 +26,7 @@ struct ConstellationMapView: View {
             GeometryReader { geo in
                 TimelineView(.animation) { timeline in
                     let currentZoom = max(min(zoom * pinch, maxZoom), minZoom)
+                    let currentPan = CGSize(width: pan.width + drag.width, height: pan.height + drag.height)
                     let magnify = MagnificationGesture()
                         .updating($pinch) { value, state, _ in
                             state = value
@@ -31,13 +34,22 @@ struct ConstellationMapView: View {
                         .onEnded { value in
                             zoom = clampZoom(zoom * value)
                         }
+                    let panGesture = DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                        .updating($drag) { value, state, _ in
+                            state = value.translation
+                        }
+                        .onEnded { value in
+                            pan.width += value.translation.width
+                            pan.height += value.translation.height
+                        }
                     let doubleTap = TapGesture(count: 2)
-                        .onEnded { withAnimation(.easeInOut) { zoom = 1.0 } }
+                        .onEnded { withAnimation(.easeInOut) { zoom = 1.0; pan = .zero } }
 
                     Canvas { context, size in
-                        drawSky(context: &context, size: size, current: timeline.date, zoom: currentZoom)
+                        drawSky(context: &context, size: size, current: timeline.date, zoom: currentZoom, pan: currentPan)
                     }
                     .gesture(magnify)
+                    .simultaneousGesture(panGesture)
                     .gesture(doubleTap)
                 }
                 .background(colorScheme == .dark ? Color.black : Color.prussianSoft)
@@ -127,7 +139,7 @@ struct ConstellationMapView: View {
                         .foregroundColor(nightVisionMode ? .red : .white)
                 }
                 Button {
-                    withAnimation(.easeInOut) { zoom = 1.0 }
+                    withAnimation(.easeInOut) { zoom = 1.0; pan = .zero }
                 } label: {
                     Image(systemName: "arrow.counterclockwise.circle")
                         .foregroundColor(nightVisionMode ? .red : .white)
@@ -157,7 +169,7 @@ struct ConstellationMapView: View {
 
     // MARK: - Drawing
 
-    private func drawSky(context: inout GraphicsContext, size: CGSize, current: Date, zoom: CGFloat) {
+    private func drawSky(context: inout GraphicsContext, size: CGSize, current: Date, zoom: CGFloat, pan: CGSize) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let radius = min(size.width, size.height) * 0.48
 
@@ -170,6 +182,8 @@ struct ConstellationMapView: View {
         context.drawLayer { layer in
             layer.translateBy(x: center.x, y: center.y)
             layer.scaleBy(x: zoom, y: zoom)
+            // translate by pan after scaling, divide to keep finger mapping consistent
+            layer.translateBy(x: pan.width / zoom, y: pan.height / zoom)
             layer.translateBy(x: -center.x, y: -center.y)
 
             // Night-sky gradient fill inside the dome
