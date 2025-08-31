@@ -172,7 +172,6 @@ struct ConstellationMapView: View {
 
         // Compute star positions
         let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
-        let headingRad = locationManager.heading * .pi / 180.0
 
         // Constellation lines first (so stars draw over them)
         for line in ConstellationData.lines {
