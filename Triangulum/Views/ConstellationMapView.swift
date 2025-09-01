@@ -144,31 +144,25 @@ struct ConstellationMapView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 16) {
-            LegendDot(color: nightVisionMode ? .red : .white, label: "Star")
-            LegendLine(color: (nightVisionMode ? Color.red : Color.white).opacity(0.8), label: "Constellation")
-            LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
-            LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
-            Spacer()
-            // Zoom controls
-            HStack(spacing: 12) {
-                Button {
-                    withAnimation(.easeInOut) { zoom = clampZoom(zoom / 1.15) }
-                } label: {
-                    Image(systemName: "minus.circle")
-                        .foregroundColor(nightVisionMode ? .red : .white)
+        HStack(spacing: 14) {
+            // Only show legend on wider screens to avoid line breaks
+            if horizontalSizeClass == .regular {
+                LegendDot(color: nightVisionMode ? .red : .white, label: "Star")
+                LegendLine(color: (nightVisionMode ? Color.red : Color.white).opacity(0.8), label: "Constellation")
+                LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
+                LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
+            }
+            Spacer(minLength: 8)
+            // Compact zoom controls (icon-only)
+            HStack(spacing: 14) {
+                Button { withAnimation(.easeInOut) { zoom = clampZoom(zoom / 1.15) } } label: {
+                    Image(systemName: "minus.circle").foregroundColor(nightVisionMode ? .red : .white)
                 }
-                Button {
-                    withAnimation(.easeInOut) { zoom = clampZoom(zoom * 1.15) }
-                } label: {
-                    Image(systemName: "plus.circle")
-                        .foregroundColor(nightVisionMode ? .red : .white)
+                Button { withAnimation(.easeInOut) { zoom = clampZoom(zoom * 1.15) } } label: {
+                    Image(systemName: "plus.circle").foregroundColor(nightVisionMode ? .red : .white)
                 }
-                Button {
-                    withAnimation(.easeInOut) { zoom = 1.0; pan = .zero }
-                } label: {
-                    Image(systemName: "arrow.counterclockwise.circle")
-                        .foregroundColor(nightVisionMode ? .red : .white)
+                Button { withAnimation(.easeInOut) { zoom = 1.0; pan = .zero } } label: {
+                    Image(systemName: "arrow.counterclockwise.circle").foregroundColor(nightVisionMode ? .red : .white)
                 }
             }
             Menu {
@@ -189,7 +183,7 @@ struct ConstellationMapView: View {
                     .contentShape(Rectangle())
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(nightVisionMode ? Color.red.opacity(0.08) : Color.white.opacity(0.85))
     }
