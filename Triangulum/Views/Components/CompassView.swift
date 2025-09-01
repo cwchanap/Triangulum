@@ -3,17 +3,20 @@ import SwiftUI
 public struct CompassView: View {
     public let heading: Double // degrees 0..360, 0=N
     public var redMode: Bool = false
+    public var tint: Color? = nil // overrides default ink in non-red mode
 
-    public init(heading: Double, redMode: Bool = false) {
+    public init(heading: Double, redMode: Bool = false, tint: Color? = nil) {
         self.heading = heading
         self.redMode = redMode
+        self.tint = tint
     }
 
     public var body: some View {
         Canvas { context, size in
             let center = CGPoint(x: size.width/2, y: size.height/2)
             let r = min(size.width, size.height) * 0.48
-            let ringColor = (redMode ? Color.red : Color.white).opacity(0.7)
+            let ink = redMode ? Color.red : (tint ?? Color.white)
+            let ringColor = ink.opacity(0.7)
 
             // Outer ring
             let ring = Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r*2, height: r*2))
@@ -31,7 +34,7 @@ public struct CompassView: View {
             }
 
             // Cardinal labels fixed to view; needle rotates instead
-            let labelColor = (redMode ? Color.red : Color.white)
+            let labelColor = ink
             let labels: [(String, Double)] = [("N",0),("E",90),("S",180),("W",270)]
             for (txt, deg) in labels {
                 let ang = deg * .pi / 180
@@ -64,4 +67,3 @@ public struct CompassView: View {
         .padding(2)
     }
 }
-

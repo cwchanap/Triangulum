@@ -144,8 +144,8 @@ struct ConstellationMapView: View {
             LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
             LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
             Spacer()
-            // Compass
-            CompassView(heading: locationManager.heading, redMode: nightVisionMode)
+            // Compass (use dark ink on light footer)
+            CompassView(heading: locationManager.heading, redMode: nightVisionMode, tint: nightVisionMode ? .red : .prussianBlueDark)
                 .frame(width: 44, height: 44)
             // Zoom controls
             HStack(spacing: 8) {
@@ -189,6 +189,8 @@ struct ConstellationMapView: View {
                 Image(systemName: "ellipsis.circle")
                     .foregroundColor(nightVisionMode ? .red : .white)
                     .font(.title3)
+                    .padding(8)
+                    .contentShape(Rectangle())
             }
         }
         .padding(.horizontal)

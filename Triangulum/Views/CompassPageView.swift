@@ -11,7 +11,7 @@ struct CompassPageView: View {
             (nightVisionMode ? Color.black : Color.prussianSoft).ignoresSafeArea()
             VStack(spacing: 24) {
                 Spacer()
-                CompassView(heading: locationManager.heading, redMode: nightVisionMode)
+                CompassView(heading: locationManager.heading, redMode: nightVisionMode, tint: nightVisionMode ? .red : .prussianBlueDark)
                     .frame(width: 260, height: 260)
                 Text("\(Int(locationManager.heading.rounded()))°")
                     .font(.system(size: 28, weight: .bold))
