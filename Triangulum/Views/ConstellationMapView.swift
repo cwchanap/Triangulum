@@ -20,7 +20,7 @@ struct ConstellationMapView: View {
     @State private var largeCompassOffset: CGSize = .zero
     @GestureState private var largeCompassDrag: CGSize = .zero
 
-    private let minZoom: CGFloat = 0.6
+    private let minZoom: CGFloat = 1.0
     private let maxZoom: CGFloat = 3.0
 
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -221,12 +221,13 @@ struct ConstellationMapView: View {
             let lstHoursForSun = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
             let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHoursForSun, latDeg: observer.lat)
             let nightFactor = Self.visibilityFactor(sunAltitudeDeg: sunAltAz.altDeg)
+            let effectiveNight = max(nightFactor, 0.35) // ensure visibility even in daytime
 
             // Procedural faint starfield (twinkling)
-            drawBackgroundStars(context: &layer, center: center, radius: radius, nightFactor: nightFactor, current: current)
+            drawBackgroundStars(context: &layer, center: center, radius: radius, nightFactor: effectiveNight, current: current)
 
             // Milky Way soft band along galactic plane
-            drawMilkyWay(context: &layer, center: center, radius: radius, observer: observer, nightFactor: nightFactor, current: current)
+            drawMilkyWay(context: &layer, center: center, radius: radius, observer: observer, nightFactor: effectiveNight, current: current)
 
             // Sun and Moon markers
             drawSunAndMoon(context: &layer, center: center, radius: radius, observer: observer, current: current)
@@ -250,7 +251,7 @@ struct ConstellationMapView: View {
                 layer.draw(resolved, at: point, anchor: .center)
             }
 
-            guard locationManager.isAvailable else { return }
+            // Even if location isn't available, draw stars using default lat/lon
 
             // Compute star positions
             let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
@@ -262,7 +263,7 @@ struct ConstellationMapView: View {
                         var path = Path()
                         path.move(to: pa)
                         path.addLine(to: pb)
-                        layer.stroke(path, with: .color(fg.opacity(0.5 * nightFactor)), lineWidth: 0.7)
+                        layer.stroke(path, with: .color(fg.opacity(0.5 * effectiveNight)), lineWidth: 0.7)
                     }
                 }
             }
@@ -273,17 +274,17 @@ struct ConstellationMapView: View {
                 if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
                     let size = max(1.5, 5.2 - 0.8 * star.mag)
                     let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
-                    layer.fill(Path(ellipseIn: rect), with: .color(fg.opacity(nightFactor)))
+                    layer.fill(Path(ellipseIn: rect), with: .color(fg.opacity(effectiveNight)))
 
                     if skyShowStarLabels && star.mag < 1.0 { // label brighter stars
-                        let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(nightFactor))
+                        let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(effectiveNight))
                         layer.draw(layer.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
                     }
                 }
             }
 
             if skyShowConstellationLabels {
-                drawConstellationLabels(context: &layer, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, fg: fg.opacity(nightFactor))
+                drawConstellationLabels(context: &layer, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, fg: fg.opacity(effectiveNight))
             }
         }
 
