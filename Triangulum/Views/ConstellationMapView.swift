@@ -6,6 +6,7 @@ struct ConstellationMapView: View {
     @ObservedObject var locationManager: LocationManager
     @State private var now: Date = Date()
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("nightVisionMode") private var nightVisionMode = false
     @AppStorage("skyShowStarLabels") private var skyShowStarLabels = true
     @AppStorage("skyShowConstellationLabels") private var skyShowConstellationLabels = true
