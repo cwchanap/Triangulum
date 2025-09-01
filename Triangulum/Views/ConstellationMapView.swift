@@ -151,17 +151,13 @@ struct ConstellationMapView: View {
             LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
             Spacer()
             // Zoom controls
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Button {
                     withAnimation(.easeInOut) { zoom = clampZoom(zoom / 1.15) }
                 } label: {
                     Image(systemName: "minus.circle")
                         .foregroundColor(nightVisionMode ? .red : .white)
                 }
-                Text("\(Int((zoom * 100).rounded()))%")
-                    .font(.caption2)
-                    .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
-                    .frame(minWidth: 36)
                 Button {
                     withAnimation(.easeInOut) { zoom = clampZoom(zoom * 1.15) }
                 } label: {
@@ -175,9 +171,6 @@ struct ConstellationMapView: View {
                         .foregroundColor(nightVisionMode ? .red : .white)
                 }
             }
-            Text("Up = North  •  Right = East")
-                .font(.caption2)
-                .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
             Menu {
                 Toggle("Night Vision", isOn: $nightVisionMode)
                 Toggle("Star Labels", isOn: $skyShowStarLabels)
