@@ -11,7 +11,7 @@ struct ConstellationMapView: View {
     @AppStorage("skyShowConstellationLabels") private var skyShowConstellationLabels = true
     @AppStorage("skyCatalog") private var skyCatalog = "bright" // bright | extended
     @AppStorage("skyShowLargeCompass") private var skyShowLargeCompass = false
-    @AppStorage("skySnapNorth") private var skySnapNorth = false
+    @AppStorage("skySnapNorth") private var skySnapNorth = true
     @State private var zoom: CGFloat = 1.0
     @GestureState private var pinch: CGFloat = 1.0
     @State private var pan: CGSize = .zero
@@ -49,13 +49,19 @@ struct ConstellationMapView: View {
                     let doubleTap = TapGesture(count: 2)
                         .onEnded { withAnimation(.easeInOut) { zoom = 1.0; pan = .zero } }
 
-                    ZStack(alignment: .topLeading) {
+                    ZStack(alignment: .topTrailing) {
                         Canvas { context, size in
                             drawSky(context: &context, size: size, current: timeline.date, zoom: currentZoom, pan: currentPan)
                         }
                         .gesture(magnify)
                         .simultaneousGesture(panGesture)
                         .gesture(doubleTap)
+
+                        // Small compass pinned top-right (non-interactive)
+                        CompassView(heading: locationManager.heading, redMode: nightVisionMode, tint: nightVisionMode ? .red : .prussianBlueDark)
+                            .frame(width: 44, height: 44)
+                            .padding([.top, .trailing], 12)
+                            .allowsHitTesting(false)
 
                         if skyShowLargeCompass {
                             let compDrag = DragGesture()
@@ -144,9 +150,6 @@ struct ConstellationMapView: View {
             LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
             LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
             Spacer()
-            // Compass (use dark ink on light footer)
-            CompassView(heading: locationManager.heading, redMode: nightVisionMode, tint: nightVisionMode ? .red : .prussianBlueDark)
-                .frame(width: 44, height: 44)
             // Zoom controls
             HStack(spacing: 8) {
                 Button {
