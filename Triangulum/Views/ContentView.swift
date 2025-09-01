@@ -98,6 +98,12 @@ struct ContentView: View {
                             .foregroundColor(.white)
                     }
                     
+                    NavigationLink(destination: CompassPageView(locationManager: locationManager)) {
+                        Image(systemName: "location.north.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    
                     NavigationLink(destination: PreferencesView()) {
                         Image(systemName: "gearshape.fill")
                             .font(.title2)
