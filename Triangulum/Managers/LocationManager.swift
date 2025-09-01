@@ -114,6 +114,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
     }
+
+    // MARK: - Heading Calibration
+    func requestHeadingCalibration() {
+        // There's no public API to force-show calibration, but restarting
+        // heading updates and allowing calibration prompt helps trigger it
+        // when the system deems necessary.
+        guard CLLocationManager.headingAvailable() else { return }
+        locationManager.stopUpdatingHeading()
+        locationManager.startUpdatingHeading()
+    }
     
     // MARK: - CLLocationManagerDelegate
     

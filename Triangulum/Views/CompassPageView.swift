@@ -4,6 +4,7 @@ struct CompassPageView: View {
     @ObservedObject var locationManager: LocationManager
     @AppStorage("nightVisionMode") private var nightVisionMode = false
     @State private var isCalibrating = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ZStack {
@@ -23,10 +24,27 @@ struct CompassPageView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(Color.prussianBlue, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button {
+                    locationManager.requestHeadingCalibration()
+                } label: {
+                    Image(systemName: "scope")
+                        .foregroundColor(.white)
+                }
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                } label: {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(.white)
+                }
+            }
+        }
     }
 }
 
 #Preview {
     CompassPageView(locationManager: LocationManager())
 }
-
