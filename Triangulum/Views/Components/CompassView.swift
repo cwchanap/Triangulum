@@ -35,7 +35,8 @@ public struct CompassView: View {
 
             // Cardinal labels fixed to view; needle rotates instead
             let labelColor = ink
-            let labels: [(String, Double)] = [("N",0),("E",90),("S",180),("W",270)]
+            // Place 'N' at top by using -90° for N, then clockwise
+            let labels: [(String, Double)] = [("N",-90),("E",0),("S",90),("W",180)]
             for (txt, deg) in labels {
                 let ang = deg * .pi / 180
                 let p = CGPoint(x: center.x + cos(ang) * (r - 10), y: center.y + sin(ang) * (r - 10))

@@ -204,8 +204,6 @@ struct ConstellationMapView: View {
         context.drawLayer { layer in
             layer.translateBy(x: center.x, y: center.y)
             layer.scaleBy(x: zoom, y: zoom)
-            // translate by pan after scaling, divide to keep finger mapping consistent
-            layer.translateBy(x: pan.width / zoom, y: pan.height / zoom)
             layer.translateBy(x: -center.x, y: -center.y)
 
             // Night-sky gradient fill inside the dome
@@ -241,12 +239,16 @@ struct ConstellationMapView: View {
                 layer.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
             }
 
-            // Cardinal directions (rotated by heading)
+            // Pan offsets mapped to azimuth/altitude
+            let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0) // ~90° per radius
+            let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
+
+            // Cardinal directions (rotated by heading and panned)
             let labels = [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]
             let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
             for (text, az) in labels {
                 let theta = az * .pi / 180
-                let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad, altitudeDeg: 0)
+                let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad + azOffsetRad, altitudeDeg: 0 + altOffsetDeg)
                 var resolved = layer.resolve(Text(text).font(.caption).foregroundColor(fg))
                 layer.draw(resolved, at: point, anchor: .center)
             }
@@ -258,8 +260,8 @@ struct ConstellationMapView: View {
             // Constellation lines first (so stars draw over them)
             for line in ConstellationData.lines {
                 if let a = ConstellationData.star(named: line.0), let b = ConstellationData.star(named: line.1) {
-                    if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad),
-                       let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
+                    if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg),
+                       let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg) {
                         var path = Path()
                         path.move(to: pa)
                         path.addLine(to: pb)
@@ -271,7 +273,7 @@ struct ConstellationMapView: View {
             // Draw stars
             let starsToUse: [Star] = skyCatalog == "extended" ? ConstellationData.starsExtended : ConstellationData.stars
             for star in starsToUse {
-                if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
+                if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg) {
                     let size = max(1.5, 5.2 - 0.8 * star.mag)
                     let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
                     layer.fill(Path(ellipseIn: rect), with: .color(fg.opacity(effectiveNight)))
@@ -284,7 +286,7 @@ struct ConstellationMapView: View {
             }
 
             if skyShowConstellationLabels {
-                drawConstellationLabels(context: &layer, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, fg: fg.opacity(effectiveNight))
+                drawConstellationLabels(context: &layer, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg, fg: fg.opacity(effectiveNight))
             }
         }
 
@@ -360,7 +362,7 @@ struct ConstellationMapView: View {
         }
     }
 
-    private func drawConstellationLabels(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, lstHours: Double, observer: Observer, headingRad: Double, fg: Color) {
+    private func drawConstellationLabels(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, lstHours: Double, observer: Observer, headingRad: Double, azOffsetRad: Double, altOffsetDeg: Double, fg: Color) {
         // Define label groups
         let orion = ["Betelgeuse","Bellatrix","Rigel","Saiph","Alnilam","Alnitak","Mintaka"]
         let dipper = ["Dubhe","Merak","Phecda","Megrez","Alioth","Mizar","Alkaid"]
@@ -368,7 +370,7 @@ struct ConstellationMapView: View {
             var pts: [CGPoint] = []
             for n in names {
                 if let s = ConstellationData.star(named: n) {
-                    if let p = project(star: s, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad) {
+                    if let p = project(star: s, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg) {
                         pts.append(p)
                     }
                 }
@@ -393,10 +395,13 @@ struct ConstellationMapView: View {
         // Sun
         let sunEq = Astronomer.sunEquatorial(date: current)
         let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
-        if sunAltAz.altDeg > 0 {
+        if true {
             let az = sunAltAz.azDeg * .pi / 180.0
             let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: az - headingRad, altitudeDeg: sunAltAz.altDeg)
+            let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0)
+            let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
+            let adjAlt = max(-90.0, min(90.0, sunAltAz.altDeg + altOffsetDeg))
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: az - headingRad + azOffsetRad, altitudeDeg: adjAlt)
             let s: CGFloat = 8
             let rect = CGRect(x: p.x - s/2, y: p.y - s/2, width: s, height: s)
             let color = nightVisionMode ? Color.red : Color.yellow
@@ -408,10 +413,13 @@ struct ConstellationMapView: View {
         // Moon
         let moonEq = Astronomer.moonEquatorial(date: current)
         let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
-        if moonAltAz.altDeg > 0 {
+        if true {
             let azMoon = moonAltAz.azDeg * .pi / 180.0
             let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon - headingRad, altitudeDeg: moonAltAz.altDeg)
+            let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0)
+            let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
+            let adjAlt = max(-90.0, min(90.0, moonAltAz.altDeg + altOffsetDeg))
+            let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon - headingRad + azOffsetRad, altitudeDeg: adjAlt)
 
             // Phase and orientation
             let k = Astronomer.illuminationFraction(sunEq: sunEq, moonEq: moonEq)
@@ -468,12 +476,12 @@ struct ConstellationMapView: View {
         return t * t * (3 - 2 * t)
     }
 
-    private func project(star: Star, lstHours: Double, observer: Observer, center: CGPoint, radius: CGFloat, headingRad: Double) -> CGPoint? {
+    private func project(star: Star, lstHours: Double, observer: Observer, center: CGPoint, radius: CGFloat, headingRad: Double, azOffsetRad: Double, altOffsetDeg: Double) -> CGPoint? {
         let eq = Equatorial(raHours: star.raHours, decDeg: star.decDeg)
         let altaz = Astronomer.altAz(eq: eq, lstHours: lstHours, latDeg: observer.lat)
-        guard altaz.altDeg > 0 else { return nil } // only plot above horizon
+        let adjAlt = max(-90.0, min(90.0, altaz.altDeg + altOffsetDeg))
         let azRad = altaz.azDeg * .pi / 180
-        let pt = pointOnDome(center: center, radius: radius, azimuthRad: azRad - headingRad, altitudeDeg: altaz.altDeg)
+        let pt = pointOnDome(center: center, radius: radius, azimuthRad: azRad - headingRad + azOffsetRad, altitudeDeg: adjAlt)
         return pt
     }
 
