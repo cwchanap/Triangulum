@@ -1,0 +1,27 @@
+name: Build and Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-and-lint:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build
+        run: xcodebuild -project Triangulum.xcodeproj -scheme Triangulum -configuration Debug | xcpretty
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Run SwiftLint
+        run: swiftlint
