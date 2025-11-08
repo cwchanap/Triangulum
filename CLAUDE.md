@@ -9,21 +9,28 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
 ## Development Commands
 
 ### Building and Running
-- **Build**: Use Xcode to build the project (`⌘+B`)
+- **Build**: `xcodebuild -project Triangulum.xcodeproj -scheme Triangulum -configuration Debug` or use Xcode (`⌘+B`)
 - **Run**: Use Xcode to run on simulator or device (`⌘+R`)
-- **Test**: Use Xcode to run unit tests (`⌘+U`)
+- **Clean Build**: `xcodebuild clean -project Triangulum.xcodeproj -scheme Triangulum` or Xcode (`⌘+Shift+K`)
 
 ### Testing
-- **Unit Tests**: `TriangulumTests` target contains unit tests
+- **Unit Tests**: `xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'platform=iOS Simulator,name=iPhone 15'`
 - **UI Tests**: `TriangulumUITests` target contains UI automation tests
-- Run tests using Xcode Test Navigator or `⌘+U`
+- **Test in Xcode**: Use Test Navigator or `⌘+U`
+- **List available destinations**: `xcodebuild -showdestinations -project Triangulum.xcodeproj -scheme Triangulum`
+
+### Project Information
+- **iOS Deployment Target**: 18.5+
+- **Schemes**: Triangulum (main scheme)
+- **Build Configurations**: Debug, Release
+- **Targets**: Triangulum (main app), TriangulumTests, TriangulumUITests
 
 ## Architecture
 
 ### Core Components
 
 - **App Entry Point**: `TriangulumApp.swift` - Main app structure with SwiftData ModelContainer setup for persistent storage
-- **Views**: 
+- **Views**:
   - `ContentView.swift` - Main navigation interface with sensor widget displays and snapshot capture functionality
   - `BarometerView.swift` - Real-time barometer display with pressure, altitude, and attitude data
   - `LocationView.swift` - GPS location display with coordinates and accuracy
@@ -32,11 +39,21 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
   - `PreferencesView.swift` - Widget visibility controls and map provider selection
   - `MapView.swift` - Map interface with provider switching capabilities
   - `OSMMapView.swift` - OpenStreetMap implementation using MKTileOverlay
-- **Data Management**: 
+  - `CompassPageView.swift` - Compass navigation interface
+  - `ConstellationMapView.swift` - Star map and celestial navigation display
+  - `Views/Components/` - Reusable UI components
+- **Data Management**:
   - `BarometerManager.swift` - CoreMotion wrapper for barometric sensor and device attitude
   - `LocationManager.swift` - CoreLocation wrapper with permission handling
   - `AccelerometerManager.swift`, `GyroscopeManager.swift`, `MagnetometerManager.swift` - Additional sensor managers
   - `SnapshotManager` class for comprehensive sensor snapshot and photo management
+- **Utilities**:
+  - `KeychainHelper.swift` - Secure iOS Keychain wrapper for API key storage
+  - `OSMGeocoder.swift` - OpenStreetMap geocoding services
+  - `AppleSearchCompleter.swift` - Apple Maps search completion integration
+- **Configuration**:
+  - `Config.swift` - Centralized configuration management with Keychain integration for API keys
+  - `PrivacyInfo.plist` - Privacy manifest for App Store compliance
 - **Models**:
   - `SensorReading.swift` - Database model for sensor measurements with SensorType enum (legacy/SwiftData)
   - `SensorSnapshot.swift` - Complete sensor state capture with photo attachment support
@@ -62,8 +79,9 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
 - **CoreLocation**: GPS and location services with permission handling
 - **PhotosUI**: Photo selection and management integration
 - **MapKit**: Map display with custom tile overlay support for OpenStreetMap
+- **Security Framework**: iOS Keychain Services for secure API key storage
 - **UserDefaults**: Primary persistence for snapshot data and preferences
-- **iOS 17.0+**: Minimum deployment target (supports SwiftData)
+- **iOS 18.5+**: Minimum deployment target (updated from iOS 17.0)
 
 ## Project Structure
 
@@ -79,7 +97,10 @@ Triangulum/
 │   ├── FootprintView.swift        # Sensor snapshot management and viewing
 │   ├── PreferencesView.swift      # App preferences and widget controls
 │   ├── MapView.swift              # Map interface with provider switching
-│   └── OSMMapView.swift           # OpenStreetMap tile overlay implementation
+│   ├── OSMMapView.swift           # OpenStreetMap tile overlay implementation
+│   ├── CompassPageView.swift      # Compass navigation interface
+│   ├── ConstellationMapView.swift # Star map and celestial navigation
+│   └── Components/                # Reusable UI components
 ├── Models/          # Data models and structures
 │   ├── SensorReading.swift        # SwiftData model for sensor measurements (legacy)
 │   ├── SensorSnapshot.swift       # Complete sensor state capture with photos
@@ -90,9 +111,15 @@ Triangulum/
 │   ├── AccelerometerManager.swift # Accelerometer data collection
 │   ├── GyroscopeManager.swift     # Gyroscope data collection
 │   └── MagnetometerManager.swift  # Magnetometer data collection
+├── Utilities/       # Helper classes and utilities
+│   ├── KeychainHelper.swift       # Secure iOS Keychain wrapper
+│   ├── OSMGeocoder.swift          # OpenStreetMap geocoding services
+│   └── AppleSearchCompleter.swift # Apple Maps search completion
 ├── Extensions/      # SwiftUI extensions and utilities
 │   └── Color+Theme.swift          # Prussian Blue color theme definitions
-└── Assets.xcassets/ # App icons and visual assets
+├── Assets.xcassets/ # App icons and visual assets
+├── Config.swift     # Centralized configuration with Keychain integration
+└── PrivacyInfo.plist # Privacy manifest for App Store compliance
 ```
 
 ## Development Notes
@@ -137,6 +164,16 @@ Triangulum/
   - `OpenStreetMap` using an `MKMapView` with `MKTileOverlay` (file: `OSMMapView.swift`)
 - Preference is stored in `@AppStorage("mapProvider")` with values `"apple"` or `"osm"`.
 - `MapView.swift` switches rendering based on this preference and preserves the center-on-user behavior.
+
+### API Configuration and Security
+- **Weather Integration**: App supports OpenWeatherMap API with secure Keychain storage
+- **API Key Management**: Users configure their own API keys through Preferences → Weather Configuration
+- **Security Implementation**: Uses `KeychainHelper.swift` with iOS Security framework for encrypted storage
+- **Development Setup**:
+  - Get free OpenWeatherMap API key from https://openweathermap.org/api
+  - Configure through app Preferences (no hardcoded keys in codebase)
+  - Environment variable support: `OPENWEATHER_API_KEY` for CI/development
+- **App Store Compliance**: Privacy manifest (`PrivacyInfo.plist`) included for App Store requirements
 
 ### Sensor Management Notes
 - Some sensors (accelerometer, gyroscope, magnetometer) are temporarily disabled in `ContentView.swift:102-105` pending privacy permission configuration
