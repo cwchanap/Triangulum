@@ -19,6 +19,10 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
 - **Test in Xcode**: Use Test Navigator or `⌘+U`
 - **List available destinations**: `xcodebuild -showdestinations -project Triangulum.xcodeproj -scheme Triangulum`
 
+### Linting
+- **SwiftLint**: Install with `brew install swiftlint`, run with `swiftlint`
+- CI automatically runs SwiftLint on all pushes and PRs
+
 ### Project Information
 - **iOS Deployment Target**: 18.5+
 - **Schemes**: Triangulum (main scheme)
@@ -47,6 +51,9 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
   - `LocationManager.swift` - CoreLocation wrapper with permission handling
   - `AccelerometerManager.swift`, `GyroscopeManager.swift`, `MagnetometerManager.swift` - Additional sensor managers
   - `SnapshotManager` class for comprehensive sensor snapshot and photo management
+  - `WeatherManager` - OpenWeatherMap API integration with automatic location-based weather fetching
+  - `TileCacheManager` - Offline map tile caching with SwiftData persistence and 7-day expiration
+  - `WidgetOrderManager` - Manages user-customizable widget ordering with UserDefaults persistence
 - **Utilities**:
   - `KeychainHelper.swift` - Secure iOS Keychain wrapper for API key storage
   - `OSMGeocoder.swift` - OpenStreetMap geocoding services
@@ -57,6 +64,9 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
 - **Models**:
   - `SensorReading.swift` - Database model for sensor measurements with SensorType enum (legacy/SwiftData)
   - `SensorSnapshot.swift` - Complete sensor state capture with photo attachment support
+  - `MapTile.swift` - SwiftData model for offline map tile caching with expiration tracking
+  - `Weather.swift` - Weather data models for OpenWeatherMap API integration
+  - `WidgetOrder.swift` - Widget ordering system with drag-and-drop support
   - `Item.swift` - Generic item model (legacy/placeholder)
 
 ### Data Flow
@@ -130,6 +140,9 @@ Triangulum/
 - SwiftData `@Query` for reactive database displays (legacy sensor readings)
 - UserDefaults-based persistence with JSON encoding for snapshot data
 - NavigationSplitView architecture with detail/sidebar navigation pattern
+- **SwiftData ModelContainer**: App-level setup in `TriangulumApp.swift` with fallback to in-memory storage if persistent storage fails
+  - Registered models: `Item`, `SensorReading`, `MapTile`
+  - Environment injection via `.modelContainer()` modifier
 
 ### Hardware Integration
 - Real-time sensor data collection from multiple CoreMotion and CoreLocation sources
@@ -143,19 +156,26 @@ Triangulum/
 - Custom Prussian Blue color theme defined in `Color+Theme.swift`
 - Real-time data visualization with live sensor readings
 - Configurable widget visibility through `@AppStorage` preferences
-- Snapshot capture with photo attachment workflow
+- **Drag-and-drop widget reordering**: Users can reorder sensor widgets via edit mode (managed by `WidgetOrderManager`)
+- Snapshot capture with dual photo system:
+  - Direct camera capture via `UIImagePickerController` with `ImagePicker` wrapper
+  - Photo library selection via `PhotosPicker` with async image loading
+  - Maximum 5 photos per snapshot with preview grid and removal controls
 - Paginated sensor footprint viewing with detailed snapshot inspection
 - NavigationSplitView with toolbar customization and color theming
 
 ### Data Storage Architecture
-- **Dual persistence approach**: SwiftData for legacy models, UserDefaults for current snapshot system
+- **Triple persistence approach**: SwiftData for legacy sensor readings and map tiles, UserDefaults for snapshots and preferences
 - **SensorSnapshot model**: Comprehensive sensor state capture including:
   - Barometer data (pressure, sea level pressure, device attitude)
   - Location data (coordinates, altitude, accuracy)
   - Motion sensor data (accelerometer, gyroscope, magnetometer with magnitude calculations)
+  - Weather data (temperature, conditions, humidity) when available
   - Photo attachments via UUID-based reference system
 - **SnapshotManager**: ObservableObject handling all snapshot CRUD operations with async photo processing
 - **Photo storage**: JPEG compression with 0.8 quality, stored as Data in UserDefaults dictionary
+- **Map tile caching**: SwiftData-based offline tile storage with `MapTile` model, 7-day expiration, and cache management via `TileCacheManager`
+- **Widget preferences**: Individual widget visibility stored in `@AppStorage`, widget order managed by `WidgetOrderManager` in UserDefaults
 - **Error handling**: Graceful fallback with corrupted data cleanup to prevent crashes
 
 ### Map Provider Preference
@@ -165,17 +185,23 @@ Triangulum/
 - Preference is stored in `@AppStorage("mapProvider")` with values `"apple"` or `"osm"`.
 - `MapView.swift` switches rendering based on this preference and preserves the center-on-user behavior.
 
-### API Configuration and Security
-- **Weather Integration**: App supports OpenWeatherMap API with secure Keychain storage
+### Weather Integration
+- **OpenWeatherMap API**: Automatic location-based weather fetching via `WeatherManager`
 - **API Key Management**: Users configure their own API keys through Preferences → Weather Configuration
-- **Security Implementation**: Uses `KeychainHelper.swift` with iOS Security framework for encrypted storage
-- **Development Setup**:
-  - Get free OpenWeatherMap API key from https://openweathermap.org/api
-  - Configure through app Preferences (no hardcoded keys in codebase)
-  - Environment variable support: `OPENWEATHER_API_KEY` for CI/development
-- **App Store Compliance**: Privacy manifest (`PrivacyInfo.plist`) included for App Store requirements
+- **Security**: Uses `KeychainHelper.swift` with iOS Security framework for encrypted key storage
+- **Availability Logic**: Weather widget auto-checks for valid API key and location data, displays appropriate error states
+- **Setup**: Get free API key from https://openweathermap.org/api, configure through app Preferences
+- **Environment variable support**: `OPENWEATHER_API_KEY` for CI/development
+- **Auto-refresh**: Polls every 3 seconds to check availability and fetches weather when conditions are met
 
 ### Sensor Management Notes
-- Some sensors (accelerometer, gyroscope, magnetometer) are temporarily disabled in `ContentView.swift:102-105` pending privacy permission configuration
+- Some sensors (accelerometer, gyroscope, magnetometer) are temporarily disabled in `ContentView.swift:126-129` pending privacy permission configuration
 - All sensor managers follow the same pattern: start/stop methods, @Published properties for real-time updates
 - CoreMotion sensors provide both individual axis values and calculated magnitude for comprehensive data capture
+- Managers are initialized with dependencies (e.g., `BarometerManager` and `WeatherManager` both require `LocationManager`)
+
+### CI/CD
+- **GitHub Actions**: Two workflows in `.github/workflows/`
+  - `build-lint.yml`: Builds project and runs SwiftLint on pushes to main and PRs
+  - `unit-tests.yml`: Runs unit tests on iPhone 15 simulator for pushes to main and PRs
+- Both use `latest-stable` Xcode version via `maxim-lobanov/setup-xcode@v1`
