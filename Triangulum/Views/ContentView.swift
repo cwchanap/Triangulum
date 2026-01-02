@@ -121,6 +121,9 @@ struct ContentView: View {
             Color.prussianSoft.ignoresSafeArea()
         }
         .onAppear {
+            // Configure pressure history manager with SwiftData context
+            barometerManager.configureHistory(with: modelContext)
+
             barometerManager.startBarometerUpdates()
             locationManager.startLocationUpdates()
             // TODO: Temporarily disabled until privacy permissions are properly configured

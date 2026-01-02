@@ -276,7 +276,8 @@ struct TriangulumTests {
             locationManager: locationManager,
             accelerometerManager: accelerometerManager,
             gyroscopeManager: gyroscopeManager,
-            magnetometerManager: magnetometerManager
+            magnetometerManager: magnetometerManager,
+            weatherManager: nil
         )
         
         // Test barometer data
@@ -333,7 +334,8 @@ struct TriangulumTests {
             locationManager: locationManager,
             accelerometerManager: accelerometerManager,
             gyroscopeManager: gyroscopeManager,
-            magnetometerManager: magnetometerManager
+            magnetometerManager: magnetometerManager,
+            weatherManager: nil
         )
         
         let encoded = try JSONEncoder().encode(originalSnapshot)
