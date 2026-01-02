@@ -6,7 +6,13 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(git add:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(swiftlint lint:*)",
+      "Bash(xcrun simctl list:*)",
+      "Bash(xcode-select:*)",
+      "Bash(xcrun xcodebuild:*)",
+      "Bash(xcrun simctl runtime list:*)",
+      "Bash(xcrun xcresulttool get:*)"
     ],
     "deny": []
   }
