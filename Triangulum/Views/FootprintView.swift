@@ -1,6 +1,5 @@
 import SwiftUI
 import PhotosUI
-import MapKit
 
 struct FootprintView: View {
     @ObservedObject var snapshotManager: SnapshotManager

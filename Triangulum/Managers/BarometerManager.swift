@@ -68,11 +68,17 @@ class BarometerManager: ObservableObject {
             // Record to history for trend analysis and graphs
             // historyManager is @MainActor, so we need to hop to main actor context
             Task { @MainActor in
-                self.historyManager?.recordReading(
-                    pressure: currentPressure,
-                    altitude: currentAltitude,
-                    seaLevelPressure: seaLevel
-                )
+                guard let historyManager = self.historyManager else { return }
+
+                do {
+                    try await historyManager.recordReading(
+                        pressure: currentPressure,
+                        altitude: currentAltitude,
+                        seaLevelPressure: seaLevel
+                    )
+                } catch {
+                    print("⚠️ Failed to record barometer reading: \(error.localizedDescription)")
+                }
             }
         }
 
