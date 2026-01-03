@@ -231,12 +231,12 @@ struct PressureHistoryManagerTests {
         #expect(manager.trend == .unknown)
     }
 
-    @Test func testRecordReading() throws {
+    @Test func testRecordReading() async throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
         manager.configure(with: context)
 
-        manager.recordReading(
+        try await manager.recordReading(
             pressure: 101.325,
             altitude: 100.0,
             seaLevelPressure: 102.5
@@ -246,16 +246,16 @@ struct PressureHistoryManagerTests {
         #expect(manager.recentReadings.first?.pressure == 101.325)
     }
 
-    @Test func testRecordReadingMinimumInterval() throws {
+    @Test func testRecordReadingMinimumInterval() async throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
         manager.configure(with: context)
 
         // Record first reading
-        manager.recordReading(pressure: 101.0, altitude: 100.0, seaLevelPressure: 102.0)
+        try await manager.recordReading(pressure: 101.0, altitude: 100.0, seaLevelPressure: 102.0)
 
         // Try to record immediately - should be ignored due to minimum interval
-        manager.recordReading(pressure: 102.0, altitude: 100.0, seaLevelPressure: 103.0)
+        try await manager.recordReading(pressure: 102.0, altitude: 100.0, seaLevelPressure: 103.0)
 
         // Should still have only one reading
         #expect(manager.recentReadings.count == 1)

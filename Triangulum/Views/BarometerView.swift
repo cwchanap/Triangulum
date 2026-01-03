@@ -127,6 +127,9 @@ struct BarometerView: View {
             .cornerRadius(12)
             .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Barometer details")
+        .accessibilityHint("Opens detailed barometer view")
         .buttonStyle(.plain)
         .sheet(isPresented: $showingDetail) {
             BarometerDetailView(barometerManager: barometerManager)
@@ -180,6 +183,9 @@ struct TrendIndicatorView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(trendColor.opacity(0.1))
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(trendAccessibilityLabel)
+        .accessibilityHint("Pressure trend indicator")
     }
 
     private var trendColor: Color {
@@ -199,6 +205,14 @@ struct TrendIndicatorView: View {
         let rate = abs(historyManager.changeRate)
         let direction = historyManager.changeRate >= 0 ? "+" : "-"
         return "\(direction)\(String(format: "%.2f", rate)) hPa/hr"
+    }
+
+    private var trendAccessibilityLabel: String {
+        if historyManager.trend != .unknown {
+            return "\(historyManager.trend.prediction). \(rateText)"
+        } else {
+            return historyManager.trend.prediction
+        }
     }
 }
 

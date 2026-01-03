@@ -2,6 +2,21 @@ import Foundation
 import SwiftData
 import Combine
 
+/// Errors that can occur during pressure history recording
+enum HistoryError: LocalizedError {
+    case modelContextNotConfigured
+    case saveFailed(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .modelContextNotConfigured:
+            return "Model context not configured"
+        case .saveFailed(let error):
+            return "Failed to save reading: \(error.localizedDescription)"
+        }
+    }
+}
+
 /// Pressure trend direction based on rate of change
 enum PressureTrend: String {
     case risingFast = "rising_fast"
@@ -121,8 +136,10 @@ class PressureHistoryManager: ObservableObject {
     // MARK: - Data Recording
 
     /// Records a new pressure reading if enough time has passed since the last one
-    func recordReading(pressure: Double, altitude: Double, seaLevelPressure: Double) {
-        guard let modelContext = modelContext else { return }
+    func recordReading(pressure: Double, altitude: Double, seaLevelPressure: Double) async throws {
+        guard let modelContext = modelContext else {
+            throw HistoryError.modelContextNotConfigured
+        }
 
         // Check if enough time has passed since last recording
         let now = Date()
@@ -140,8 +157,12 @@ class PressureHistoryManager: ObservableObject {
         )
 
         modelContext.insert(reading)
-        try? modelContext.save()
-        lastRecordedTime = now
+        do {
+            try modelContext.save()
+            lastRecordedTime = now
+        } catch {
+            throw HistoryError.saveFailed(error)
+        }
 
         // Update recent readings and recalculate trend
         recentReadings.append(reading)
