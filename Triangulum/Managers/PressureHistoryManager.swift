@@ -167,9 +167,9 @@ class PressureHistoryManager: ObservableObject {
         // Update recent readings and recalculate trend
         recentReadings.append(reading)
 
-        // Keep only last hour in memory for quick access
-        let oneHourAgo = now.addingTimeInterval(-3600)
-        recentReadings = recentReadings.filter { $0.timestamp > oneHourAgo }
+        // Keep data for up to 7 days in memory to support all time range views during live updates
+        let retentionCutoff = now.addingTimeInterval(-retentionPeriod)
+        recentReadings = recentReadings.filter { $0.timestamp > retentionCutoff }
 
         calculateTrend()
         calculateStatistics()
