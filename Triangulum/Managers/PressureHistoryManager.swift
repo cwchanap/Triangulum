@@ -213,6 +213,7 @@ class PressureHistoryManager: ObservableObject {
     private func calculateTrend() {
         guard let modelContext = modelContext else {
             trend = .unknown
+            changeRate = 0
             return
         }
 
@@ -236,12 +237,14 @@ class PressureHistoryManager: ObservableObject {
             // Calculate rate of change in kPa per hour
             guard let first = readings.first, let last = readings.last else {
                 trend = .unknown
+                changeRate = 0
                 return
             }
 
             let timeDiff = last.timestamp.timeIntervalSince(first.timestamp)
             guard timeDiff > 0 else {
                 trend = .unknown
+                changeRate = 0
                 return
             }
 
@@ -269,6 +272,7 @@ class PressureHistoryManager: ObservableObject {
         } catch {
             print("Failed to calculate trend: \(error)")
             trend = .unknown
+            changeRate = 0
         }
     }
 
