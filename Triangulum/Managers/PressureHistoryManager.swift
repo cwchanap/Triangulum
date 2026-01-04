@@ -172,6 +172,7 @@ class PressureHistoryManager: ObservableObject {
         recentReadings = recentReadings.filter { $0.timestamp > oneHourAgo }
 
         calculateTrend()
+        calculateStatistics()
 
         // Periodically clean up old data
         if Int.random(in: 0..<60) == 0 {
