@@ -5,10 +5,13 @@ struct BarometerDetailView: View {
     @ObservedObject var barometerManager: BarometerManager
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTimeRange: TimeRange = .oneHour
-    @State private var readings: [PressureReading] = []
 
     private var historyManager: PressureHistoryManager? {
         barometerManager.historyManager
+    }
+
+    private var readings: [PressureReading] {
+        historyManager?.recentReadings ?? []
     }
 
     var body: some View {
@@ -44,10 +47,10 @@ struct BarometerDetailView: View {
                 }
             }
             .onAppear {
-                loadData()
+                historyManager?.loadRecentReadings(for: selectedTimeRange)
             }
             .onChange(of: selectedTimeRange) { _, _ in
-                loadData()
+                historyManager?.loadRecentReadings(for: selectedTimeRange)
             }
         }
     }
@@ -347,10 +350,7 @@ struct BarometerDetailView: View {
 
     // MARK: - Data Loading
 
-    private func loadData() {
-        readings = historyManager?.fetchReadings(for: selectedTimeRange) ?? []
-        historyManager?.loadRecentReadings(for: selectedTimeRange)
-    }
+    // Data is now observed live from historyManager.recentReadings
 }
 
 // MARK: - Stat Row Component
