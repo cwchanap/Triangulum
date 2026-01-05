@@ -11,7 +11,9 @@ struct BarometerDetailView: View {
     }
 
     private var readings: [PressureReading] {
-        historyManager?.recentReadings ?? []
+        guard let historyManager = historyManager else { return [] }
+        let cutoffDate = Date().addingTimeInterval(-selectedTimeRange.seconds)
+        return historyManager.recentReadings.filter { $0.timestamp > cutoffDate }
     }
 
     var body: some View {
