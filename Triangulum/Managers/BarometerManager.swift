@@ -13,6 +13,7 @@ class BarometerManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var isAttitudeAvailable: Bool = false
     @Published var errorMessage: String = ""
+    @Published var historyRecordingError: Error? = nil
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -76,8 +77,12 @@ class BarometerManager: ObservableObject {
                         altitude: currentAltitude,
                         seaLevelPressure: seaLevel
                     )
+                    // Clear error on successful recording
+                    self.historyRecordingError = nil
                 } catch {
                     print("⚠️ Failed to record barometer reading: \(error.localizedDescription)")
+                    // Surface the error to make it observable
+                    self.historyRecordingError = error
                 }
             }
         }
