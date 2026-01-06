@@ -136,6 +136,10 @@ class PressureHistoryManager: ObservableObject {
     // MARK: - Data Recording
 
     /// Records a new pressure reading if enough time has passed since the last one
+    /// - Parameters:
+    ///   - pressure: Current pressure reading in **kPa** (converted to hPa for trend calculations)
+    ///   - altitude: Altitude in meters (from GPS)
+    ///   - seaLevelPressure: Sea-level adjusted pressure in kPa
     func recordReading(pressure: Double, altitude: Double, seaLevelPressure: Double) async throws {
         guard let modelContext = modelContext else {
             throw HistoryError.modelContextNotConfigured
@@ -234,7 +238,7 @@ class PressureHistoryManager: ObservableObject {
                 return
             }
 
-            // Calculate rate of change in kPa per hour
+            // Calculate rate of change in hPa per hour
             guard let first = readings.first, let last = readings.last else {
                 trend = .unknown
                 changeRate = 0
