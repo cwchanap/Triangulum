@@ -14,23 +14,23 @@ struct SimpleOSMMapView: UIViewRepresentable {
     var enableCaching: Bool = false
     // Recenter token triggers animated recenter to `center` whenever it changes
     var recenterToken: UUID = UUID()
-    var annotationCoordinate: CLLocationCoordinate2D? = nil
-    var annotationTitle: String? = nil
-    var annotationSubtitle: String? = nil
-    var onRegionChanged: ((MKCoordinateRegion) -> Void)? = nil
-    
+    var annotationCoordinate: CLLocationCoordinate2D?
+    var annotationTitle: String?
+    var annotationSubtitle: String?
+    var onRegionChanged: ((MKCoordinateRegion) -> Void)?
+
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
-        
+
         // Configure the map
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
         mapView.mapType = .standard
-        
+
         // Set initial region
         let region = MKCoordinateRegion(center: center, span: span)
         mapView.setRegion(region, animated: false)
-        
+
         // Add OSM tile overlay
         setupOSMTileOverlay(on: mapView)
 
@@ -42,10 +42,10 @@ struct SimpleOSMMapView: UIViewRepresentable {
             pin.subtitle = annotationSubtitle
             mapView.addAnnotation(pin)
         }
-        
+
         return mapView
     }
-    
+
     func updateUIView(_ uiView: MKMapView, context: Context) {
         // Recenter only when the token changes to avoid fighting user pans/zooms
         if context.coordinator.lastRecenterToken != recenterToken {
@@ -57,15 +57,15 @@ struct SimpleOSMMapView: UIViewRepresentable {
         // Update annotations to reflect selection state
         updateAnnotations(on: uiView)
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
     }
-    
+
     private func setupOSMTileOverlay(on mapView: MKMapView) {
         // Use the reliable tile server
         let osmTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        
+
         let tileOverlay: MKTileOverlay
         if enableCaching {
             // Use cached tile overlay
@@ -76,19 +76,19 @@ struct SimpleOSMMapView: UIViewRepresentable {
             tileOverlay = MKTileOverlay(urlTemplate: osmTemplate)
             print("SimpleOSMMapView: Added standard OSM tile overlay")
         }
-        
+
         // Configure overlay with more permissive settings
         tileOverlay.canReplaceMapContent = true
         tileOverlay.maximumZ = 18
         tileOverlay.minimumZ = 0
-        
+
         // Add to map
         mapView.addOverlay(tileOverlay)
-        
+
         // Add a visual indicator that we're loading OSM
         addLoadingIndicator(to: mapView)
     }
-    
+
     private func addLoadingIndicator(to mapView: MKMapView) {
         let label = UILabel()
         label.text = "Loading OpenStreetMap..."
@@ -100,7 +100,7 @@ struct SimpleOSMMapView: UIViewRepresentable {
         label.clipsToBounds = true
         label.translatesAutoresizingMaskIntoConstraints = false
         label.tag = 999 // For easy removal later
-        
+
         mapView.addSubview(label)
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: mapView.centerXAnchor),
@@ -108,21 +108,21 @@ struct SimpleOSMMapView: UIViewRepresentable {
             label.widthAnchor.constraint(equalToConstant: 200),
             label.heightAnchor.constraint(equalToConstant: 30)
         ])
-        
+
         // Remove after 5 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
             label.removeFromSuperview()
         }
     }
-    
+
     private func regionsEqual(lhs: MKCoordinateRegion, rhs: MKCoordinateRegion) -> Bool {
         let threshold = 1e-6
         return abs(lhs.center.latitude - rhs.center.latitude) < threshold &&
-               abs(lhs.center.longitude - rhs.center.longitude) < threshold &&
-               abs(lhs.span.latitudeDelta - rhs.span.latitudeDelta) < threshold &&
-               abs(lhs.span.longitudeDelta - rhs.span.longitudeDelta) < threshold
+            abs(lhs.center.longitude - rhs.center.longitude) < threshold &&
+            abs(lhs.span.latitudeDelta - rhs.span.latitudeDelta) < threshold &&
+            abs(lhs.span.longitudeDelta - rhs.span.longitudeDelta) < threshold
     }
-    
+
     final class Coordinator: NSObject, MKMapViewDelegate {
         var parent: SimpleOSMMapView
         var lastRecenterToken: UUID?
@@ -142,11 +142,11 @@ struct SimpleOSMMapView: UIViewRepresentable {
             }
             return MKOverlayRenderer(overlay: overlay)
         }
-        
+
         func mapViewDidFinishLoadingMap(_ mapView: MKMapView) {
             print("SimpleOSMMapView: Map finished loading")
         }
-        
+
         func mapView(_ mapView: MKMapView, didFailToLocateUserWithError error: Error) {
             print("SimpleOSMMapView: Failed to locate user: \(error)")
         }

@@ -3,50 +3,50 @@ import CoreMotion
 
 class GyroscopeManager: ObservableObject {
     private let motionManager = CMMotionManager()
-    
+
     @Published var rotationX: Double = 0.0
     @Published var rotationY: Double = 0.0
     @Published var rotationZ: Double = 0.0
     @Published var magnitude: Double = 0.0
     @Published var isAvailable: Bool = false
     @Published var errorMessage: String = ""
-    
+
     init() {
         checkAvailability()
     }
-    
+
     private func checkAvailability() {
         isAvailable = motionManager.isGyroAvailable
     }
-    
+
     func startGyroscopeUpdates() {
         guard isAvailable else {
             errorMessage = "Gyroscope not available on this device"
             return
         }
-        
+
         guard motionManager.isGyroAvailable else {
             errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
             return
         }
-        
+
         motionManager.gyroUpdateInterval = 0.1
-        
+
         motionManager.startGyroUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
-            
+
             if let error = error {
-                if error.localizedDescription.contains("not authorized") || 
-                   error.localizedDescription.contains("permission") {
+                if error.localizedDescription.contains("not authorized") ||
+                    error.localizedDescription.contains("permission") {
                     self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
                 } else {
                     self.errorMessage = "Error reading gyroscope: \(error.localizedDescription)"
                 }
                 return
             }
-            
+
             guard let data = data else { return }
-            
+
             self.rotationX = data.rotationRate.x
             self.rotationY = data.rotationRate.y
             self.rotationZ = data.rotationRate.z
@@ -54,7 +54,7 @@ class GyroscopeManager: ObservableObject {
             self.errorMessage = ""
         }
     }
-    
+
     func stopGyroscopeUpdates() {
         motionManager.stopGyroUpdates()
     }

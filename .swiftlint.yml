@@ -1,0 +1,70 @@
+# SwiftLint Configuration for Triangulum
+
+# Disabled Rules
+disabled_rules:
+  - todo
+  - trailing_whitespace
+  - vertical_whitespace
+
+# Customizable Rules
+line_length:
+  warning: 120
+  error: 200
+  ignores_function_declarations: true
+  ignores_comments: true
+
+identifier_name:
+  excluded:
+    - x
+    - y
+    - z
+    - r
+    - i
+    - j
+    - k
+    - n
+    - t
+    - a
+    - b
+    - c
+    - d
+    - f
+    - g
+    - h
+    - l
+    - m
+    - p
+    - s
+    - D
+    - F
+    - L
+    - M
+
+function_body_length:
+  warning: 50
+  error: 100
+
+type_body_length:
+  warning: 250
+  error: 700
+
+file_length:
+  warning: 400
+  error: 900
+
+function_parameter_count:
+  warning: 6
+  error: 10
+
+large_tuple:
+  warning: 3
+  error: 5
+
+nesting:
+  type_level:
+    warning: 2
+    error: 3
+
+# Exclude paths
+excluded:
+  - Pods

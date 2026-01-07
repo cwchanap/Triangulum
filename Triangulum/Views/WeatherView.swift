@@ -3,7 +3,7 @@ import SwiftUI
 struct WeatherView: View {
     @ObservedObject var weatherManager: WeatherManager
     @State private var showingWeatherSearch = false
-    
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -15,7 +15,7 @@ struct WeatherView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
-                
+
                 Button(action: {
                     showingWeatherSearch = true
                 }) {
@@ -23,7 +23,7 @@ struct WeatherView: View {
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
                 }
-                
+
                 Button(action: {
                     print("DEBUG: Manual refresh button pressed")
                     weatherManager.refreshWeather()
@@ -34,7 +34,7 @@ struct WeatherView: View {
                 }
                 .disabled(weatherManager.isLoading)
             }
-            
+
             if weatherManager.isInitializing {
                 VStack(spacing: 8) {
                     ProgressView()
@@ -99,7 +99,7 @@ struct WeatherView: View {
                                 .font(.caption)
                                 .foregroundColor(.prussianBlueLight)
                         }
-                        
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(weather.temperatureCelsius, specifier: "%.1f")°C")
                                 .font(.title)
@@ -112,10 +112,10 @@ struct WeatherView: View {
                                 .font(.caption)
                                 .foregroundColor(.prussianBlueLight)
                         }
-                        
+
                         Spacer()
                     }
-                    
+
                     // Weather details
                     VStack(spacing: 8) {
                         HStack {
@@ -128,9 +128,9 @@ struct WeatherView: View {
                                     .fontWeight(.medium)
                                     .foregroundColor(.prussianBlueDark)
                             }
-                            
+
                             Spacer()
-                            
+
                             VStack(alignment: .trailing) {
                                 Text("Pressure")
                                     .font(.caption)
@@ -141,7 +141,7 @@ struct WeatherView: View {
                                     .foregroundColor(.prussianBlueDark)
                             }
                         }
-                        
+
                         if let windSpeed = weather.windSpeed {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -153,9 +153,9 @@ struct WeatherView: View {
                                         .fontWeight(.medium)
                                         .foregroundColor(.prussianBlueDark)
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 if let visibility = weather.visibility {
                                     VStack(alignment: .trailing) {
                                         Text("Visibility")
@@ -169,7 +169,7 @@ struct WeatherView: View {
                                 }
                             }
                         }
-                        
+
                         HStack {
                             VStack(alignment: .leading) {
                                 Text("Min")
@@ -180,9 +180,9 @@ struct WeatherView: View {
                                     .fontWeight(.medium)
                                     .foregroundColor(.prussianBlueDark)
                             }
-                            
+
                             Spacer()
-                            
+
                             VStack(alignment: .trailing) {
                                 Text("Max")
                                     .font(.caption)
@@ -194,7 +194,7 @@ struct WeatherView: View {
                             }
                         }
                     }
-                    
+
                     // Location and timestamp
                     VStack(spacing: 2) {
                         Text(weather.locationName)
@@ -242,7 +242,7 @@ struct WeatherView: View {
 #Preview {
     let locationManager = LocationManager()
     let weatherManager = WeatherManager(locationManager: locationManager)
-    
+
     return WeatherView(weatherManager: weatherManager)
         .onAppear {
             // Mock weather data for preview

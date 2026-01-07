@@ -28,7 +28,7 @@ struct ConstellationMapView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            GeometryReader { geo in
+            GeometryReader { _ in
                 TimelineView(.animation) { timeline in
                     let currentZoom = max(min(zoom * pinch, maxZoom), minZoom)
                     let currentPan = CGSize(width: pan.width + drag.width, height: pan.height + drag.height)
@@ -364,8 +364,8 @@ struct ConstellationMapView: View {
 
     private func drawConstellationLabels(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, lstHours: Double, observer: Observer, headingRad: Double, azOffsetRad: Double, altOffsetDeg: Double, fg: Color) {
         // Define label groups
-        let orion = ["Betelgeuse","Bellatrix","Rigel","Saiph","Alnilam","Alnitak","Mintaka"]
-        let dipper = ["Dubhe","Merak","Phecda","Megrez","Alioth","Mizar","Alkaid"]
+        let orion = ["Betelgeuse", "Bellatrix", "Rigel", "Saiph", "Alnilam", "Alnitak", "Mintaka"]
+        let dipper = ["Dubhe", "Merak", "Phecda", "Megrez", "Alioth", "Mizar", "Alkaid"]
         func centroid(for names: [String]) -> CGPoint? {
             var pts: [CGPoint] = []
             for n in names {
@@ -571,9 +571,9 @@ struct ConstellationMapView: View {
             let zg = sin(b)
 
             // Transpose of equatorial->galactic matrix (J2000)
-            let r11 = -0.0548755604, r12 = 0.4941094279,  r13 = -0.8676661490
+            let r11 = -0.0548755604, r12 = 0.4941094279, r13 = -0.8676661490
             let r21 = -0.8734370902, r22 = -0.4448296300, r23 = -0.1980763734
-            let r31 = -0.4838350155, r32 = 0.7469822445,  r33 = 0.4559837762
+            let r31 = -0.4838350155, r32 = 0.7469822445, r33 = 0.4559837762
 
             let xe = r11 * xg + r12 * yg + r13 * zg
             let ye = r21 * xg + r22 * yg + r23 * zg

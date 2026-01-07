@@ -6,7 +6,7 @@ import MapKit
 // It uses the public Nominatim service with polite headers.
 enum OSMGeocoder {
     struct Result: Decodable {
-        let display_name: String
+        let displayName: String
         let lat: String
         let lon: String
 
@@ -15,7 +15,12 @@ enum OSMGeocoder {
         }
     }
 
-    static func search(query: String, limit: Int = 5, region: MKCoordinateRegion? = nil, bounded: Bool = false) async throws -> [Result] {
+    static func search(
+        query: String,
+        limit: Int = 5,
+        region: MKCoordinateRegion? = nil,
+        bounded: Bool = false
+    ) async throws -> [Result] {
         guard var components = URLComponents(string: "https://nominatim.openstreetmap.org/search") else {
             return []
         }

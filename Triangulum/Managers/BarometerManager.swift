@@ -13,7 +13,7 @@ class BarometerManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var isAttitudeAvailable: Bool = false
     @Published var errorMessage: String = ""
-    @Published var historyRecordingError: Error? = nil
+    @Published var historyRecordingError: Error?
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()

@@ -15,7 +15,7 @@ struct TriangulumApp: App {
             Item.self,
             SensorReading.self,
             MapTile.self,
-            PressureReading.self,
+            PressureReading.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
