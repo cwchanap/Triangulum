@@ -3,7 +3,7 @@ import CoreMotion
 
 struct AccelerometerView: View {
     @ObservedObject var accelerometerManager: AccelerometerManager
-    
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -16,7 +16,7 @@ struct AccelerometerView: View {
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
             }
-            
+
             if !accelerometerManager.isAvailable {
                 Text("Accelerometer not available on this device")
                     .foregroundColor(.prussianError)
@@ -37,9 +37,9 @@ struct AccelerometerView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Y-Axis")
                                 .font(.caption)
@@ -50,7 +50,7 @@ struct AccelerometerView: View {
                                 .foregroundColor(.prussianBlueDark)
                         }
                     }
-                    
+
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Z-Axis")
@@ -61,9 +61,9 @@ struct AccelerometerView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Magnitude")
                                 .font(.caption)
@@ -74,7 +74,7 @@ struct AccelerometerView: View {
                                 .foregroundColor(.prussianBlueDark)
                         }
                     }
-                    
+
                     ProgressView(value: min(max(accelerometerManager.magnitude / 2.0, 0.0), 1.0))
                         .progressViewStyle(LinearProgressViewStyle(tint: accelerationColor))
                 }
@@ -91,7 +91,7 @@ struct AccelerometerView: View {
         .cornerRadius(12)
         .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
     }
-    
+
     private var accelerationColor: Color {
         let magnitude = accelerometerManager.magnitude
         if magnitude > 1.5 {
@@ -111,7 +111,7 @@ struct AccelerometerView: View {
     manager.accelerationZ = 0.987
     manager.magnitude = 1.123
     manager.isAvailable = true
-    
+
     return AccelerometerView(accelerometerManager: manager)
         .padding()
 }

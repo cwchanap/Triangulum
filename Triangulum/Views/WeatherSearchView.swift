@@ -14,9 +14,9 @@ struct WeatherSearchView: View {
     @State private var isSearching = false
     @State private var errorMessage = ""
     @State private var searchHistory: [SearchedCity] = []
-    
+
     private let weatherManager = WeatherSearchManager()
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -33,11 +33,11 @@ struct WeatherSearchView: View {
             loadSearchHistory()
         }
     }
-    
+
     private var searchBarSection: some View {
         VStack(spacing: 12) {
             searchBarContent
-            
+
             if !errorMessage.isEmpty {
                 Text(errorMessage)
                     .font(.caption)
@@ -49,25 +49,25 @@ struct WeatherSearchView: View {
         .background(Color.white)
         .shadow(color: .prussianBlue.opacity(0.1), radius: 2, x: 0, y: 2)
     }
-    
+
     private var searchBarContent: some View {
         HStack(spacing: 12) {
             searchTextField
             searchButton
         }
     }
-    
+
     private var searchTextField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.prussianBlueLight)
-            
+
             TextField("Search city (e.g., London, Paris, Tokyo)", text: $searchText)
                 .textInputAutocapitalization(.words)
                 .onSubmit {
                     searchWeather()
                 }
-            
+
             if !searchText.isEmpty {
                 Button(action: {
                     searchText = ""
@@ -83,7 +83,7 @@ struct WeatherSearchView: View {
         .background(Color.prussianSoft.opacity(0.3))
         .cornerRadius(10)
     }
-    
+
     private var searchButton: some View {
         Button(action: searchWeather) {
             if isSearching {
@@ -101,7 +101,7 @@ struct WeatherSearchView: View {
         .cornerRadius(8)
         .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
-    
+
     private var contentSection: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
@@ -124,7 +124,7 @@ struct WeatherSearchView: View {
                         .padding(.top)
                     }
                 }
-                
+
                 // Search History
                 if !searchHistory.isEmpty {
                     Section {
@@ -151,19 +151,19 @@ struct WeatherSearchView: View {
                         .padding(.top)
                     }
                 }
-                
+
                 // Empty State
                 if searchResults.isEmpty && searchHistory.isEmpty && !isSearching {
                     VStack(spacing: 16) {
                         Image(systemName: "globe.americas.fill")
                             .font(.system(size: 60))
                             .foregroundColor(.prussianBlueLight)
-                        
+
                         Text("Search Weather Worldwide")
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.prussianBlueDark)
-                        
+
                         Text("Enter any city name to get current weather conditions from around the world")
                             .font(.body)
                             .foregroundColor(.prussianBlueLight)
@@ -176,20 +176,20 @@ struct WeatherSearchView: View {
         }
         .background(Color.prussianSoft.ignoresSafeArea())
     }
-    
+
     // MARK: - Search Functions
-    
+
     private func searchWeather() {
         let city = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !city.isEmpty else { return }
-        
+
         searchWeatherForCity(city)
     }
-    
+
     private func searchWeatherForCity(_ city: String) {
         isSearching = true
         errorMessage = ""
-        
+
         Task {
             do {
                 let weather = try await weatherManager.fetchWeather(for: city)
@@ -206,43 +206,43 @@ struct WeatherSearchView: View {
             }
         }
     }
-    
+
     // MARK: - History Management
-    
+
     private func addToHistory(_ weather: Weather) {
         let city = SearchedCity(name: weather.locationName, country: "")
-        
+
         // Remove if already exists to avoid duplicates
         searchHistory.removeAll { $0.name.lowercased() == city.name.lowercased() }
-        
+
         // Add to beginning
         searchHistory.insert(city, at: 0)
-        
+
         // Keep only last 10 searches
         if searchHistory.count > 10 {
             searchHistory = Array(searchHistory.prefix(10))
         }
-        
+
         saveSearchHistory()
     }
-    
+
     private func removeFromHistory(_ city: SearchedCity) {
         searchHistory.removeAll { $0.id == city.id }
         saveSearchHistory()
     }
-    
+
     private func clearHistory() {
         searchHistory.removeAll()
         saveSearchHistory()
     }
-    
+
     private func loadSearchHistory() {
         if let data = UserDefaults.standard.data(forKey: "weatherSearchHistory"),
            let decoded = try? JSONDecoder().decode([SearchedCity].self, from: data) {
             searchHistory = decoded
         }
     }
-    
+
     private func saveSearchHistory() {
         if let encoded = try? JSONEncoder().encode(searchHistory) {
             UserDefaults.standard.set(encoded, forKey: "weatherSearchHistory")
@@ -255,7 +255,7 @@ struct WeatherSearchView: View {
 struct WeatherSearchResultCard: View {
     let weather: Weather
     let onSave: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 12) {
             HStack {
@@ -265,16 +265,16 @@ struct WeatherSearchResultCard: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.prussianBlueDark)
                 }
-                
+
                 Spacer()
-                
+
                 Button(action: onSave) {
                     Image(systemName: "bookmark")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
                 }
             }
-            
+
             HStack(spacing: 20) {
                 // Temperature
                 VStack(alignment: .leading, spacing: 4) {
@@ -286,9 +286,9 @@ struct WeatherSearchResultCard: View {
                         .fontWeight(.bold)
                         .foregroundColor(.prussianBlueDark)
                 }
-                
+
                 Spacer()
-                
+
                 // Conditions
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("Conditions")
@@ -301,7 +301,7 @@ struct WeatherSearchResultCard: View {
                         .multilineTextAlignment(.trailing)
                 }
             }
-            
+
             // Additional Info
             HStack(spacing: 16) {
                 WeatherInfoItem(title: "Feels Like", value: String(format: "%.1f°C", weather.feelsLike - 273.15))
@@ -321,7 +321,7 @@ struct WeatherHistoryCard: View {
     let city: SearchedCity
     let onTap: () -> Void
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -329,16 +329,16 @@ struct WeatherHistoryCard: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.prussianBlueDark)
-                
+
                 if !city.country.isEmpty {
                     Text(city.country)
                         .font(.caption2)
                         .foregroundColor(.prussianBlueLight)
                 }
             }
-            
+
             Spacer()
-            
+
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.caption)
@@ -360,7 +360,7 @@ struct WeatherHistoryCard: View {
 struct WeatherInfoItem: View {
     let title: String
     let value: String
-    
+
     var body: some View {
         VStack(spacing: 2) {
             Text(title)
@@ -387,30 +387,30 @@ struct SearchedCity: Codable, Identifiable {
 
 class WeatherSearchManager {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
-    
+
     func fetchWeather(for city: String) async throws -> Weather {
         guard Config.hasValidAPIKey else {
             throw WeatherSearchError.noAPIKey
         }
-        
+
         let apiKey = Config.openWeatherAPIKey
         let encodedCity = city.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? city
         let urlString = "\(baseURL)?q=\(encodedCity)&appid=\(apiKey)"
-        
+
         guard let url = URL(string: urlString) else {
             throw WeatherSearchError.invalidURL
         }
-        
+
         let (data, response) = try await URLSession.shared.data(from: url)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw WeatherSearchError.invalidResponse
         }
-        
+
         guard httpResponse.statusCode == 200 else {
             throw WeatherSearchError.cityNotFound
         }
-        
+
         let weatherResponse = try JSONDecoder().decode(WeatherResponse.self, from: data)
         return Weather(from: weatherResponse)
     }
@@ -421,7 +421,7 @@ enum WeatherSearchError: Error, LocalizedError {
     case invalidURL
     case invalidResponse
     case cityNotFound
-    
+
     var errorDescription: String? {
         switch self {
         case .noAPIKey:

@@ -17,34 +17,34 @@ struct PreferencesView: View {
     @AppStorage("showMapWidget") private var showMapWidget = true
     @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
     @StateObject private var locationManager = LocationManager()
-    
+
     @State private var apiKeyInput = ""
     @State private var showingAPIKeyAlert = false
     @State private var showingViewAPIKeyAlert = false
     @State private var apiKeyStatus = "Not Set"
-    
+
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Sensor Widgets")) {
                     Toggle("Barometer", isOn: $showBarometerWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-                    
+
                     Toggle("Location", isOn: $showLocationWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-                    
+
                     Toggle("Weather", isOn: $showWeatherWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-                    
+
                     Toggle("Accelerometer", isOn: $showAccelerometerWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-                    
+
                     Toggle("Gyroscope", isOn: $showGyroscopeWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-                    
+
                     Toggle("Magnetometer", isOn: $showMagnetometerWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-                    
+
                     Toggle("Map", isOn: $showMapWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
                 }
@@ -56,7 +56,7 @@ struct PreferencesView: View {
                         Text("OpenStreetMap").tag("osm")
                     }
                     .pickerStyle(SegmentedPickerStyle())
-                    
+
                     if mapProvider == "osm" {
                         NavigationLink(destination: MapCacheView(locationManager: locationManager)) {
                             HStack {
@@ -71,7 +71,7 @@ struct PreferencesView: View {
                         .foregroundColor(.prussianBlueLight)
                     }
                 }
-                
+
                 Section(header: Text("Weather Configuration")) {
                     HStack {
                         Text("API Key Status:")
@@ -82,7 +82,7 @@ struct PreferencesView: View {
                             .font(.caption)
                             .foregroundColor(Config.hasValidAPIKey ? .green : .red)
                     }
-                    
+
                     Button(action: {
                         showingAPIKeyAlert = true
                         apiKeyInput = "" // Clear input field
@@ -96,7 +96,7 @@ struct PreferencesView: View {
                                 .foregroundColor(.prussianAccent)
                         }
                     }
-                    
+
                     if Config.hasValidAPIKey {
                         Button(action: {
                             showingViewAPIKeyAlert = true
@@ -111,7 +111,7 @@ struct PreferencesView: View {
                             }
                         }
                     }
-                    
+
                     if Config.hasValidAPIKey {
                         Button(action: {
                             if Config.deleteAPIKey() {
@@ -128,7 +128,7 @@ struct PreferencesView: View {
                             }
                         }
                     }
-                    
+
                     Text("Get your free API key from openweathermap.org")
                         .font(.caption2)
                         .foregroundColor(.prussianBlueLight)
@@ -170,7 +170,7 @@ struct PreferencesView: View {
             Text(Config.openWeatherAPIKey.isEmpty ? "No API key found" : Config.openWeatherAPIKey)
         }
     }
-    
+
     private func updateAPIKeyStatus() {
         apiKeyStatus = Config.hasValidAPIKey ? "✓ Set" : "Not Set"
     }

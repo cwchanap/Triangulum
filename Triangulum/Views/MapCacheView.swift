@@ -11,7 +11,7 @@ import MapKit
 struct MapCacheView: View {
     @StateObject private var cacheManager = TileCacheManager.shared
     @ObservedObject var locationManager: LocationManager
-    
+
     var body: some View {
         VStack(spacing: 16) {
             // Header
@@ -26,7 +26,7 @@ struct MapCacheView: View {
                 Spacer()
             }
             .padding(.horizontal)
-            
+
             // Cache Statistics
             VStack(spacing: 12) {
                 HStack {
@@ -39,9 +39,9 @@ struct MapCacheView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.prussianBlueDark)
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Tiles Cached")
                             .font(.caption)
@@ -60,13 +60,13 @@ struct MapCacheView: View {
                         .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
                 )
             }
-            
+
             // Note about download location
             VStack(spacing: 8) {
                 Text("Download Tiles")
                     .font(.headline)
                     .foregroundColor(.prussianBlueDark)
-                
+
                 Text("Use the Map view to download tiles for specific areas. Toggle the cache mode button in the Map view to access download controls.")
                     .font(.callout)
                     .foregroundColor(.prussianBlueLight)
@@ -80,13 +80,13 @@ struct MapCacheView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
             )
-            
+
             // Cache Management
             VStack(spacing: 12) {
                 Text("Cache Management")
                     .font(.headline)
                     .foregroundColor(.prussianBlueDark)
-                
+
                 Button(action: {
                     Task {
                         await cacheManager.clearCache()
@@ -112,7 +112,7 @@ struct MapCacheView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
             )
-            
+
             Spacer()
         }
         .padding()
@@ -131,7 +131,7 @@ struct MapCacheView: View {
 
 #Preview {
     let manager = LocationManager()
-    
+
     return MapCacheView(locationManager: manager)
         .onAppear {
             manager.latitude = 37.7749

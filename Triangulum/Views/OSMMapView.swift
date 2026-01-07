@@ -16,10 +16,10 @@ struct OSMMapView: UIViewRepresentable {
         overlay.canReplaceMapContent = true
         overlay.maximumZ = 19
         overlay.minimumZ = 0
-        
+
         // Add debugging
         print("OSMMapView: Adding tile overlay with template: \(template)")
-        
+
         mapView.addOverlay(overlay, level: .aboveLabels)
 
         mapView.showsUserLocation = true
@@ -29,7 +29,7 @@ struct OSMMapView: UIViewRepresentable {
         // Initial region
         let region = MKCoordinateRegion(center: center, span: span)
         mapView.setRegion(region, animated: false)
-        
+
         // Enable user location to automatically center when available
         if !isTrackingUser {
             mapView.userTrackingMode = .none
@@ -72,7 +72,7 @@ struct OSMMapView: UIViewRepresentable {
             print("OSMMapView: Using default overlay renderer")
             return MKOverlayRenderer(overlay: overlay)
         }
-        
+
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             print("OSMMapView: Region changed to: \(mapView.region)")
         }

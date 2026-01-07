@@ -563,8 +563,8 @@ struct DistanceCalculationTests {
         let deltaLon = (lon2 - lon1) * .pi / 180
 
         let haversineA = sin(deltaLat / 2) * sin(deltaLat / 2) +
-                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
-                sin(deltaLon / 2) * sin(deltaLon / 2)
+            cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
+            sin(deltaLon / 2) * sin(deltaLon / 2)
 
         let angularDistance = 2 * atan2(sqrt(haversineA), sqrt(1 - haversineA))
 

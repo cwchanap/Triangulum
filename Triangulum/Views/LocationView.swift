@@ -3,7 +3,7 @@ import CoreLocation
 
 struct LocationView: View {
     @ObservedObject var locationManager: LocationManager
-    
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -15,14 +15,14 @@ struct LocationView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
-                
+
                 NavigationLink(destination: MapView(locationManager: locationManager)) {
                     Image(systemName: "map")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
                 }
             }
-            
+
             if !locationManager.isAvailable {
                 Text("Location services disabled in system settings")
                     .foregroundColor(.prussianError)
@@ -63,9 +63,9 @@ struct LocationView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Longitude")
                                 .font(.caption)
@@ -76,7 +76,7 @@ struct LocationView: View {
                                 .foregroundColor(.prussianBlueDark)
                         }
                     }
-                    
+
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Altitude (above sea level)")
@@ -87,9 +87,9 @@ struct LocationView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Accuracy")
                                 .font(.caption)
@@ -100,7 +100,7 @@ struct LocationView: View {
                                 .foregroundColor(accuracyColor)
                         }
                     }
-                    
+
                     ProgressView(value: min(max((100 - locationManager.accuracy) / 100.0, 0.0), 1.0))
                         .progressViewStyle(LinearProgressViewStyle(tint: accuracyColor))
                 }
@@ -117,7 +117,7 @@ struct LocationView: View {
         .cornerRadius(12)
         .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
     }
-    
+
     private var accuracyColor: Color {
         if locationManager.accuracy < 5.0 {
             return .prussianSuccess
@@ -131,7 +131,7 @@ struct LocationView: View {
 
 #Preview {
     let manager = LocationManager()
-    
+
     return LocationView(locationManager: manager)
         .onAppear {
             manager.latitude = 37.7749

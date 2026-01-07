@@ -11,21 +11,21 @@ import UIKit
 
 class CachedTileOverlay: MKTileOverlay {
     private lazy var cacheManager: TileCacheManager = TileCacheManager.shared
-    
+
     override init(urlTemplate: String?) {
         super.init(urlTemplate: urlTemplate)
         self.canReplaceMapContent = true
     }
-    
+
     override func url(forTilePath path: MKTileOverlayPath) -> URL {
         // We override loadTile instead, so this won't be used
         return URL(string: "https://tile.openstreetmap.org/\(path.z)/\(path.x)/\(path.y).png")!
     }
-    
+
     override func loadTile(at path: MKTileOverlayPath, result: @escaping (Data?, Error?) -> Void) {
         Task { @MainActor in
             let tileData = await cacheManager.getTile(x: path.x, y: path.y, z: path.z)
-            
+
             if let data = tileData {
                 result(data, nil)
             } else {
