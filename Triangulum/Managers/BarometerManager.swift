@@ -56,6 +56,14 @@ class BarometerManager: ObservableObject {
             guard let data = data else { return }
 
             let currentPressure = data.pressure.doubleValue
+
+            // Validate location availability before calculating sea level pressure
+            guard locationManager.hasValidLocation else {
+                self.errorMessage = "Waiting for location data for accurate pressure reading"
+                self.pressure = currentPressure
+                return
+            }
+
             let currentAltitude = self.locationManager.altitude
             let seaLevel = self.calculateSeaLevelPressure(
                 currentPressure: currentPressure,
