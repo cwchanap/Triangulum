@@ -301,6 +301,30 @@ class PressureHistoryManager: ObservableObject {
         )
     }
 
+    // MARK: - Statistics Helpers
+
+    /// Calculates statistics for a given array of pressure readings
+    /// - Parameter readings: Array of pressure readings to analyze
+    /// - Returns: Statistics calculated from the provided readings
+    static func calculateStatistics(for readings: [PressureReading]) -> PressureStatistics {
+        guard !readings.isEmpty else {
+            return .empty
+        }
+
+        let pressures = readings.map { $0.pressure }
+        let altitudes = readings.map { $0.altitude }
+
+        return PressureStatistics(
+            minPressure: pressures.min() ?? 0,
+            maxPressure: pressures.max() ?? 0,
+            avgPressure: pressures.reduce(0, +) / Double(pressures.count),
+            minAltitude: altitudes.min() ?? 0,
+            maxAltitude: altitudes.max() ?? 0,
+            avgAltitude: altitudes.reduce(0, +) / Double(altitudes.count),
+            dataPointCount: readings.count
+        )
+    }
+
     // MARK: - Data Cleanup
 
     /// Removes readings older than the retention period

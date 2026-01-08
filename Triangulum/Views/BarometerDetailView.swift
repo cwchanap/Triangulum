@@ -232,7 +232,7 @@ struct BarometerDetailView: View {
     // MARK: - Statistics Card
 
     private var statisticsCard: some View {
-        let stats = historyManager?.statistics ?? .empty
+        let stats = PressureHistoryManager.calculateStatistics(for: readings)
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {

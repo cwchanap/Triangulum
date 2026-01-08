@@ -13,6 +13,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var errorMessage: String = ""
 
+    /// Indicates whether a valid location fix has been received
+    var hasValidLocation: Bool {
+        return isAvailable && accuracy > 0
+    }
+
     override init() {
         super.init()
         locationManager.delegate = self
