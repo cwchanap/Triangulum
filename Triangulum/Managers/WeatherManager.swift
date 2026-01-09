@@ -4,6 +4,7 @@ import CoreLocation
 class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
     var locationManager: LocationManager
+    private var weatherCheckTimer: Timer?
 
     @Published var currentWeather: Weather?
     @Published var isLoading: Bool = false
@@ -21,22 +22,32 @@ class WeatherManager: ObservableObject {
         setupLocationObserver()
     }
 
+    deinit {
+        stopMonitoring()
+    }
+
     private func setupLocationObserver() {
         // Check immediately
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.checkAndFetchWeather()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.checkAndFetchWeather()
         }
 
         // Then check periodically
-        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
-            self.checkAndFetchWeather()
+        weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.checkAndFetchWeather()
         }
+    }
+
+    func stopMonitoring() {
+        weatherCheckTimer?.invalidate()
+        weatherCheckTimer = nil
     }
 
     private func checkAndFetchWeather() {
         let hasAPIKey = Config.hasValidAPIKey
         let locationAvailable = locationManager.isAvailable
-        let hasLocationData = locationManager.latitude != 0.0 && locationManager.longitude != 0.0
+        let coordinate = CLLocationCoordinate2D(latitude: locationManager.latitude, longitude: locationManager.longitude)
+        let hasLocationData = CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 || coordinate.longitude != 0)
 
         print("DEBUG: Check - API: \(hasAPIKey), Location: \(locationAvailable), Coords: \(hasLocationData)")
 
@@ -82,7 +93,8 @@ class WeatherManager: ObservableObject {
             return
         }
 
-        guard locationManager.latitude != 0.0 && locationManager.longitude != 0.0 else {
+        let coordinate = CLLocationCoordinate2D(latitude: locationManager.latitude, longitude: locationManager.longitude)
+        guard CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 || coordinate.longitude != 0) else {
             errorMessage = "No location data available"
             return
         }

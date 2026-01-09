@@ -167,7 +167,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // Heading updates
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         // Use trueHeading if valid, else magneticHeading
-        let headingValue = newHeading.trueHeading > 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        let headingValue = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
         heading = headingValue
     }
 

@@ -10,9 +10,9 @@ import SwiftData
 
 @Model
 final class MapTile {
-    var tileX: Int
-    var tileY: Int
-    var tileZ: Int
+    @Attribute(originalName: "x") var tileX: Int
+    @Attribute(originalName: "y") var tileY: Int
+    @Attribute(originalName: "z") var tileZ: Int
     var data: Data
     var timestamp: Date
     var url: String

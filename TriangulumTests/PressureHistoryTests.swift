@@ -288,7 +288,7 @@ struct PressureHistoryManagerTests {
             )
             context.insert(reading)
         }
-        try? context.save()
+        try context.save()
 
         let readings = manager.fetchReadings(for: .oneHour)
 
@@ -311,7 +311,7 @@ struct PressureHistoryManagerTests {
             )
             context.insert(reading)
         }
-        try? context.save()
+        try context.save()
 
         manager.loadRecentReadings(for: .oneHour)
 
@@ -338,7 +338,7 @@ struct PressureHistoryManagerTests {
             )
             context.insert(reading)
         }
-        try? context.save()
+        try context.save()
 
         manager.loadRecentReadings(for: .oneHour)
 

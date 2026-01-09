@@ -119,7 +119,7 @@ class PressureHistoryManager: ObservableObject {
     private var modelContext: ModelContext?
     private var lastRecordedTime: Date?
     private let minimumRecordingInterval: TimeInterval = 60  // 1 minute
-    private let minimumTrendDataMinutes: TimeInterval = 30 * 60  // 30 minutes
+    private let minimumTrendDataSeconds: TimeInterval = 30 * 60  // 30 minutes
     private let retentionPeriod: TimeInterval = 7 * 24 * 60 * 60  // 7 days
 
     // MARK: - Initialization
@@ -222,7 +222,7 @@ class PressureHistoryManager: ObservableObject {
         }
 
         // Need at least 30 minutes of data
-        let thirtyMinutesAgo = Date().addingTimeInterval(-minimumTrendDataMinutes)
+        let thirtyMinutesAgo = Date().addingTimeInterval(-minimumTrendDataSeconds)
 
         let descriptor = FetchDescriptor<PressureReading>(
             predicate: #Predicate { $0.timestamp > thirtyMinutesAgo },
@@ -344,8 +344,12 @@ class PressureHistoryManager: ObservableObject {
             }
 
             if !oldReadings.isEmpty {
-                try? modelContext.save()
-                print("Cleaned up \(oldReadings.count) old pressure readings")
+                do {
+                    try modelContext.save()
+                    print("Cleaned up \(oldReadings.count) old pressure readings")
+                } catch {
+                    print("Failed to save after deletions: \(error.localizedDescription)")
+                }
             }
         } catch {
             print("Failed to cleanup old readings: \(error)")
