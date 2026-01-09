@@ -37,9 +37,9 @@ class AccelerometerManager: ObservableObject {
             guard let self = self else { return }
 
             if let error = error {
-                // Check for permission-related errors
-                if error.localizedDescription.contains("not authorized") ||
-                    error.localizedDescription.contains("permission") {
+                // Check for permission-related errors using NSError domain/code
+                let nsError = error as NSError
+                if nsError.domain == CMErrorDomain {
                     self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
                 } else {
                     self.errorMessage = "Error reading accelerometer: \(error.localizedDescription)"

@@ -10,6 +10,12 @@ enum OSMGeocoder {
         let lat: String
         let lon: String
 
+        enum CodingKeys: String, CodingKey {
+            case displayName = "display_name"
+            case lat
+            case lon
+        }
+
         var coordinate: CLLocationCoordinate2D {
             CLLocationCoordinate2D(latitude: Double(lat) ?? 0, longitude: Double(lon) ?? 0)
         }

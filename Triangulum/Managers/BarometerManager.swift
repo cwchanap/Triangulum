@@ -107,8 +107,15 @@ class BarometerManager: ObservableObject {
         guard isAttitudeAvailable else { return }
 
         motionManager.deviceMotionUpdateInterval = 0.1
-        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
-            guard let self = self, let motion = motion else { return }
+        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
+            guard let self = self else { return }
+
+            if let error = error {
+                self.errorMessage = "Motion sensor error: \(error.localizedDescription)"
+                return
+            }
+
+            guard let motion = motion else { return }
             self.attitude = motion.attitude
         }
     }

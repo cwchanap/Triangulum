@@ -5,7 +5,6 @@ import CoreLocation
 struct SnapshotComparisonView: View {
     let snapshot1: SensorSnapshot
     let snapshot2: SensorSnapshot
-    @ObservedObject var snapshotManager: SnapshotManager
     @Environment(\.dismiss) private var dismiss
 
     private var distance: CLLocationDistance {
@@ -34,8 +33,8 @@ struct SnapshotComparisonView: View {
                     // Location comparison
                     locationComparisonCard
 
-                    // Weather comparison (if available)
-                    if snapshot1.weather != nil || snapshot2.weather != nil {
+                    // Weather comparison (if available for both)
+                    if snapshot1.weather != nil && snapshot2.weather != nil {
                         weatherComparisonCard
                     }
                 }
@@ -499,7 +498,6 @@ class ComparisonAnnotation: NSObject, MKAnnotation {
 }
 
 #Preview {
-    let manager = SnapshotManager()
     let locationManager = LocationManager()
     let barometerManager = BarometerManager(locationManager: locationManager)
 
@@ -523,7 +521,6 @@ class ComparisonAnnotation: NSObject, MKAnnotation {
 
     return SnapshotComparisonView(
         snapshot1: snapshot1,
-        snapshot2: snapshot2,
-        snapshotManager: manager
+        snapshot2: snapshot2
     )
 }
