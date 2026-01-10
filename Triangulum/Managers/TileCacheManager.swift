@@ -22,6 +22,13 @@ class TileCacheManager: ObservableObject {
     @Published var tilesCount: Int = 0
     @Published var isDownloading: Bool = false
     @Published var downloadProgress: Double = 0.0
+    @Published var initializationError: String?
+    @Published var lastOperationError: String?
+
+    /// Indicates whether the cache is available for use
+    var isCacheAvailable: Bool {
+        modelContainer != nil
+    }
 
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -40,14 +47,19 @@ class TileCacheManager: ObservableObject {
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            print("Failed to create TileCacheManager ModelContainer: \(error)")
+            let errorMessage = "Failed to create TileCacheManager ModelContainer: \(error.localizedDescription)"
+            print("❌ \(errorMessage)")
+            initializationError = errorMessage
         }
     }
 
     // MARK: - Tile Retrieval
 
     func getTile(tileX: Int, tileY: Int, tileZ: Int) async -> Data? {
-        guard let modelContainer = modelContainer else { return nil }
+        guard let modelContainer = modelContainer else {
+            print("⚠️ TileCacheManager: Cannot get tile - cache not initialized")
+            return nil
+        }
 
         let context = ModelContext(modelContainer)
         // let tileKey = "\(tileZ)/\(tileX)/\(tileY)"
@@ -127,6 +139,9 @@ class TileCacheManager: ObservableObject {
         var downloadedTiles = 0
 
         guard let modelContainer = modelContainer else {
+            let errorMessage = "Cannot download tiles: cache not available"
+            print("❌ TileCacheManager: \(errorMessage)")
+            lastOperationError = errorMessage
             isDownloading = false
             return
         }
@@ -141,7 +156,7 @@ class TileCacheManager: ObservableObject {
             await withTaskGroup(of: Void.self) { group in
                 for tile in batch {
                     group.addTask {
-                        _ = await self.downloadTile(x: tile.x, y: tile.y, z: tile.z, context: context)
+                        _ = await self.downloadTile(tileX: tile.tileX, tileY: tile.tileY, tileZ: tile.tileZ, context: context)
                     }
                 }
             }
@@ -252,8 +267,16 @@ class TileCacheManager: ObservableObject {
         }
     }
 
-    func clearCache() async {
-        guard let modelContainer = modelContainer else { return }
+    /// Clears all cached tiles
+    /// - Returns: true if cache was cleared successfully, false otherwise
+    @discardableResult
+    func clearCache() async -> Bool {
+        guard let modelContainer = modelContainer else {
+            let errorMessage = "Cannot clear cache: cache not available"
+            print("❌ TileCacheManager: \(errorMessage)")
+            lastOperationError = errorMessage
+            return false
+        }
 
         let context = ModelContext(modelContainer)
 
@@ -267,8 +290,13 @@ class TileCacheManager: ObservableObject {
 
             try context.save()
             updateCacheStats()
+            lastOperationError = nil
+            return true
         } catch {
-            print("Error clearing cache: \(error)")
+            let errorMessage = "Error clearing cache: \(error.localizedDescription)"
+            print("❌ TileCacheManager: \(errorMessage)")
+            lastOperationError = errorMessage
+            return false
         }
     }
 

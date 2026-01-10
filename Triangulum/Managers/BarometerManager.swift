@@ -53,7 +53,10 @@ class BarometerManager: ObservableObject {
                 return
             }
 
-            guard let data = data else { return }
+            guard let data = data else {
+                print("⚠️ BarometerManager: Received nil data without error from altimeter")
+                return
+            }
 
             let currentPressure = data.pressure.doubleValue
 
@@ -77,7 +80,11 @@ class BarometerManager: ObservableObject {
             // Record to history for trend analysis and graphs
             // historyManager is @MainActor, so we need to hop to main actor context
             Task { @MainActor in
-                guard let historyManager = self.historyManager else { return }
+                guard let historyManager = self.historyManager else {
+                    // History manager not configured - this is expected during initial setup
+                    // but should be logged if it persists after configureHistory() is called
+                    return
+                }
 
                 do {
                     try await historyManager.recordReading(
@@ -115,7 +122,10 @@ class BarometerManager: ObservableObject {
                 return
             }
 
-            guard let motion = motion else { return }
+            guard let motion = motion else {
+                print("⚠️ BarometerManager: Received nil motion data without error")
+                return
+            }
             self.attitude = motion.attitude
         }
     }

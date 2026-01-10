@@ -171,7 +171,7 @@ class PressureHistoryManager: ObservableObject {
         // Update recent readings and recalculate trend
         recentReadings.append(reading)
 
-        // Keep data for up to 7 days in memory to support all time range views during live updates
+        // Remove readings older than retention period from in-memory buffer to prevent unbounded growth
         let retentionCutoff = now.addingTimeInterval(-retentionPeriod)
         recentReadings = recentReadings.filter { $0.timestamp > retentionCutoff }
 
@@ -187,8 +187,13 @@ class PressureHistoryManager: ObservableObject {
     // MARK: - Data Retrieval
 
     /// Fetches readings for a specific time range
+    /// - Parameter timeRange: The time range to fetch readings for
+    /// - Returns: Array of readings, or empty array if context not configured or fetch fails
     func fetchReadings(for timeRange: TimeRange) -> [PressureReading] {
-        guard let modelContext = modelContext else { return [] }
+        guard let modelContext = modelContext else {
+            print("⚠️ PressureHistoryManager: Cannot fetch readings - context not configured")
+            return []
+        }
 
         let cutoffDate = Date().addingTimeInterval(-timeRange.seconds)
 
@@ -200,7 +205,7 @@ class PressureHistoryManager: ObservableObject {
         do {
             return try modelContext.fetch(descriptor)
         } catch {
-            print("Failed to fetch pressure readings: \(error)")
+            print("❌ PressureHistoryManager: Failed to fetch readings: \(error.localizedDescription)")
             return []
         }
     }
@@ -329,7 +334,10 @@ class PressureHistoryManager: ObservableObject {
 
     /// Removes readings older than the retention period
     private func cleanupOldData() {
-        guard let modelContext = modelContext else { return }
+        guard let modelContext = modelContext else {
+            print("⚠️ PressureHistoryManager: Cannot cleanup - context not configured")
+            return
+        }
 
         let cutoffDate = Date().addingTimeInterval(-retentionPeriod)
 
@@ -346,13 +354,13 @@ class PressureHistoryManager: ObservableObject {
             if !oldReadings.isEmpty {
                 do {
                     try modelContext.save()
-                    print("Cleaned up \(oldReadings.count) old pressure readings")
+                    print("✓ PressureHistoryManager: Cleaned up \(oldReadings.count) old pressure readings")
                 } catch {
-                    print("Failed to save after deletions: \(error.localizedDescription)")
+                    print("❌ PressureHistoryManager: Failed to save after deletions: \(error.localizedDescription)")
                 }
             }
         } catch {
-            print("Failed to cleanup old readings: \(error)")
+            print("❌ PressureHistoryManager: Failed to cleanup old readings: \(error.localizedDescription)")
         }
     }
 }

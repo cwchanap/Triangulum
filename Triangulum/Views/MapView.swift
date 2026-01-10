@@ -116,7 +116,7 @@ struct MapView: View {
                         let item = osmSuggestions[idx]
                         Button(action: { selectOSMSuggestion(item) }) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(item.display_name)
+                                Text(item.displayName)
                                     .font(.subheadline)
                                     .lineLimit(2)
                                     .foregroundColor(.prussianBlueDark)
@@ -595,9 +595,9 @@ extension MapView {
                     osmCenter = first.coordinate
                     osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                     osmRecenterToken = UUID()
-                    searchMessage = first.display_name
+                    searchMessage = first.displayName
                     selectedResultCoordinate = first.coordinate
-                    selectedResultTitle = first.display_name
+                    selectedResultTitle = first.displayName
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
                 }
             }
@@ -678,10 +678,10 @@ extension MapView {
         osmCenter = result.coordinate
         osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
         osmRecenterToken = UUID()
-        searchMessage = result.display_name
+        searchMessage = result.displayName
         osmSuggestions = []
         selectedResultCoordinate = result.coordinate
-        selectedResultTitle = result.display_name
+        selectedResultTitle = result.displayName
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
     }
 

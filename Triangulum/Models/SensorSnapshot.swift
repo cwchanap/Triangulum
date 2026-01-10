@@ -132,12 +132,20 @@ struct SensorSnapshot: Codable, Identifiable {
 }
 
 struct SnapshotPhoto: Codable, Identifiable {
-    let id = UUID()
+    let id: UUID
     let imageData: Data
     let timestamp: Date
 
-    init(image: UIImage) {
-        self.imageData = image.jpegData(compressionQuality: 0.8) ?? Data()
+    /// Creates a new snapshot photo from a UIImage
+    /// - Parameter image: The image to store
+    /// - Returns: nil if JPEG conversion fails
+    init?(image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.8), !data.isEmpty else {
+            print("❌ SnapshotPhoto: Failed to convert image to JPEG data")
+            return nil
+        }
+        self.id = UUID()
+        self.imageData = data
         self.timestamp = Date()
     }
 
@@ -182,15 +190,29 @@ class SnapshotManager: ObservableObject {
         savePhotos()
     }
 
-    func addPhoto(to snapshotID: UUID, image: UIImage) {
-        guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else { return }
+    /// Adds a photo to a snapshot
+    /// - Parameters:
+    ///   - snapshotID: The ID of the snapshot to add the photo to
+    ///   - image: The image to add
+    /// - Returns: true if the photo was added successfully, false otherwise
+    @discardableResult
+    func addPhoto(to snapshotID: UUID, image: UIImage) -> Bool {
+        guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else {
+            print("⚠️ SnapshotManager: Cannot add photo - snapshot not found: \(snapshotID)")
+            return false
+        }
 
-        let photo = SnapshotPhoto(image: image)
+        guard let photo = SnapshotPhoto(image: image) else {
+            print("❌ SnapshotManager: Failed to create photo from image")
+            return false
+        }
+
         photos[photo.id] = photo
         snapshots[snapshotIndex].photoIDs.append(photo.id)
 
         saveSnapshots()
         savePhotos()
+        return true
     }
 
     func removePhoto(_ photoID: UUID, from snapshotID: UUID) {

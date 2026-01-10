@@ -24,7 +24,7 @@ class CachedTileOverlay: MKTileOverlay {
 
     override func loadTile(at path: MKTileOverlayPath, result: @escaping (Data?, Error?) -> Void) {
         Task { @MainActor in
-            let tileData = await cacheManager.getTile(x: path.x, y: path.y, z: path.z)
+            let tileData = await cacheManager.getTile(tileX: path.x, tileY: path.y, tileZ: path.z)
 
             if let data = tileData {
                 result(data, nil)

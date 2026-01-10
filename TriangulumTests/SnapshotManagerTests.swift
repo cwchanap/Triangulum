@@ -239,9 +239,10 @@ struct SnapshotManagerTests {
         let testImage = createTestImage()
         let photo = SnapshotPhoto(image: testImage)
 
-        #expect(photo.imageData.count > 0)
-        #expect(photo.image != nil)
-        #expect(photo.timestamp.timeIntervalSinceNow < 1.0)
+        #expect(photo != nil)
+        #expect(photo?.imageData.count ?? 0 > 0)
+        #expect(photo?.image != nil)
+        #expect(photo?.timestamp.timeIntervalSinceNow ?? -100 < 1.0)
     }
 
     @Test func testSnapshotPhotoJPEGCompression() {
@@ -249,10 +250,11 @@ struct SnapshotManagerTests {
         let photo = SnapshotPhoto(image: testImage)
 
         // Should have some data due to JPEG compression
-        #expect(photo.imageData.count > 0)
+        #expect(photo != nil)
+        #expect(photo?.imageData.count ?? 0 > 0)
 
         // Should be able to recreate image from data
-        let recreatedImage = photo.image
+        let recreatedImage = photo?.image
         #expect(recreatedImage != nil)
     }
 
@@ -264,8 +266,9 @@ struct SnapshotManagerTests {
         let emptyImage = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
         let photo = SnapshotPhoto(image: emptyImage)
 
-        // Should handle empty image gracefully
-        #expect(photo.imageData != nil) // Could be empty data, but not nil
+        // Empty/zero-size image may fail JPEG conversion, so photo could be nil
+        // This is expected behavior - the failable initializer correctly rejects invalid images
+        // No assertion needed - just verify it doesn't crash
     }
 
     @Test func testMultiplePhotosPerSnapshot() {

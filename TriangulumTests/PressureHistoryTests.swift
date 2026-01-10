@@ -155,16 +155,16 @@ struct PressureReadingTests {
         #expect(reading.timestamp <= afterCreation)
     }
 
-    @Test func testPressureReadingWithZeroValues() {
+    @Test func testPressureReadingWithZeroAltitude() {
+        // Zero altitude is valid (sea level)
         let reading = PressureReading(
-            pressure: 0.0,
+            pressure: 101.325,
             altitude: 0.0,
-            seaLevelPressure: 0.0
+            seaLevelPressure: 101.325
         )
 
-        #expect(reading.pressure == 0.0)
         #expect(reading.altitude == 0.0)
-        #expect(reading.seaLevelPressure == 0.0)
+        #expect(reading.pressure == 101.325)
     }
 
     @Test func testPressureReadingWithNegativeAltitude() {
@@ -615,5 +615,71 @@ struct DeltaCalculationTests {
         let formatted = String(format: "%@%.2f", sign, delta)
 
         #expect(formatted == "-5.12")
+    }
+}
+
+// MARK: - HistoryError Tests
+
+struct HistoryErrorTests {
+
+    @Test func testModelContextNotConfiguredError() {
+        let error = HistoryError.modelContextNotConfigured
+
+        #expect(error.errorDescription == "Model context not configured")
+    }
+
+    @Test func testSaveFailedError() {
+        let underlyingError = NSError(domain: "TestDomain", code: 42, userInfo: [
+            NSLocalizedDescriptionKey: "Test save failure"
+        ])
+        let error = HistoryError.saveFailed(underlyingError)
+
+        #expect(error.errorDescription?.contains("Failed to save reading") == true)
+        #expect(error.errorDescription?.contains("Test save failure") == true)
+    }
+
+    @Test func testHistoryErrorIsLocalizedError() {
+        let error: LocalizedError = HistoryError.modelContextNotConfigured
+        #expect(error.errorDescription != nil)
+    }
+}
+
+// MARK: - PressureHistoryManager Error Handling Tests
+
+@MainActor
+struct PressureHistoryManagerErrorTests {
+
+    @Test func testRecordReadingWithoutConfiguration() async {
+        let manager = PressureHistoryManager()
+        // Don't configure - should throw
+
+        do {
+            try await manager.recordReading(
+                pressure: 101.325,
+                altitude: 100.0,
+                seaLevelPressure: 102.5
+            )
+            // Should not reach here
+            #expect(Bool(false), "Expected error to be thrown")
+        } catch let error as HistoryError {
+            switch error {
+            case .modelContextNotConfigured:
+                #expect(true) // Expected error
+            case .saveFailed:
+                #expect(Bool(false), "Expected modelContextNotConfigured, got saveFailed")
+            }
+        } catch {
+            #expect(Bool(false), "Expected HistoryError, got \(type(of: error))")
+        }
+    }
+
+    @Test func testFetchReadingsWithoutConfiguration() {
+        let manager = PressureHistoryManager()
+        // Don't configure
+
+        let readings = manager.fetchReadings(for: .oneHour)
+
+        // Should return empty array, not crash
+        #expect(readings.isEmpty)
     }
 }

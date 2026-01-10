@@ -110,11 +110,11 @@ struct TileCacheManagerTests {
         let manager = TileCacheManager.shared
 
         // Test valid coordinates
-        let validTile = await manager.getTile(x: 0, y: 0, z: 0)
+        let validTile = await manager.getTile(tileX: 0, tileY: 0, tileZ: 0)
         #expect(validTile != nil || validTile == nil) // Either succeeds or fails gracefully
 
         // Test boundary coordinates
-        let boundaryTile = await manager.getTile(x: 255, y: 255, z: 8)
+        let boundaryTile = await manager.getTile(tileX: 255, tileY: 255, tileZ: 8)
         #expect(boundaryTile != nil || boundaryTile == nil) // Either succeeds or fails gracefully
     }
 
@@ -157,15 +157,15 @@ struct TileCacheManagerTests {
         let manager = TileCacheManager.shared
 
         // Test negative coordinates (should handle gracefully)
-        let negativeTile = await manager.getTile(x: -1, y: -1, z: 1)
+        let negativeTile = await manager.getTile(tileX: -1, tileY: -1, tileZ: 1)
         #expect(negativeTile != nil || negativeTile == nil)
 
         // Test very high coordinates (should handle gracefully)
-        let highCoordTile = await manager.getTile(x: 999999, y: 999999, z: 20)
+        let highCoordTile = await manager.getTile(tileX: 999999, tileY: 999999, tileZ: 20)
         #expect(highCoordTile != nil || highCoordTile == nil)
 
         // Test zero zoom level
-        let zeroZoomTile = await manager.getTile(x: 0, y: 0, z: 0)
+        let zeroZoomTile = await manager.getTile(tileX: 0, tileY: 0, tileZ: 0)
         #expect(zeroZoomTile != nil || zeroZoomTile == nil)
     }
 }
