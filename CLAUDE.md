@@ -141,7 +141,7 @@ Triangulum/
 - UserDefaults-based persistence with JSON encoding for snapshot data
 - NavigationSplitView architecture with detail/sidebar navigation pattern
 - **SwiftData ModelContainer**: App-level setup in `TriangulumApp.swift` with fallback to in-memory storage if persistent storage fails
-  - Registered models: `Item`, `SensorReading`, `MapTile`
+  - Registered models: `Item`, `SensorReading`, `MapTile`, `PressureReading`
   - Environment injection via `.modelContainer()` modifier
 
 ### Hardware Integration

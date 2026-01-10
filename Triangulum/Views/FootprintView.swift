@@ -137,8 +137,7 @@ struct FootprintView: View {
                 if selectedSnapshots.count == 2 {
                     SnapshotComparisonView(
                         snapshot1: selectedSnapshots[0],
-                        snapshot2: selectedSnapshots[1],
-                        snapshotManager: snapshotManager
+                        snapshot2: selectedSnapshots[1]
                     )
                 }
             }
