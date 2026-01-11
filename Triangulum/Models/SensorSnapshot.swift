@@ -175,7 +175,7 @@ class SnapshotManager: ObservableObject {
     }
 
     func deleteSnapshot(at index: Int) {
-        guard index < snapshots.count else { return }
+        guard index >= 0 && index < snapshots.count else { return }
         snapshots.remove(at: index)
         saveSnapshots()
     }
