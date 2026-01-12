@@ -226,18 +226,20 @@ class PressureHistoryManager: ObservableObject {
             return
         }
 
-        // Need at least 30 minutes of data
-        let thirtyMinutesAgo = Date().addingTimeInterval(-minimumTrendDataSeconds)
+        // Add a buffer to ensure we capture enough data points spanning the minimum period
+        let fetchBufferSeconds: TimeInterval = 300  // 5 minutes buffer
+        let fetchStart = Date().addingTimeInterval(-minimumTrendDataSeconds - fetchBufferSeconds)
 
         let descriptor = FetchDescriptor<PressureReading>(
-            predicate: #Predicate { $0.timestamp > thirtyMinutesAgo },
+            predicate: #Predicate { $0.timestamp > fetchStart },
             sortBy: [SortDescriptor(\.timestamp, order: .forward)]
         )
 
         do {
             let readings = try modelContext.fetch(descriptor)
 
-            guard readings.count >= 2 else {
+            // Require at least 3 samples for meaningful trend calculation
+            guard readings.count >= 3 else {
                 trend = .unknown
                 changeRate = 0
                 return
@@ -251,13 +253,15 @@ class PressureHistoryManager: ObservableObject {
             }
 
             let timeDiff = last.timestamp.timeIntervalSince(first.timestamp)
-            guard timeDiff > 0 else {
+            // Enforce minimum time span before calculating rate
+            guard timeDiff >= minimumTrendDataSeconds else {
                 trend = .unknown
                 changeRate = 0
                 return
             }
 
-            let pressureDiff = last.pressure - first.pressure
+            // Use seaLevelPressure for weather trends (altitude-normalized)
+            let pressureDiff = last.seaLevelPressure - first.seaLevelPressure
             let hoursElapsed = timeDiff / 3600
 
             // Convert to hPa (1 kPa = 10 hPa)
@@ -292,7 +296,8 @@ class PressureHistoryManager: ObservableObject {
             return
         }
 
-        let pressures = recentReadings.map { $0.pressure }
+        // Use seaLevelPressure for weather statistics (altitude-normalized)
+        let pressures = recentReadings.map { $0.seaLevelPressure }
         let altitudes = recentReadings.map { $0.altitude }
 
         statistics = PressureStatistics(
@@ -316,7 +321,8 @@ class PressureHistoryManager: ObservableObject {
             return .empty
         }
 
-        let pressures = readings.map { $0.pressure }
+        // Use seaLevelPressure for weather statistics (altitude-normalized)
+        let pressures = readings.map { $0.seaLevelPressure }
         let altitudes = readings.map { $0.altitude }
 
         return PressureStatistics(

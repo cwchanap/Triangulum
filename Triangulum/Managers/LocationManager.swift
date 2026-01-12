@@ -138,7 +138,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         latitude = location.coordinate.latitude
         longitude = location.coordinate.longitude
         altitude = location.altitude
-        accuracy = location.horizontalAccuracy
+        // Guard against negative accuracy values, treating them as invalid (0)
+        accuracy = max(0, location.horizontalAccuracy)
         errorMessage = ""
     }
 

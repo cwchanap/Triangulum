@@ -109,13 +109,21 @@ struct TileCacheManagerTests {
     @Test func testGetTileCoordinateValidation() async {
         let manager = TileCacheManager.shared
 
-        // Test valid coordinates
+        // Test valid coordinates - tile (0,0,0) is the world map at zoom level 0
         let validTile = await manager.getTile(tileX: 0, tileY: 0, tileZ: 0)
-        #expect(validTile != nil || validTile == nil) // Either succeeds or fails gracefully
+        // If tile is retrieved, it should contain non-empty data
+        if let tileData = validTile {
+            #expect(!tileData.isEmpty, "Retrieved tile should contain non-empty data")
+        }
+        // Nil result is acceptable (network timeout, cache miss, etc.)
 
-        // Test boundary coordinates
+        // Test boundary coordinates - (255,255,8) is at the edge of zoom level 8
         let boundaryTile = await manager.getTile(tileX: 255, tileY: 255, tileZ: 8)
-        #expect(boundaryTile != nil || boundaryTile == nil) // Either succeeds or fails gracefully
+        // If tile is retrieved, it should contain non-empty data
+        if let tileData = boundaryTile {
+            #expect(!tileData.isEmpty, "Retrieved tile should contain non-empty data")
+        }
+        // Nil result is acceptable (network timeout, cache miss, out of bounds, etc.)
     }
 
     @Test func testDownloadTilesForRegionParameters() async {
