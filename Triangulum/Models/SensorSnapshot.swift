@@ -3,6 +3,7 @@ import CoreMotion
 import UIKit
 
 struct SensorSnapshot: Codable, Identifiable {
+    // swiftlint:disable:next identifier_name
     let id = UUID()
     let timestamp: Date
     let barometer: BarometerData
@@ -132,6 +133,7 @@ struct SensorSnapshot: Codable, Identifiable {
 }
 
 struct SnapshotPhoto: Codable, Identifiable {
+    // swiftlint:disable:next identifier_name
     let id: UUID
     let imageData: Data
     let timestamp: Date

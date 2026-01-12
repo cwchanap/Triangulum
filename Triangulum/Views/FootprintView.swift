@@ -488,11 +488,11 @@ struct PaginationView: View {
                 .foregroundColor(.prussianBlueLight)
 
             HStack(spacing: 20) {
-                Button(action: {
+                Button {
                     if currentPage > 0 {
                         currentPage -= 1
                     }
-                }) {
+                } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                         Text("Previous")
@@ -507,11 +507,11 @@ struct PaginationView: View {
                     .fontWeight(.medium)
                     .foregroundColor(.prussianBlueDark)
 
-                Button(action: {
+                Button {
                     if currentPage < totalPages - 1 {
                         currentPage += 1
                     }
-                }) {
+                } label: {
                     HStack(spacing: 4) {
                         Text("Next")
                         Image(systemName: "chevron.right")

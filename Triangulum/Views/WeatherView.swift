@@ -16,18 +16,18 @@ struct WeatherView: View {
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
 
-                Button(action: {
+                Button {
                     showingWeatherSearch = true
-                }) {
+                } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
                 }
 
-                Button(action: {
+                Button {
                     print("DEBUG: Manual refresh button pressed")
                     weatherManager.refreshWeather()
-                }) {
+                } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)

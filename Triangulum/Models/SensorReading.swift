@@ -25,11 +25,11 @@ class SensorReading {
 }
 
 enum SensorType: String, CaseIterable, Codable {
-    case barometer = "barometer"
-    case gps = "gps"
-    case accelerometer = "accelerometer"
-    case gyroscope = "gyroscope"
-    case magnetometer = "magnetometer"
+    case barometer
+    case gps
+    case accelerometer
+    case gyroscope
+    case magnetometer
 
     var displayName: String {
         switch self {

@@ -34,10 +34,10 @@ struct ContentView: View {
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
 
     init() {
-        let lm = LocationManager()
-        _locationManager = StateObject(wrappedValue: lm)
-        _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: lm))
-        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: lm))
+        let locationManager = LocationManager()
+        _locationManager = StateObject(wrappedValue: locationManager)
+        _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: locationManager))
+        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: locationManager))
     }
 
     var body: some View {
@@ -82,11 +82,11 @@ struct ContentView: View {
             .environment(\.editMode, .constant(isEditMode ? EditMode.active : EditMode.inactive))
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button(action: {
+                    Button {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isEditMode.toggle()
                         }
-                    }) {
+                    } label: {
                         Image(systemName: isEditMode ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle")
                             .font(.title2)
                             .foregroundColor(.white)
@@ -254,9 +254,9 @@ struct SnapshotCreationView: View {
                     // Photo Action Buttons
                     HStack(spacing: 12) {
                         // Camera Button
-                        Button(action: {
+                        Button {
                             showingCamera = true
-                        }) {
+                        } label: {
                             HStack {
                                 Image(systemName: "camera")
                                 Text("Camera")
@@ -305,9 +305,9 @@ struct SnapshotCreationView: View {
                                         .clipped()
                                         .cornerRadius(8)
 
-                                    Button(action: {
+                                    Button {
                                         capturedImages.remove(at: index)
-                                    }) {
+                                    } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.white)
                                             .background(Circle().fill(Color.black.opacity(0.6)))
@@ -327,12 +327,12 @@ struct SnapshotCreationView: View {
                                         .clipped()
                                         .cornerRadius(8)
 
-                                    Button(action: {
+                                    Button {
                                         photoPreviewImages.remove(at: index)
                                         if index < tempSelectedPhotos.count {
                                             tempSelectedPhotos.remove(at: index)
                                         }
-                                    }) {
+                                    } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.white)
                                             .background(Circle().fill(Color.black.opacity(0.6)))

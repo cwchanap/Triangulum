@@ -83,10 +83,10 @@ struct PreferencesView: View {
                             .foregroundColor(Config.hasValidAPIKey ? .green : .red)
                     }
 
-                    Button(action: {
+                    Button {
                         showingAPIKeyAlert = true
                         apiKeyInput = "" // Clear input field
-                    }) {
+                    } label: {
                         HStack {
                             Image(systemName: "key")
                                 .font(.caption)
@@ -98,9 +98,9 @@ struct PreferencesView: View {
                     }
 
                     if Config.hasValidAPIKey {
-                        Button(action: {
+                        Button {
                             showingViewAPIKeyAlert = true
-                        }) {
+                        } label: {
                             HStack {
                                 Image(systemName: "eye")
                                     .font(.caption)
@@ -113,11 +113,11 @@ struct PreferencesView: View {
                     }
 
                     if Config.hasValidAPIKey {
-                        Button(action: {
+                        Button {
                             if Config.deleteAPIKey() {
                                 updateAPIKeyStatus()
                             }
-                        }) {
+                        } label: {
                             HStack {
                                 Image(systemName: "trash")
                                     .font(.caption)
