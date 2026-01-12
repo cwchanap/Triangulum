@@ -27,7 +27,7 @@ class AccelerometerManager: ObservableObject {
 
         // Check if motion permissions are likely denied by testing availability
         guard motionManager.isAccelerometerAvailable else {
-            errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
+            errorMessage = "Motion & Fitness permission required. Enable in Settings > Privacy & Security."
             return
         }
 

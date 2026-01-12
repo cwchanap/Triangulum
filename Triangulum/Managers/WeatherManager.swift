@@ -47,7 +47,8 @@ class WeatherManager: ObservableObject {
         let hasAPIKey = Config.hasValidAPIKey
         let locationAvailable = locationManager.isAvailable
         let coordinate = CLLocationCoordinate2D(latitude: locationManager.latitude, longitude: locationManager.longitude)
-        let hasLocationData = CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 || coordinate.longitude != 0)
+        // Require both latitude and longitude to be non-zero
+        let hasLocationData = CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 && coordinate.longitude != 0)
 
         print("DEBUG: Check - API: \(hasAPIKey), Location: \(locationAvailable), Coords: \(hasLocationData)")
 
@@ -94,7 +95,8 @@ class WeatherManager: ObservableObject {
         }
 
         let coordinate = CLLocationCoordinate2D(latitude: locationManager.latitude, longitude: locationManager.longitude)
-        guard CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 || coordinate.longitude != 0) else {
+        // Require both latitude and longitude to be non-zero
+        guard CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 && coordinate.longitude != 0) else {
             errorMessage = "No location data available"
             return
         }

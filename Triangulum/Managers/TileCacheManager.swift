@@ -146,8 +146,6 @@ class TileCacheManager: ObservableObject {
             return
         }
 
-        let context = ModelContext(modelContainer)
-
         // Download tiles in batches to avoid overwhelming with server
         let batchSize = 5
         for batchStart in stride(from: 0, to: tilesToDownload.count, by: batchSize) {
@@ -156,7 +154,10 @@ class TileCacheManager: ObservableObject {
             await withTaskGroup(of: Void.self) { group in
                 for tile in batch {
                     group.addTask {
-                        _ = await self.downloadTile(tileX: tile.tileX, tileY: tile.tileY, tileZ: tile.tileZ, context: context)
+                        // Create a fresh ModelContext for each task to avoid concurrent access issues
+                        // ModelContext is not thread-safe and cannot be shared across concurrent operations
+                        let taskContext = ModelContext(modelContainer)
+                        _ = await self.downloadTile(tileX: tile.tileX, tileY: tile.tileY, tileZ: tile.tileZ, context: taskContext)
                     }
                 }
             }
