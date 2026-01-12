@@ -87,11 +87,11 @@ struct MapCacheView: View {
                     .font(.headline)
                     .foregroundColor(.prussianBlueDark)
 
-                Button(action: {
+                Button {
                     Task {
                         await cacheManager.clearCache()
                     }
-                }) {
+                } label: {
                     HStack {
                         Image(systemName: "trash")
                         Text("Clear Cache")

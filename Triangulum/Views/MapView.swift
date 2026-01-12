@@ -45,14 +45,18 @@ struct MapView: View {
 
                 if mapProvider == "osm" {
                     // Toggle cache mode
-                    Button(action: { isCacheMode.toggle() }) {
+                    Button {
+                        isCacheMode.toggle()
+                    } label: {
                         Image(systemName: isCacheMode ? "externaldrive.fill" : "externaldrive")
                             .font(.title3)
                             .foregroundColor(isCacheMode ? .prussianAccent : .prussianBlueLight)
                     }
                 }
 
-                Button(action: centerOnUser) {
+                Button {
+                    centerOnUser()
+                } label: {
                     Image(systemName: isTrackingUser ? "location.fill" : "location")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
@@ -71,12 +75,12 @@ struct MapView: View {
                             .disableAutocorrection(true)
                             .onSubmit { performSearch() }
                         if !searchText.isEmpty {
-                            Button(action: {
+                            Button {
                                 searchText = ""
                                 searchMessage = nil
                                 osmSuggestions = []
                                 appleCompleter.results = []
-                            }) {
+                            } label: {
                                 Image(systemName: "xmark.circle.fill").foregroundColor(.prussianBlueLight)
                             }
                         }
@@ -114,7 +118,9 @@ struct MapView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(0..<min(osmSuggestions.count, 6), id: \.self) { idx in
                         let item = osmSuggestions[idx]
-                        Button(action: { selectOSMSuggestion(item) }) {
+                        Button {
+                            selectOSMSuggestion(item)
+                        } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.displayName)
                                     .font(.subheadline)
@@ -139,7 +145,9 @@ struct MapView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(0..<min(appleCompleter.results.count, 6), id: \.self) { idx in
                         let comp = appleCompleter.results[idx]
-                        Button(action: { selectAppleCompletion(comp) }) {
+                        Button {
+                            selectAppleCompletion(comp)
+                        } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(comp.title).font(.subheadline).foregroundColor(.prussianBlueDark)
                                 if !comp.subtitle.isEmpty {
@@ -211,11 +219,11 @@ struct MapView: View {
                             }
                         }
 
-                        Button(action: {
+                        Button {
                             Task {
                                 await cacheManager.clearCache()
                             }
-                        }) {
+                        } label: {
                             Image(systemName: "trash")
                                 .font(.caption)
                                 .foregroundColor(.prussianError)

@@ -8,13 +8,14 @@
 import Foundation
 
 enum WidgetType: String, CaseIterable, Identifiable {
-    case barometer = "barometer"
-    case location = "location"
-    case weather = "weather"
-    case accelerometer = "accelerometer"
-    case gyroscope = "gyroscope"
-    case magnetometer = "magnetometer"
+    case barometer
+    case location
+    case weather
+    case accelerometer
+    case gyroscope
+    case magnetometer
 
+    // swiftlint:disable:next identifier_name
     var id: String { rawValue }
 
     var displayName: String {

@@ -69,10 +69,10 @@ struct WeatherSearchView: View {
                 }
 
             if !searchText.isEmpty {
-                Button(action: {
+                Button {
                     searchText = ""
                     errorMessage = ""
-                }) {
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.prussianBlueLight)
                 }
@@ -377,6 +377,7 @@ struct WeatherInfoItem: View {
 // MARK: - Data Models
 
 struct SearchedCity: Codable, Identifiable {
+    // swiftlint:disable:next identifier_name
     let id = UUID()
     let name: String
     let country: String

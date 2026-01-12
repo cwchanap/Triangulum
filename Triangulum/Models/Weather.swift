@@ -8,6 +8,7 @@ struct WeatherResponse: Codable {
     let name: String
 
     struct WeatherCondition: Codable {
+        // swiftlint:disable:next identifier_name
         let id: Int
         let main: String
         let description: String
