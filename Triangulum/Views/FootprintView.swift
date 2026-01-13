@@ -347,7 +347,10 @@ struct SnapshotDetailView: View {
                                 .foregroundColor(.prussianBlueLight)
                                 .italic()
                         } else {
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                            LazyVGrid(
+                                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                                spacing: 8
+                            ) {
                                 ForEach(photos) { photo in
                                     if let image = photo.image {
                                         Image(uiImage: image)
@@ -376,7 +379,10 @@ struct SnapshotDetailView: View {
                             .foregroundColor(.prussianBlueDark)
 
                         DetailRowView(label: "Pressure", value: String(format: "%.2f kPa", snapshot.barometer.pressure))
-                        DetailRowView(label: "Sea Level Pressure", value: String(format: "%.2f kPa", snapshot.barometer.seaLevelPressure))
+                        DetailRowView(
+                            label: "Sea Level Pressure",
+                            value: String(format: "%.2f kPa", snapshot.barometer.seaLevelPressure)
+                        )
 
                         if let attitude = snapshot.barometer.attitude {
                             DetailRowView(label: "Roll", value: String(format: "%.1f°", attitude.roll * 180 / .pi))
@@ -396,7 +402,10 @@ struct SnapshotDetailView: View {
 
                         DetailRowView(label: "Latitude", value: String(format: "%.6f°", snapshot.location.latitude))
                         DetailRowView(label: "Longitude", value: String(format: "%.6f°", snapshot.location.longitude))
-                        DetailRowView(label: "GPS Altitude", value: String(format: "%.2f m", snapshot.location.altitude))
+                        DetailRowView(
+                            label: "GPS Altitude",
+                            value: String(format: "%.2f m", snapshot.location.altitude)
+                        )
                         DetailRowView(label: "Accuracy", value: String(format: "±%.2f m", snapshot.location.accuracy))
                     }
                     .padding()
@@ -409,7 +418,10 @@ struct SnapshotDetailView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.prussianBlueDark)
 
-                        Text(snapshot.timestamp, format: .dateTime.weekday().month().day().year().hour().minute().second())
+                        Text(
+                            snapshot.timestamp,
+                            format: .dateTime.weekday().month().day().year().hour().minute().second()
+                        )
                             .font(.body)
                             .foregroundColor(.prussianBlueDark)
                     }

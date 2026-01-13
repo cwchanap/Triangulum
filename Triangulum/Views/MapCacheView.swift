@@ -67,7 +67,10 @@ struct MapCacheView: View {
                     .font(.headline)
                     .foregroundColor(.prussianBlueDark)
 
-                Text("Use the Map view to download tiles for specific areas. Toggle the cache mode button in the Map view to access download controls.")
+                Text(
+                    "Use the Map view to download tiles for specific areas. " +
+                    "Toggle the cache mode button in the Map view to access download controls."
+                )
                     .font(.callout)
                     .foregroundColor(.prussianBlueLight)
                     .multilineTextAlignment(.center)

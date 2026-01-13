@@ -13,7 +13,10 @@ struct MapView: View {
     @State private var isTrackingUser = false
     @State private var isCacheMode = false
     // OSM-specific centering and search state
-    @State private var osmCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+    @State private var osmCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(
+        latitude: 37.7749,
+        longitude: -122.4194
+    )
     @State private var osmSpan: MKCoordinateSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
     @State private var osmRecenterToken: UUID = UUID()
     @State private var searchText: String = ""
@@ -177,7 +180,9 @@ struct MapView: View {
                             Text("Pan map to desired area, then tap 'Cache This Area'")
                                 .font(.caption)
                                 .foregroundColor(.prussianBlueLight)
-                            Text("\(cacheManager.getCacheInfo().sizeInMB, specifier: "%.1f") MB cached (\(cacheManager.tilesCount) tiles)")
+                            Text(
+                                "\(cacheManager.getCacheInfo().sizeInMB, specifier: "%.1f") MB cached (\(cacheManager.tilesCount) tiles)"
+                            )
                                 .font(.caption2)
                                 .foregroundColor(.prussianBlueLight.opacity(0.8))
                         }
@@ -241,7 +246,8 @@ struct MapView: View {
                     .foregroundColor(.prussianError)
                     .font(.caption)
                     .frame(height: 200)
-            } else if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+            } else if locationManager.authorizationStatus == .denied ||
+                        locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
                     Text("Location access denied")
                         .foregroundColor(.prussianError)
@@ -298,7 +304,11 @@ struct MapView: View {
                                             Image(systemName: "plus.circle")
                                                 .font(.title)
                                                 .foregroundColor(.blue.opacity(0.8))
-                                                .background(Circle().fill(Color.white.opacity(0.8)).frame(width: 30, height: 30))
+                                                .background(
+                                                    Circle()
+                                                        .fill(Color.white.opacity(0.8))
+                                                        .frame(width: 30, height: 30)
+                                                )
                                             Spacer()
                                         }
                                         Spacer()
@@ -311,8 +321,14 @@ struct MapView: View {
                                             Spacer()
                                             Button(action: cacheCurrentArea) {
                                                 HStack {
-                                                    Image(systemName: cacheManager.isDownloading ? "arrow.down.circle" : "arrow.down.circle.fill")
-                                                    Text(cacheManager.isDownloading ? "Downloading..." : "Cache This Area")
+                                                    Image(systemName: cacheManager.isDownloading
+                                                        ? "arrow.down.circle"
+                                                        : "arrow.down.circle.fill"
+                                                    )
+                                                    Text(cacheManager.isDownloading
+                                                        ? "Downloading..."
+                                                        : "Cache This Area"
+                                                    )
                                                         .fontWeight(.medium)
                                                 }
                                                 .font(.subheadline)
@@ -401,13 +417,17 @@ struct MapView: View {
                 )
             }
 
-            if locationManager.isAvailable && locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways {
+            if locationManager.isAvailable &&
+                (locationManager.authorizationStatus == .authorizedWhenInUse ||
+                 locationManager.authorizationStatus == .authorizedAlways) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Coordinates")
                             .font(.caption)
                             .foregroundColor(.prussianBlueLight)
-                        Text("\(locationManager.latitude, specifier: "%.6f")°, \(locationManager.longitude, specifier: "%.6f")°")
+                        Text(
+                            "\(locationManager.latitude, specifier: "%.6f")°, \(locationManager.longitude, specifier: "%.6f")°"
+                        )
                             .font(.caption2)
                             .fontWeight(.medium)
                             .foregroundColor(.prussianBlueDark)

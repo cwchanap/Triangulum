@@ -247,8 +247,22 @@ struct WeatherView: View {
         .onAppear {
             // Mock weather data for preview
             let mockResponse = WeatherResponse(
-                weather: [WeatherResponse.WeatherCondition(id: 800, main: "Clear", description: "clear sky", icon: "01d")],
-                main: WeatherResponse.WeatherMain(temp: 295.15, feelsLike: 297.0, tempMin: 293.0, tempMax: 298.0, pressure: 1013, humidity: 65),
+                weather: [
+                    WeatherResponse.WeatherCondition(
+                        id: 800,
+                        main: "Clear",
+                        description: "clear sky",
+                        icon: "01d"
+                    )
+                ],
+                main: WeatherResponse.WeatherMain(
+                    temp: 295.15,
+                    feelsLike: 297.0,
+                    tempMin: 293.0,
+                    tempMax: 298.0,
+                    pressure: 1013,
+                    humidity: 65
+                ),
                 wind: WeatherResponse.WeatherWind(speed: 3.5, deg: 180),
                 visibility: 10000,
                 name: "San Francisco"

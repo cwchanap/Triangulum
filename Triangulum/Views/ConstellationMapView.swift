@@ -52,14 +52,24 @@ struct ConstellationMapView: View {
 
                     ZStack(alignment: .topTrailing) {
                         Canvas { context, size in
-                            drawSky(context: &context, size: size, current: timeline.date, zoom: currentZoom, pan: currentPan)
+                            drawSky(
+                                context: &context,
+                                size: size,
+                                current: timeline.date,
+                                zoom: currentZoom,
+                                pan: currentPan
+                            )
                         }
                         .gesture(magnify)
                         .simultaneousGesture(panGesture)
                         .gesture(doubleTap)
 
                         // Small compass pinned top-right (non-interactive)
-                        CompassView(heading: locationManager.heading, redMode: nightVisionMode, tint: nightVisionMode ? .red : .prussianBlueDark)
+                        CompassView(
+                            heading: locationManager.heading,
+                            redMode: nightVisionMode,
+                            tint: nightVisionMode ? .red : .prussianBlueDark
+                        )
                             .frame(width: 44, height: 44)
                             .padding([.top, .trailing], 12)
                             .allowsHitTesting(false)
@@ -76,9 +86,15 @@ struct ConstellationMapView: View {
                             CompassView(heading: skySnapNorth ? 0 : locationManager.heading, redMode: nightVisionMode)
                                 .frame(width: 120, height: 120)
                                 .padding(12)
-                                .background((nightVisionMode ? Color.red.opacity(0.08) : Color.black.opacity(0.25)).blur(radius: 0))
+                                .background(
+                                    (nightVisionMode ? Color.red.opacity(0.08) : Color.black.opacity(0.25))
+                                        .blur(radius: 0)
+                                )
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .offset(x: largeCompassOffset.width + largeCompassDrag.width, y: largeCompassOffset.height + largeCompassDrag.height)
+                                .offset(
+                                    x: largeCompassOffset.width + largeCompassDrag.width,
+                                    y: largeCompassOffset.height + largeCompassDrag.height
+                                )
                                 .highPriorityGesture(compDrag)
                         }
                     }

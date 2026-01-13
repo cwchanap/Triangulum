@@ -222,7 +222,10 @@ struct SnapshotCreationView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.prussianBlueDark)
 
-                    Text("Sensor data has been recorded at \(snapshot?.timestamp.formatted(date: .omitted, time: .shortened) ?? "now")")
+                    Text(
+                        "Sensor data has been recorded at " +
+                        "\(snapshot?.timestamp.formatted(date: .omitted, time: .shortened) ?? "now")"
+                    )
                         .font(.body)
                         .foregroundColor(.prussianBlueLight)
                         .multilineTextAlignment(.center)

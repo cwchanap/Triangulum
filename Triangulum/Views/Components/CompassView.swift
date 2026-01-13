@@ -19,7 +19,12 @@ public struct CompassView: View {
             let ringColor = ink.opacity(0.7)
 
             // Outer ring
-            let ring = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius*2, height: radius*2))
+            let ring = Path(ellipseIn: CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            ))
             context.stroke(ring, with: .color(ringColor), lineWidth: 1)
 
             // Tick marks (every 45°)

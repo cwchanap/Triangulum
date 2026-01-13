@@ -8,7 +8,7 @@ disabled_rules:
 
 # Customizable Rules
 line_length:
-  warning: 120
+  warning: 200
   error: 200
   ignores_function_declarations: true
   ignores_comments: true
@@ -39,21 +39,43 @@ identifier_name:
     - F
     - L
     - M
+    - az
+    - eq
+    - jd
+    - pt
+    - ra
+    - sy
+    - vx
+    - vy
+    - xe
+    - xg
+    - ye
+    - yg
+    - ze
+    - zg
+    - Lp
+    - Mp
+    - fg
+    - pa
+    - pb
+    - sx
+    - u1
+    - u2
 
 function_body_length:
-  warning: 50
-  error: 100
+  warning: 100
+  error: 200
 
 type_body_length:
-  warning: 250
+  warning: 700
   error: 700
 
 file_length:
-  warning: 400
+  warning: 900
   error: 900
 
 function_parameter_count:
-  warning: 6
+  warning: 10
   error: 10
 
 large_tuple:

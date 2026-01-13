@@ -27,7 +27,8 @@ struct LocationView: View {
                 Text("Location services disabled in system settings")
                     .foregroundColor(.prussianError)
                     .font(.caption)
-            } else if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+            } else if locationManager.authorizationStatus == .denied ||
+                        locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
                     Text("Location access denied")
                         .foregroundColor(.prussianError)
