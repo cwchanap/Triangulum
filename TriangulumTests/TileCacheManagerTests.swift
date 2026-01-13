@@ -164,16 +164,22 @@ struct TileCacheManagerTests {
     @Test func testCoordinateEdgeCases() async {
         let manager = TileCacheManager.shared
 
-        // Test negative coordinates (should handle gracefully)
+        // Test negative coordinates (should return nil - these are invalid)
         let negativeTile = await manager.getTile(tileX: -1, tileY: -1, tileZ: 1)
-        #expect(negativeTile != nil || negativeTile == nil)
+        #expect(negativeTile == nil, "Negative coordinates should return nil")
 
-        // Test very high coordinates (should handle gracefully)
-        let highCoordTile = await manager.getTile(tileX: 999999, tileY: 999999, tileZ: 20)
-        #expect(highCoordTile != nil || highCoordTile == nil)
+        // Test very high coordinates beyond valid range (should return nil)
+        // For Z=20, valid range is 0-1,048,575, so 999,999 is valid
+        // Let's use a truly out-of-bounds value
+        let outOfBoundsTile = await manager.getTile(tileX: 2_000_000, tileY: 2_000_000, tileZ: 20)
+        #expect(outOfBoundsTile == nil, "Out-of-bounds coordinates should return nil")
 
-        // Test zero zoom level
+        // Test valid zero zoom level tile (should return data or nil due to network issues)
+        // This is not an edge case but a valid tile (0,0,0) is the world map at zoom 0
         let zeroZoomTile = await manager.getTile(tileX: 0, tileY: 0, tileZ: 0)
-        #expect(zeroZoomTile != nil || zeroZoomTile == nil)
+        if let tileData = zeroZoomTile {
+            #expect(!tileData.isEmpty, "Retrieved tile should contain non-empty data")
+        }
+        // Nil is acceptable (network timeout, cache miss, etc.)
     }
 }
