@@ -135,7 +135,9 @@ class BarometerManager: ObservableObject {
         let gasConstant = 287.053
         let gravity = 9.80665
 
-        let exponent = (gravity * altitude) / (gasConstant * temperatureK)
+        // Use absolute altitude so below-sea-level locations still adjust pressure upward
+        let adjustedAltitude = abs(altitude)
+        let exponent = (gravity * adjustedAltitude) / (gasConstant * temperatureK)
         let pressureRatio = exp(exponent)
 
         return currentPressure * pressureRatio
