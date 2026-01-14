@@ -139,6 +139,33 @@ struct FootprintView: View {
                         snapshot1: selectedSnapshots[0],
                         snapshot2: selectedSnapshots[1]
                     )
+                    .onAppear {
+                        // Dismiss sheet if snapshots are removed while presented
+                        if selectedSnapshots.count != 2 {
+                            showingComparison = false
+                        }
+                    }
+                } else {
+                    // Fallback view when snapshots are unavailable
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.prussianWarning)
+
+                        Text("Comparison Unavailable")
+                            .font(.headline)
+                            .foregroundColor(.prussianBlueDark)
+
+                        Text("One or both selected snapshots have been removed")
+                            .font(.body)
+                            .foregroundColor(.prussianBlueLight)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .onAppear {
+                        // Auto-dismiss the sheet
+                        showingComparison = false
+                    }
                 }
             }
         }
