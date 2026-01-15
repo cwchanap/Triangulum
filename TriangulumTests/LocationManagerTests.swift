@@ -10,6 +10,7 @@ import Foundation
 import CoreLocation
 @testable import Triangulum
 
+@Suite(.serialized)
 struct LocationManagerTests {
 
     @Test func testLocationManagerInitialization() {
@@ -22,9 +23,14 @@ struct LocationManagerTests {
         #expect(manager.errorMessage == "")
     }
 
-    @Test func testAvailabilityCheck() {
+    @Test func testAvailabilityCheck() async {
         let manager = LocationManager()
 
+        // Wait for async availability check to complete
+        // The LocationManager.checkAvailability() runs on a background queue
+        try? await Task.sleep(for: .milliseconds(100))
+
+        // Both should report the same location services state
         #expect(manager.isAvailable == CLLocationManager.locationServicesEnabled())
     }
 
@@ -35,11 +41,16 @@ struct LocationManagerTests {
                     manager.authorizationStatus == .notDetermined)
     }
 
-    @Test func testLocationUnavailableError() {
+    @Test func testLocationUnavailableError() async {
         let manager = LocationManager()
+
+        // Wait for async availability check to complete
+        try? await Task.sleep(for: .milliseconds(100))
 
         if !manager.isAvailable {
             manager.startLocationUpdates()
+            // Wait for async error message to be set
+            try? await Task.sleep(for: .milliseconds(100))
             #expect(manager.errorMessage == "Location services not available")
         }
     }
@@ -82,10 +93,17 @@ struct LocationManagerTests {
         #expect(manager.errorMessage.contains("Location error"))
     }
 
-    @Test func testAuthorizationStatusChange() {
+    @Test func testAuthorizationStatusChange() async {
         let manager = LocationManager()
 
+        // Wait for initial async availability check to complete
+        try? await Task.sleep(for: .milliseconds(100))
+
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .denied)
+
+        // The delegate method sets authorizationStatus synchronously before calling checkAvailability async
+        // But checkAvailability will eventually overwrite with the system's actual status
+        // We check immediately after the delegate call, before async completes
         #expect(manager.authorizationStatus == .denied)
     }
 
@@ -130,8 +148,11 @@ struct LocationManagerTests {
         #expect(manager.errorMessage.contains("Location error"))
     }
 
-    @Test func testAuthorizationStatusTransitions() {
+    @Test func testAuthorizationStatusTransitions() async {
         let manager = LocationManager()
+
+        // Wait for initial async availability check to complete
+        try? await Task.sleep(for: .milliseconds(100))
 
         // Test authorized when in use
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .authorizedWhenInUse)
@@ -153,8 +174,11 @@ struct LocationManagerTests {
         #expect(manager.errorMessage.isEmpty)
     }
 
-    @Test func testLocationManagerInitialState() {
+    @Test func testLocationManagerInitialState() async {
         let manager = LocationManager()
+
+        // Wait for async availability check to complete
+        try? await Task.sleep(for: .milliseconds(100))
 
         #expect(manager.latitude == 0.0)
         #expect(manager.longitude == 0.0)

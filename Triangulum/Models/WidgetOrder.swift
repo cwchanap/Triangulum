@@ -42,7 +42,7 @@ enum WidgetType: String, CaseIterable, Identifiable {
 }
 
 class WidgetOrderManager: ObservableObject {
-    @Published var widgetOrder: [WidgetType] = []
+    @Published private(set) var widgetOrder: [WidgetType] = []
 
     private let userDefaults = UserDefaults.standard
     private let widgetOrderKey = "widgetOrder"
@@ -63,7 +63,7 @@ class WidgetOrderManager: ObservableObject {
         }
     }
 
-    func saveWidgetOrder() {
+    private func saveWidgetOrder() {
         let orderStrings = widgetOrder.map { $0.rawValue }
         userDefaults.set(orderStrings, forKey: widgetOrderKey)
     }

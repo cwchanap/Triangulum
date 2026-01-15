@@ -12,7 +12,8 @@
       "Bash(xcode-select:*)",
       "Bash(xcrun xcodebuild:*)",
       "Bash(xcrun simctl runtime list:*)",
-      "Bash(xcrun xcresulttool get:*)"
+      "Bash(xcrun xcresulttool get:*)",
+      "Bash(swiftlint:*)"
     ],
     "deny": []
   }

@@ -8,8 +8,10 @@
 import Testing
 import Foundation
 import CoreMotion
+import SwiftData
 @testable import Triangulum
 
+@Suite(.serialized)
 struct BarometerManagerTests {
 
     @Test func testBarometerManagerInitialization() {
@@ -138,5 +140,60 @@ struct BarometerManagerTests {
         #expect(manager.errorMessage.isEmpty)
         #expect(manager.isAvailable == CMAltimeter.isRelativeAltitudeAvailable())
         #expect(manager.isAttitudeAvailable == CMMotionManager().isDeviceMotionAvailable)
+    }
+
+    @MainActor
+    @Test func testHistoryManagerConfiguration() throws {
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
+
+        // historyManager should be nil before configuration
+        #expect(manager.historyManager == nil)
+
+        // Create in-memory SwiftData context for testing
+        let schema = Schema([PressureReading.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+
+        // Configure the history manager
+        manager.configureHistory(with: context)
+
+        // historyManager should be non-nil after configuration
+        #expect(manager.historyManager != nil)
+    }
+
+    @MainActor
+    @Test func testHistoryManagerConfigurationIdempotent() throws {
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
+
+        // Create two different contexts
+        let schema = Schema([PressureReading.self])
+        let config1 = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container1 = try ModelContainer(for: schema, configurations: [config1])
+        let context1 = ModelContext(container1)
+
+        let config2 = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container2 = try ModelContainer(for: schema, configurations: [config2])
+        let context2 = ModelContext(container2)
+
+        // Configure once
+        manager.configureHistory(with: context1)
+        let firstHistoryManager = manager.historyManager
+
+        // Configure again with different context
+        manager.configureHistory(with: context2)
+
+        // Should reuse the same historyManager instance (just reconfigure it)
+        #expect(manager.historyManager === firstHistoryManager)
+    }
+
+    @Test func testHistoryRecordingErrorInitiallyNil() {
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
+
+        // historyRecordingError should be nil initially
+        #expect(manager.historyRecordingError == nil)
     }
 }

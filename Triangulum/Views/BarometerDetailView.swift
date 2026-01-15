@@ -349,10 +349,6 @@ struct BarometerDetailView: View {
         let maxA = (altitudes.max() ?? 100) + 10
         return minA...maxA
     }
-
-    // MARK: - Data Loading
-
-    // Data is now observed live from historyManager.recentReadings
 }
 
 // MARK: - Stat Row Component
