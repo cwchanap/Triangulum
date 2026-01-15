@@ -40,9 +40,20 @@ class TileCacheManager: ObservableObject {
         updateCacheStats()
     }
 
-    private func setupModelContainer() {
+    /// Internal initializer for testing with in-memory storage
+    init(inMemory: Bool) {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        self.urlSession = URLSession(configuration: configuration)
+
+        setupModelContainer(inMemory: inMemory)
+        updateCacheStats()
+    }
+
+    private func setupModelContainer(inMemory: Bool = false) {
         let schema = Schema([MapTile.self])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
 
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])

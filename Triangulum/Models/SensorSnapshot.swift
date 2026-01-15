@@ -157,18 +157,39 @@ struct SnapshotPhoto: Codable, Identifiable {
 }
 
 class SnapshotManager: ObservableObject {
-    @Published var snapshots: [SensorSnapshot] = []
-    @Published var photos: [UUID: SnapshotPhoto] = [:]
-    private let userDefaults = UserDefaults.standard
-    private let snapshotsKey = "sensor_snapshots"
-    private let photosKey = "snapshot_photos"
+    @Published private(set) var snapshots: [SensorSnapshot] = []
+    @Published private(set) var photos: [UUID: SnapshotPhoto] = [:]
+    private let userDefaults: UserDefaults
+    private let snapshotsKey: String
+    private let photosKey: String
 
     init() {
+        self.userDefaults = UserDefaults.standard
+        self.snapshotsKey = "sensor_snapshots"
+        self.photosKey = "snapshot_photos"
         // Load data asynchronously to avoid blocking main thread
         Task {
             await loadSnapshotsAsync()
             await loadPhotosAsync()
         }
+    }
+
+    /// Internal initializer for testing with isolated storage
+    init(userDefaults: UserDefaults, keyPrefix: String = "") {
+        self.userDefaults = userDefaults
+        self.snapshotsKey = "\(keyPrefix)sensor_snapshots"
+        self.photosKey = "\(keyPrefix)snapshot_photos"
+        // Load synchronously for tests to ensure data is available immediately
+        loadSnapshots()
+        loadPhotos()
+    }
+
+    /// Clears all data from storage - useful for test cleanup
+    func resetStorage() {
+        snapshots.removeAll()
+        photos.removeAll()
+        userDefaults.removeObject(forKey: snapshotsKey)
+        userDefaults.removeObject(forKey: photosKey)
     }
 
     func addSnapshot(_ snapshot: SensorSnapshot) {

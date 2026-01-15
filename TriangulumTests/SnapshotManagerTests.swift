@@ -11,6 +11,7 @@ import UIKit
 @testable import Triangulum
 
 @MainActor
+@Suite(.serialized)
 struct SnapshotManagerTests {
 
     // Helper function to create a test image
@@ -23,6 +24,12 @@ struct SnapshotManagerTests {
         UIRectFill(CGRect(origin: .zero, size: size))
 
         return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
+
+    // Helper to create an isolated SnapshotManager for testing
+    private func createTestManager() -> SnapshotManager {
+        let testDefaults = UserDefaults(suiteName: "SnapshotManagerTests_\(UUID().uuidString)")!
+        return SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_")
     }
 
     // Helper struct to hold test sensor managers
@@ -77,14 +84,14 @@ struct SnapshotManagerTests {
     }
 
     @Test func testSnapshotManagerInitialization() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
 
         #expect(manager.snapshots.isEmpty)
         #expect(manager.photos.isEmpty)
     }
 
     @Test func testAddSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot(
@@ -104,7 +111,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testDeleteSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot1 = SensorSnapshot(
@@ -135,7 +142,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testDeleteSnapshotInvalidIndex() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot(
@@ -158,7 +165,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testClearAllSnapshots() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot1 = SensorSnapshot(
@@ -196,7 +203,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testAddPhoto() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot(
@@ -221,7 +228,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testAddPhotoToNonExistentSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testImage = createTestImage()
         let nonExistentID = UUID()
 
@@ -231,7 +238,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testRemovePhoto() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot(
@@ -260,7 +267,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testRemovePhotoFromNonExistentSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testPhotoID = UUID()
         let nonExistentSnapshotID = UUID()
 
@@ -272,7 +279,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testGetPhotosForSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot(
@@ -298,7 +305,7 @@ struct SnapshotManagerTests {
     }
 
     @Test func testGetPhotosForNonExistentSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let nonExistentID = UUID()
 
         let photos = manager.getPhotos(for: nonExistentID)
@@ -330,20 +337,22 @@ struct SnapshotManagerTests {
     }
 
     @Test func testSnapshotPhotoWithEmptyImage() {
-        // Create an empty image
-        UIGraphicsBeginImageContext(CGSize.zero)
-        defer { UIGraphicsEndImageContext() }
-
-        let emptyImage = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+        // Create an empty 1x1 image (CGSize.zero crashes in iOS 18+)
+        // We're testing that a very small/trivial image still works
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
+        let emptyImage = renderer.image { _ in
+            // Draw nothing - creates a 1x1 transparent image
+        }
         let photo = SnapshotPhoto(image: emptyImage)
 
-        // Empty/zero-size image may fail JPEG conversion, so photo could be nil
-        // This is expected behavior - the failable initializer correctly rejects invalid images
-        // No assertion needed - just verify it doesn't crash
+        // A 1x1 image may still produce valid JPEG data
+        // The key is that the failable initializer handles edge cases gracefully
+        // No crash = success
+        _ = photo
     }
 
     @Test func testMultiplePhotosPerSnapshot() {
-        let manager = SnapshotManager()
+        let manager = createTestManager()
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot(

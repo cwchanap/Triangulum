@@ -113,6 +113,7 @@ class PressureHistoryManager: ObservableObject {
     @Published var changeRate: Double = 0.0  // hPa per hour
     @Published var statistics: PressureStatistics = .empty
     @Published var recentReadings: [PressureReading] = []
+    @Published var fetchError: Error?
 
     // MARK: - Private Properties
 
@@ -137,9 +138,9 @@ class PressureHistoryManager: ObservableObject {
 
     /// Records a new pressure reading if enough time has passed since the last one
     /// - Parameters:
-    ///   - pressure: Current pressure reading in **kPa** (converted to hPa for trend calculations)
+    ///   - pressure: Current pressure reading in kPa (stored as-is)
     ///   - altitude: Altitude in meters (from GPS)
-    ///   - seaLevelPressure: Sea-level adjusted pressure in kPa
+    ///   - seaLevelPressure: Sea-level adjusted pressure in kPa (converted to hPa for trend calculations)
     func recordReading(pressure: Double, altitude: Double, seaLevelPressure: Double) async throws {
         guard let modelContext = modelContext else {
             throw HistoryError.modelContextNotConfigured
@@ -203,9 +204,12 @@ class PressureHistoryManager: ObservableObject {
         )
 
         do {
-            return try modelContext.fetch(descriptor)
+            let results = try modelContext.fetch(descriptor)
+            fetchError = nil  // Clear error on successful fetch
+            return results
         } catch {
             print("❌ PressureHistoryManager: Failed to fetch readings: \(error.localizedDescription)")
+            fetchError = error  // Surface error for UI observability
             return []
         }
     }

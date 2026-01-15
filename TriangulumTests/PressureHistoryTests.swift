@@ -202,6 +202,7 @@ struct PressureReadingTests {
 // MARK: - PressureHistoryManager Tests
 
 @MainActor
+@Suite(.serialized)
 struct PressureHistoryManagerTests {
 
     // Helper to create an in-memory SwiftData context for testing
@@ -325,16 +326,18 @@ struct PressureHistoryManagerTests {
         manager.configure(with: context)
 
         // Add readings with known values
+        // Note: Statistics use seaLevelPressure (not raw pressure) for weather analysis
         let now = Date()
-        let pressures = [100.0, 102.0, 104.0]
+        let rawPressures = [99.0, 100.0, 101.0]  // Raw pressure values (not used in stats)
+        let seaLevelPressures = [100.0, 102.0, 104.0]  // Sea level pressure (used in stats)
         let altitudes = [50.0, 100.0, 150.0]
 
         for index in 0..<3 {
             let reading = PressureReading(
                 timestamp: now.addingTimeInterval(Double(-index * 60)),
-                pressure: pressures[index],
+                pressure: rawPressures[index],
                 altitude: altitudes[index],
-                seaLevelPressure: 101.0
+                seaLevelPressure: seaLevelPressures[index]
             )
             context.insert(reading)
         }
@@ -342,17 +345,190 @@ struct PressureHistoryManagerTests {
 
         manager.loadRecentReadings(for: .oneHour)
 
-        #expect(manager.statistics.minPressure == 100.0)
-        #expect(manager.statistics.maxPressure == 104.0)
-        #expect(manager.statistics.avgPressure == 102.0)
+        // Statistics should use seaLevelPressure values, NOT raw pressure values
+        #expect(manager.statistics.minPressure == 100.0)  // min of seaLevelPressures
+        #expect(manager.statistics.maxPressure == 104.0)  // max of seaLevelPressures
+        #expect(manager.statistics.avgPressure == 102.0)  // avg of seaLevelPressures
         #expect(manager.statistics.minAltitude == 50.0)
         #expect(manager.statistics.maxAltitude == 150.0)
         #expect(manager.statistics.avgAltitude == 100.0)
         #expect(manager.statistics.dataPointCount == 3)
     }
+
+    @Test func testStatisticsUsesSeaLevelPressureNotRawPressure() throws {
+        // Explicitly verify that statistics use seaLevelPressure, not raw pressure
+        let manager = PressureHistoryManager()
+        let context = try createTestModelContext()
+        manager.configure(with: context)
+
+        let now = Date()
+        // Raw pressures are very different from sea level pressures
+        let reading = PressureReading(
+            timestamp: now,
+            pressure: 90.0,  // Raw pressure (e.g., at high altitude)
+            altitude: 1000.0,
+            seaLevelPressure: 101.325  // Sea level adjusted
+        )
+        context.insert(reading)
+        try context.save()
+
+        manager.loadRecentReadings(for: .oneHour)
+
+        // Statistics should show seaLevelPressure (101.325), NOT raw pressure (90.0)
+        #expect(manager.statistics.minPressure == 101.325)
+        #expect(manager.statistics.maxPressure == 101.325)
+        #expect(manager.statistics.avgPressure == 101.325)
+    }
 }
 
-// MARK: - Trend Calculation Logic Tests
+// MARK: - Trend Calculation Integration Tests
+
+@MainActor
+@Suite(.serialized)
+struct TrendCalculationIntegrationTests {
+
+    // Helper to create an in-memory SwiftData context for testing
+    private func createTestModelContext() throws -> ModelContext {
+        let schema = Schema([PressureReading.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        return ModelContext(container)
+    }
+
+    @Test func testTrendCalculationRisingFast() throws {
+        // Test that actual PressureHistoryManager calculates rising fast trend correctly
+        let manager = PressureHistoryManager()
+        let context = try createTestModelContext()
+
+        // Insert readings spanning 31 minutes with rising seaLevelPressure
+        // Note: calculateTrend() only fetches from last 35 min (30 + 5 buffer)
+        // Readings must be within that window but span at least 30 minutes
+        // Rate of +0.15 kPa over 31 min = +1.5 hPa over 0.52 hr = ~2.9 hPa/hr (risingFast)
+        let now = Date()
+        let readings = [
+            (timestamp: now.addingTimeInterval(-33 * 60), seaLevelPressure: 101.0),
+            (timestamp: now.addingTimeInterval(-22 * 60), seaLevelPressure: 101.05),
+            (timestamp: now.addingTimeInterval(-11 * 60), seaLevelPressure: 101.10),
+            (timestamp: now.addingTimeInterval(-2 * 60), seaLevelPressure: 101.15)
+        ]
+
+        for (timestamp, slp) in readings {
+            let reading = PressureReading(
+                timestamp: timestamp,
+                pressure: 100.5,
+                altitude: 100.0,
+                seaLevelPressure: slp
+            )
+            context.insert(reading)
+        }
+        try context.save()
+
+        // Configure to trigger trend calculation with the data
+        manager.configure(with: context)
+
+        // Verify trend is rising fast (rate > 1.0 hPa/hr)
+        #expect(manager.trend == .risingFast)
+        #expect(manager.changeRate > 1.0)
+    }
+
+    @Test func testTrendCalculationFallingFast() throws {
+        // Test falling fast trend
+        let manager = PressureHistoryManager()
+        let context = try createTestModelContext()
+
+        // Insert readings with falling seaLevelPressure
+        // Note: calculateTrend() only fetches from last 35 min (30 + 5 buffer)
+        // Rate of -0.15 kPa over 31 min = -1.5 hPa over 0.52 hr = ~-2.9 hPa/hr (fallingFast)
+        let now = Date()
+        let readings = [
+            (timestamp: now.addingTimeInterval(-33 * 60), seaLevelPressure: 101.15),
+            (timestamp: now.addingTimeInterval(-22 * 60), seaLevelPressure: 101.10),
+            (timestamp: now.addingTimeInterval(-11 * 60), seaLevelPressure: 101.05),
+            (timestamp: now.addingTimeInterval(-2 * 60), seaLevelPressure: 101.0)
+        ]
+
+        for (timestamp, slp) in readings {
+            let reading = PressureReading(
+                timestamp: timestamp,
+                pressure: 100.5,
+                altitude: 100.0,
+                seaLevelPressure: slp
+            )
+            context.insert(reading)
+        }
+        try context.save()
+
+        manager.configure(with: context)
+
+        #expect(manager.trend == .fallingFast)
+        #expect(manager.changeRate < -1.0)
+    }
+
+    @Test func testTrendCalculationSteady() throws {
+        // Test steady trend (minimal pressure change)
+        let manager = PressureHistoryManager()
+        let context = try createTestModelContext()
+
+        // Insert readings with minimal seaLevelPressure change
+        // Note: calculateTrend() only fetches from last 35 min (30 + 5 buffer)
+        // Rate of +0.01 kPa over 31 min = +0.1 hPa over 0.52 hr = ~0.19 hPa/hr (steady)
+        let now = Date()
+        let readings = [
+            (timestamp: now.addingTimeInterval(-33 * 60), seaLevelPressure: 101.0),
+            (timestamp: now.addingTimeInterval(-22 * 60), seaLevelPressure: 101.003),
+            (timestamp: now.addingTimeInterval(-11 * 60), seaLevelPressure: 101.007),
+            (timestamp: now.addingTimeInterval(-2 * 60), seaLevelPressure: 101.01)
+        ]
+
+        for (timestamp, slp) in readings {
+            let reading = PressureReading(
+                timestamp: timestamp,
+                pressure: 100.5,
+                altitude: 100.0,
+                seaLevelPressure: slp
+            )
+            context.insert(reading)
+        }
+        try context.save()
+
+        manager.configure(with: context)
+
+        #expect(manager.trend == .steady)
+        #expect(manager.changeRate > -0.5 && manager.changeRate < 0.5)
+    }
+
+    @Test func testTrendCalculationInsufficientData() throws {
+        // Test that trend is unknown with insufficient time span
+        let manager = PressureHistoryManager()
+        let context = try createTestModelContext()
+
+        // Insert readings spanning only 20 minutes (less than 30 min minimum)
+        let now = Date()
+        let readings = [
+            (timestamp: now.addingTimeInterval(-20 * 60), seaLevelPressure: 101.0),
+            (timestamp: now.addingTimeInterval(-10 * 60), seaLevelPressure: 101.05),
+            (timestamp: now.addingTimeInterval(-1 * 60), seaLevelPressure: 101.10)
+        ]
+
+        for (timestamp, slp) in readings {
+            let reading = PressureReading(
+                timestamp: timestamp,
+                pressure: 100.5,
+                altitude: 100.0,
+                seaLevelPressure: slp
+            )
+            context.insert(reading)
+        }
+        try context.save()
+
+        manager.configure(with: context)
+
+        // Should be unknown due to insufficient time span
+        #expect(manager.trend == .unknown)
+    }
+}
+
+// MARK: - Trend Calculation Logic Tests (Threshold Verification)
 
 struct TrendCalculationTests {
 
@@ -647,6 +823,7 @@ struct HistoryErrorTests {
 // MARK: - PressureHistoryManager Error Handling Tests
 
 @MainActor
+@Suite(.serialized)
 struct PressureHistoryManagerErrorTests {
 
     @Test func testRecordReadingWithoutConfiguration() async {
