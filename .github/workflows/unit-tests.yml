@@ -18,4 +18,6 @@ jobs:
           xcode-version: latest-stable
 
       - name: Run Unit Tests
-        run: xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'platform=iOS Simulator,name=iPhone 16' | xcpretty
+        run: |
+          set -o pipefail
+          xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'platform=iOS Simulator,name=iPhone 16' | xcpretty
