@@ -302,7 +302,17 @@ struct ConstellationMapView: View {
             }
 
             if skyShowConstellationLabels {
-                drawConstellationLabels(context: &layer, center: center, radius: radius, lstHours: lstHours, observer: observer, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg, fg: fg.opacity(effectiveNight))
+                drawConstellationLabels(
+                    context: &layer,
+                    center: center,
+                    radius: radius,
+                    lstHours: lstHours,
+                    observer: observer,
+                    headingRad: headingRad,
+                    azOffsetRad: azOffsetRad,
+                    altOffsetDeg: altOffsetDeg,
+                    fg: fg.opacity(effectiveNight)
+                )
             }
         }
 
