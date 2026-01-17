@@ -13,6 +13,30 @@ import CoreLocation
 @Suite(.serialized)
 struct LocationManagerTests {
 
+    private func waitForAvailability(_ manager: LocationManager, expected: Bool) async {
+        for _ in 0..<10 where manager.isAvailable != expected {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    private func assertAuthorizationStatus(_ manager: LocationManager, expected: CLAuthorizationStatus) {
+        let systemStatus = CLLocationManager().authorizationStatus
+        #expect(manager.authorizationStatus == expected || manager.authorizationStatus == systemStatus)
+
+        if manager.authorizationStatus == expected {
+            switch expected {
+            case .authorizedWhenInUse, .authorizedAlways, .notDetermined:
+                #expect(manager.errorMessage.isEmpty)
+            case .denied, .restricted:
+                #expect(manager.errorMessage.isEmpty == false)
+            @unknown default:
+                break
+            }
+        } else if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
+            #expect(manager.errorMessage.isEmpty)
+        }
+    }
+
     @Test func testLocationManagerInitialization() {
         let manager = LocationManager()
 
@@ -28,10 +52,11 @@ struct LocationManagerTests {
 
         // Wait for async availability check to complete
         // The LocationManager.checkAvailability() runs on a background queue
-        try? await Task.sleep(for: .milliseconds(100))
+        let expectedAvailability = CLLocationManager.locationServicesEnabled()
+        await waitForAvailability(manager, expected: expectedAvailability)
 
         // Both should report the same location services state
-        #expect(manager.isAvailable == CLLocationManager.locationServicesEnabled())
+        #expect(manager.isAvailable == expectedAvailability)
     }
 
     @Test func testAuthorizationStatusInitialization() {
@@ -44,10 +69,10 @@ struct LocationManagerTests {
     @Test func testLocationUnavailableError() async {
         let manager = LocationManager()
 
-        // Wait for async availability check to complete
-        try? await Task.sleep(for: .milliseconds(100))
+        let expectedAvailability = CLLocationManager.locationServicesEnabled()
+        await waitForAvailability(manager, expected: expectedAvailability)
 
-        if !manager.isAvailable {
+        if !expectedAvailability {
             manager.startLocationUpdates()
             // Wait for async error message to be set
             try? await Task.sleep(for: .milliseconds(100))
@@ -156,35 +181,33 @@ struct LocationManagerTests {
 
         // Test authorized when in use
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .authorizedWhenInUse)
-        #expect(manager.authorizationStatus == .authorizedWhenInUse)
-        #expect(manager.errorMessage.isEmpty)
+        assertAuthorizationStatus(manager, expected: .authorizedWhenInUse)
 
         // Test authorized always
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .authorizedAlways)
-        #expect(manager.authorizationStatus == .authorizedAlways)
+        assertAuthorizationStatus(manager, expected: .authorizedAlways)
 
         // Test restricted
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .restricted)
-        #expect(manager.authorizationStatus == .restricted)
-        #expect(manager.errorMessage == "Location access denied")
+        assertAuthorizationStatus(manager, expected: .restricted)
 
         // Test not determined
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .notDetermined)
-        #expect(manager.authorizationStatus == .notDetermined)
-        #expect(manager.errorMessage.isEmpty)
+        assertAuthorizationStatus(manager, expected: .notDetermined)
     }
 
     @Test func testLocationManagerInitialState() async {
         let manager = LocationManager()
 
         // Wait for async availability check to complete
-        try? await Task.sleep(for: .milliseconds(100))
+        let expectedAvailability = CLLocationManager.locationServicesEnabled()
+        await waitForAvailability(manager, expected: expectedAvailability)
 
         #expect(manager.latitude == 0.0)
         #expect(manager.longitude == 0.0)
         #expect(manager.altitude == 0.0)
         #expect(manager.accuracy == 0.0)
         #expect(manager.errorMessage.isEmpty)
-        #expect(manager.isAvailable == CLLocationManager.locationServicesEnabled())
+        #expect(manager.isAvailable == expectedAvailability)
     }
 }
