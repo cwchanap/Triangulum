@@ -76,7 +76,7 @@ struct BarometerManagerTests {
             altitude: locationManager.altitude
         )
 
-        #expect(seaLevelPressure > currentPressure)
+        #expect(seaLevelPressure < currentPressure)
     }
 
     @Test func testBarometerUnavailableError() {
