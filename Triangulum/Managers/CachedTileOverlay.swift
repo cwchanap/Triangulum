@@ -9,6 +9,7 @@ import Foundation
 import MapKit
 import UIKit
 
+@MainActor
 class CachedTileOverlay: MKTileOverlay {
     private lazy var cacheManager: TileCacheManager = TileCacheManager.shared
 
