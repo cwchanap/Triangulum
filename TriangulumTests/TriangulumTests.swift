@@ -423,15 +423,8 @@ struct TriangulumTests {
         let prussianError = Color.prussianError
         let prussianSuccess = Color.prussianSuccess
 
-        // Verify colors are accessible (no compilation errors)
-        #expect(prussianBlue != nil)
-        #expect(prussianBlueLight != nil)
-        #expect(prussianBlueDark != nil)
-        #expect(prussianAccent != nil)
-        #expect(prussianSoft != nil)
-        #expect(prussianWarning != nil)
-        #expect(prussianError != nil)
-        #expect(prussianSuccess != nil)
+        // Verify colors are accessible by ensuring they can be described
+        #expect(String(describing: prussianBlue).isEmpty == false)
     }
 
     @Test func testColorComponentValues() {
