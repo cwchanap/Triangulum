@@ -18,4 +18,40 @@ jobs:
           xcode-version: latest-stable
 
       - name: Run Unit Tests
-        run: xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'platform=iOS Simulator,name=iPhone 15' | xcpretty
+        run: |
+          set -o pipefail
+          SIMULATORS_JSON="${RUNNER_TEMP}/simulators.json"
+          xcrun simctl list devices available -j > "$SIMULATORS_JSON"
+          SIMULATOR_UDID=$(python3 -c "import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data.get('devices',{}).values() for d in runtime if d.get('isAvailable')]; iphones=[d for d in devices if 'iPhone' in d.get('name','')]; pick=(iphones or devices); print(pick[0]['udid'] if pick else '')" < "$SIMULATORS_JSON")
+          if [ -z "$SIMULATOR_UDID" ]; then
+            echo "No available iOS simulators detected."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
+          RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-tests.xcresult"
+          xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
+          RESULT=${PIPESTATUS[0]}
+          if [ $RESULT -ne 0 ]; then
+            echo "xcodebuild failed. Extracting test failures from xcresult..."
+            export XCRESULT_JSON="${RUNNER_TEMP}/triangulum-tests.json"
+            if ! xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact; then
+              echo "xcresulttool test-results summary failed."
+              xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+            fi
+            if ! xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON"; then
+              echo "xcresulttool failed to read $RESULT_BUNDLE"
+              xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json || true
+            fi
+          fi
+          exit $RESULT
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            ${{ runner.temp }}/triangulum-tests.xcresult
+            ${{ runner.temp }}/triangulum-tests.json
+          if-no-files-found: warn

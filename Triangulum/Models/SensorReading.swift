@@ -11,7 +11,7 @@ class SensorReading {
     var latitude: Double?
     var longitude: Double?
     var altitude: Double?
-    
+
     init(timestamp: Date = Date(), sensorType: SensorType, value: Double, unit: String, additionalData: String? = nil, latitude: Double? = nil, longitude: Double? = nil, altitude: Double? = nil) {
         self.timestamp = timestamp
         self.sensorType = sensorType
@@ -25,12 +25,12 @@ class SensorReading {
 }
 
 enum SensorType: String, CaseIterable, Codable {
-    case barometer = "barometer"
-    case gps = "gps"
-    case accelerometer = "accelerometer"
-    case gyroscope = "gyroscope"
-    case magnetometer = "magnetometer"
-    
+    case barometer
+    case gps
+    case accelerometer
+    case gyroscope
+    case magnetometer
+
     var displayName: String {
         switch self {
         case .barometer:

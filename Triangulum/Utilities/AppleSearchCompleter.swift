@@ -4,7 +4,7 @@ import MapKit
 
 final class AppleSearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
     @Published var results: [MKLocalSearchCompletion] = []
-    @Published var errorMessage: String? = nil
+    @Published var errorMessage: String?
 
     private let completer: MKLocalSearchCompleter = MKLocalSearchCompleter()
 

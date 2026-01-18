@@ -13,24 +13,27 @@ struct MapView: View {
     @State private var isTrackingUser = false
     @State private var isCacheMode = false
     // OSM-specific centering and search state
-    @State private var osmCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+    @State private var osmCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(
+        latitude: 37.7749,
+        longitude: -122.4194
+    )
     @State private var osmSpan: MKCoordinateSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
     @State private var osmRecenterToken: UUID = UUID()
     @State private var searchText: String = ""
     @State private var isSearching: Bool = false
-    @State private var searchMessage: String? = nil
-    @State private var selectedResultCoordinate: CLLocationCoordinate2D? = nil
-    @State private var selectedResultTitle: String? = nil
+    @State private var searchMessage: String?
+    @State private var selectedResultCoordinate: CLLocationCoordinate2D?
+    @State private var selectedResultTitle: String?
     @State private var cacheRadius: Double = 1000.0
     @State private var minZoom = 10
     @State private var maxZoom = 16
     @StateObject private var cacheManager = TileCacheManager.shared
     @StateObject private var appleCompleter = AppleSearchCompleter()
     @State private var osmSuggestions: [OSMGeocoder.Result] = []
-    @State private var osmAutocompleteTask: Task<Void, Error>? = nil
-    @State private var osmVisibleRegion: MKCoordinateRegion? = nil
+    @State private var osmAutocompleteTask: Task<Void, Error>?
+    @State private var osmVisibleRegion: MKCoordinateRegion?
     @State private var limitToView: Bool = false
-    
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -42,17 +45,21 @@ struct MapView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
-                
+
                 if mapProvider == "osm" {
                     // Toggle cache mode
-                    Button(action: { isCacheMode.toggle() }) {
+                    Button {
+                        isCacheMode.toggle()
+                    } label: {
                         Image(systemName: isCacheMode ? "externaldrive.fill" : "externaldrive")
                             .font(.title3)
                             .foregroundColor(isCacheMode ? .prussianAccent : .prussianBlueLight)
                     }
                 }
-                
-                Button(action: centerOnUser) {
+
+                Button {
+                    centerOnUser()
+                } label: {
                     Image(systemName: isTrackingUser ? "location.fill" : "location")
                         .font(.title3)
                         .foregroundColor(.prussianAccent)
@@ -71,12 +78,12 @@ struct MapView: View {
                             .disableAutocorrection(true)
                             .onSubmit { performSearch() }
                         if !searchText.isEmpty {
-                            Button(action: {
+                            Button {
                                 searchText = ""
                                 searchMessage = nil
                                 osmSuggestions = []
                                 appleCompleter.results = []
-                            }) {
+                            } label: {
                                 Image(systemName: "xmark.circle.fill").foregroundColor(.prussianBlueLight)
                             }
                         }
@@ -108,15 +115,17 @@ struct MapView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 6)
             }
-            
+
             // Autocomplete suggestions (provider-specific)
             if mapProvider == "osm" && !osmSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(0..<min(osmSuggestions.count, 6), id: \.self) { idx in
                         let item = osmSuggestions[idx]
-                        Button(action: { selectOSMSuggestion(item) }) {
+                        Button {
+                            selectOSMSuggestion(item)
+                        } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(item.display_name)
+                                Text(item.displayName)
                                     .font(.subheadline)
                                     .lineLimit(2)
                                     .foregroundColor(.prussianBlueDark)
@@ -139,7 +148,9 @@ struct MapView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(0..<min(appleCompleter.results.count, 6), id: \.self) { idx in
                         let comp = appleCompleter.results[idx]
-                        Button(action: { selectAppleCompletion(comp) }) {
+                        Button {
+                            selectAppleCompletion(comp)
+                        } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(comp.title).font(.subheadline).foregroundColor(.prussianBlueDark)
                                 if !comp.subtitle.isEmpty {
@@ -169,7 +180,9 @@ struct MapView: View {
                             Text("Pan map to desired area, then tap 'Cache This Area'")
                                 .font(.caption)
                                 .foregroundColor(.prussianBlueLight)
-                            Text("\(cacheManager.getCacheInfo().sizeInMB, specifier: "%.1f") MB cached (\(cacheManager.tilesCount) tiles)")
+                            Text(
+                                "\(cacheManager.getCacheInfo().sizeInMB, specifier: "%.1f") MB cached (\(cacheManager.tilesCount) tiles)"
+                            )
                                 .font(.caption2)
                                 .foregroundColor(.prussianBlueLight.opacity(0.8))
                         }
@@ -185,7 +198,7 @@ struct MapView: View {
                             }
                         }
                     }
-                    
+
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Radius: \(Int(cacheRadius))m")
@@ -194,9 +207,9 @@ struct MapView: View {
                             Slider(value: $cacheRadius, in: 500...5000, step: 250)
                                 .tint(.prussianAccent)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(spacing: 4) {
                             Text("Zoom: \(minZoom)-\(maxZoom)")
                                 .font(.caption2)
@@ -210,12 +223,12 @@ struct MapView: View {
                                 }.pickerStyle(.menu).font(.caption2)
                             }
                         }
-                        
-                        Button(action: {
+
+                        Button {
                             Task {
                                 await cacheManager.clearCache()
                             }
-                        }) {
+                        } label: {
                             Image(systemName: "trash")
                                 .font(.caption)
                                 .foregroundColor(.prussianError)
@@ -227,13 +240,14 @@ struct MapView: View {
                 .padding(.vertical, 8)
                 .background(Color.prussianSoft.opacity(0.3))
             }
-            
+
             if !locationManager.isAvailable {
                 Text("Location services disabled in system settings")
                     .foregroundColor(.prussianError)
                     .font(.caption)
                     .frame(height: 200)
-            } else if locationManager.authorizationStatus == .denied || locationManager.authorizationStatus == .restricted {
+            } else if locationManager.authorizationStatus == .denied ||
+                        locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
                     Text("Location access denied")
                         .foregroundColor(.prussianError)
@@ -280,72 +294,82 @@ struct MapView: View {
                         )
                         .overlay(
                             // Cache mode overlay
-                            isCacheMode ? 
-                            ZStack {
-                                // Center crosshair to show cache center
-                                VStack {
-                                    Spacer()
-                                    HStack {
+                            isCacheMode ?
+                                ZStack {
+                                    // Center crosshair to show cache center
+                                    VStack {
                                         Spacer()
-                                        Image(systemName: "plus.circle")
-                                            .font(.title)
-                                            .foregroundColor(.blue.opacity(0.8))
-                                            .background(Circle().fill(Color.white.opacity(0.8)).frame(width: 30, height: 30))
-                                        Spacer()
-                                    }
-                                    Spacer()
-                                }
-                                
-                                // Cache button at bottom
-                                VStack {
-                                    Spacer()
-                                    HStack {
-                                        Spacer()
-                                        Button(action: cacheCurrentArea) {
-                                            HStack {
-                                                Image(systemName: cacheManager.isDownloading ? "arrow.down.circle" : "arrow.down.circle.fill")
-                                                Text(cacheManager.isDownloading ? "Downloading..." : "Cache This Area")
-                                                    .fontWeight(.medium)
-                                            }
-                                            .font(.subheadline)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 12)
-                                            .background(
-                                                LinearGradient(
-                                                    gradient: Gradient(colors: [.prussianAccent, .prussianBlue]),
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
+                                        HStack {
+                                            Spacer()
+                                            Image(systemName: "plus.circle")
+                                                .font(.title)
+                                                .foregroundColor(.blue.opacity(0.8))
+                                                .background(
+                                                    Circle()
+                                                        .fill(Color.white.opacity(0.8))
+                                                        .frame(width: 30, height: 30)
                                                 )
-                                            )
-                                            .cornerRadius(25)
-                                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                            Spacer()
                                         }
-                                        .disabled(cacheManager.isDownloading)
-                                        .opacity(cacheManager.isDownloading ? 0.6 : 1.0)
                                         Spacer()
                                     }
-                                    .padding(.bottom, 20)
-                                }
-                                
-                                // Radius indicator in top corner
-                                VStack {
-                                    HStack {
+
+                                    // Cache button at bottom
+                                    VStack {
                                         Spacer()
-                                        Text("⊕ \(Int(cacheRadius))m radius")
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 4)
-                                            .background(Color.blue.opacity(0.8))
-                                            .cornerRadius(12)
+                                        HStack {
+                                            Spacer()
+                                            Button(action: cacheCurrentArea) {
+                                                HStack {
+                                                    Image(systemName: cacheManager.isDownloading
+                                                        ? "arrow.down.circle"
+                                                        : "arrow.down.circle.fill"
+                                                    )
+                                                    Text(cacheManager.isDownloading
+                                                        ? "Downloading..."
+                                                        : "Cache This Area"
+                                                    )
+                                                        .fontWeight(.medium)
+                                                }
+                                                .font(.subheadline)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 12)
+                                                .background(
+                                                    LinearGradient(
+                                                        gradient: Gradient(colors: [.prussianAccent, .prussianBlue]),
+                                                        startPoint: .leading,
+                                                        endPoint: .trailing
+                                                    )
+                                                )
+                                                .cornerRadius(25)
+                                                .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                            }
+                                            .disabled(cacheManager.isDownloading)
+                                            .opacity(cacheManager.isDownloading ? 0.6 : 1.0)
+                                            Spacer()
+                                        }
+                                        .padding(.bottom, 20)
                                     }
-                                    .padding(.top, 10)
-                                    .padding(.trailing, 10)
-                                    Spacer()
-                                }
-                            } : nil
+
+                                    // Radius indicator in top corner
+                                    VStack {
+                                        HStack {
+                                            Spacer()
+                                            Text("⊕ \(Int(cacheRadius))m radius")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 4)
+                                                .background(Color.blue.opacity(0.8))
+                                                .cornerRadius(12)
+                                        }
+                                        .padding(.top, 10)
+                                        .padding(.trailing, 10)
+                                        Spacer()
+                                    }
+                                } : nil
                         )
                         // Optional: brief search message overlay
                         .overlay(alignment: .top) {
@@ -392,21 +416,25 @@ struct MapView: View {
                         .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
                 )
             }
-            
-            if locationManager.isAvailable && locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways {
+
+            if locationManager.isAvailable &&
+                (locationManager.authorizationStatus == .authorizedWhenInUse ||
+                 locationManager.authorizationStatus == .authorizedAlways) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Coordinates")
                             .font(.caption)
                             .foregroundColor(.prussianBlueLight)
-                        Text("\(locationManager.latitude, specifier: "%.6f")°, \(locationManager.longitude, specifier: "%.6f")°")
+                        Text(
+                            "\(locationManager.latitude, specifier: "%.6f")°, \(locationManager.longitude, specifier: "%.6f")°"
+                        )
                             .font(.caption2)
                             .fontWeight(.medium)
                             .foregroundColor(.prussianBlueDark)
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Accuracy")
                             .font(.caption)
@@ -457,11 +485,11 @@ struct MapView: View {
             centerOnUserLocationIfAvailable()
         }
     }
-    
+
     private var userLocation: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: locationManager.latitude, longitude: locationManager.longitude)
     }
-    
+
     private var accuracyColor: Color {
         if locationManager.accuracy < 5.0 {
             return .prussianSuccess
@@ -471,13 +499,13 @@ struct MapView: View {
             return .prussianError
         }
     }
-    
+
     private func updatePosition() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
-        
+
         // Auto-center on first valid location update, or when tracking is enabled
         let shouldCenter = isTrackingUser || isFirstLocationUpdate()
-        
+
         if shouldCenter {
             if mapProvider == "osm" {
                 osmCenter = userLocation
@@ -493,29 +521,29 @@ struct MapView: View {
             }
         }
     }
-    
+
     private func isFirstLocationUpdate() -> Bool {
         // Check if we're still showing the default San Francisco location
         let defaultLat = 37.7749
         let defaultLon = -122.4194
-        
+
         if mapProvider == "osm" {
-            return abs(osmCenter.latitude - defaultLat) < 0.0001 && 
-                   abs(osmCenter.longitude - defaultLon) < 0.0001
+            return abs(osmCenter.latitude - defaultLat) < 0.0001 &&
+                abs(osmCenter.longitude - defaultLon) < 0.0001
         } else {
             // For Apple Maps, always auto-center on first valid location
             // This is simpler and ensures the map centers on user location
             return true
         }
     }
-    
+
     private func centerOnUserLocationIfAvailable() {
         // Only auto-center if we have a valid location and are still showing default location
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0,
               locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways else {
             return
         }
-        
+
         // Center on user location without enabling tracking mode
         if mapProvider == "osm" {
             osmCenter = userLocation
@@ -532,10 +560,10 @@ struct MapView: View {
             }
         }
     }
-    
+
     private func centerOnUser() {
         guard locationManager.latitude != 0.0 || locationManager.longitude != 0.0 else { return }
-        
+
         if mapProvider == "osm" {
             // Recenter OSM to current user location without toggling on every location update
             osmCenter = userLocation
@@ -552,15 +580,15 @@ struct MapView: View {
                 )
             }
         }
-        
+
         isTrackingUser.toggle()
     }
-    
+
     private func cacheCurrentArea() {
         let center = userLocation.latitude == 0.0 && userLocation.longitude == 0.0
             ? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
             : userLocation
-        
+
         Task {
             await cacheManager.downloadTilesForRegion(
                 center: center,
@@ -595,9 +623,9 @@ extension MapView {
                     osmCenter = first.coordinate
                     osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
                     osmRecenterToken = UUID()
-                    searchMessage = first.display_name
+                    searchMessage = first.displayName
                     selectedResultCoordinate = first.coordinate
-                    selectedResultTitle = first.display_name
+                    selectedResultTitle = first.displayName
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
                 }
             }
@@ -678,10 +706,10 @@ extension MapView {
         osmCenter = result.coordinate
         osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
         osmRecenterToken = UUID()
-        searchMessage = result.display_name
+        searchMessage = result.displayName
         osmSuggestions = []
         selectedResultCoordinate = result.coordinate
-        selectedResultTitle = result.display_name
+        selectedResultTitle = result.displayName
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
     }
 
@@ -708,7 +736,7 @@ extension MapView {
 
 #Preview {
     let manager = LocationManager()
-    
+
     return MapView(locationManager: manager)
         .onAppear {
             manager.latitude = 37.7749

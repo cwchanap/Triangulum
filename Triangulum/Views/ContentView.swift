@@ -25,7 +25,7 @@ struct ContentView: View {
     @State private var currentSnapshot: SensorSnapshot?
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isEditMode = false
-    
+
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
     @AppStorage("showWeatherWidget") private var showWeatherWidget = true
@@ -34,10 +34,10 @@ struct ContentView: View {
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
 
     init() {
-        let lm = LocationManager()
-        _locationManager = StateObject(wrappedValue: lm)
-        _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: lm))
-        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: lm))
+        let locationManager = LocationManager()
+        _locationManager = StateObject(wrappedValue: locationManager)
+        _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: locationManager))
+        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: locationManager))
     }
 
     var body: some View {
@@ -52,7 +52,7 @@ struct ContentView: View {
                     }
                 }
                 .onMove(perform: widgetOrderManager.moveWidget)
-                
+
                 // Camera button as a separate section
                 Section {
                     HStack {
@@ -82,34 +82,34 @@ struct ContentView: View {
             .environment(\.editMode, .constant(isEditMode ? EditMode.active : EditMode.inactive))
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button(action: {
+                    Button {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isEditMode.toggle()
                         }
-                    }) {
+                    } label: {
                         Image(systemName: isEditMode ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle")
                             .font(.title2)
                             .foregroundColor(.white)
                     }
-                    
+
                     NavigationLink(destination: ConstellationMapView(locationManager: locationManager)) {
                         Image(systemName: "star.fill")
                             .font(.title2)
                             .foregroundColor(.white)
                     }
-                    
+
                     NavigationLink(destination: CompassPageView(locationManager: locationManager)) {
                         Image(systemName: "location.north.fill")
                             .font(.title2)
                             .foregroundColor(.white)
                     }
-                    
+
                     NavigationLink(destination: PreferencesView()) {
                         Image(systemName: "gearshape.fill")
                             .font(.title2)
                             .foregroundColor(.white)
                     }
-                    
+
                     NavigationLink(destination: FootprintView(snapshotManager: snapshotManager)) {
                         Image(systemName: "location.fill")
                             .font(.title2)
@@ -121,6 +121,9 @@ struct ContentView: View {
             Color.prussianSoft.ignoresSafeArea()
         }
         .onAppear {
+            // Configure pressure history manager with SwiftData context
+            barometerManager.configureHistory(with: modelContext)
+
             barometerManager.startBarometerUpdates()
             locationManager.startLocationUpdates()
             // TODO: Temporarily disabled until privacy permissions are properly configured
@@ -144,9 +147,9 @@ struct ContentView: View {
             )
         }
     }
-    
+
     // MARK: - Widget Management
-    
+
     private func isWidgetVisible(_ widgetType: WidgetType) -> Bool {
         switch widgetType {
         case .barometer: return showBarometerWidget
@@ -157,7 +160,7 @@ struct ContentView: View {
         case .magnetometer: return showMagnetometerWidget
         }
     }
-    
+
     @ViewBuilder
     private func widgetView(for widgetType: WidgetType) -> some View {
         switch widgetType {
@@ -176,7 +179,6 @@ struct ContentView: View {
         }
     }
 
-    
     private func takeSnapshot() {
         let snapshot = SensorSnapshot(
             barometerManager: barometerManager,
@@ -196,14 +198,14 @@ struct SnapshotCreationView: View {
     let snapshotManager: SnapshotManager
     @Binding var selectedPhotos: [PhotosPickerItem]
     @Binding var isPresented: Bool
-    
+
     @State private var tempSelectedPhotos: [PhotosPickerItem] = []
     @State private var isProcessingPhotos = false
     @State private var showingImagePicker = false
     @State private var showingCamera = false
     @State private var capturedImages: [UIImage] = []
     @State private var photoPreviewImages: [UIImage] = []
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 24) {
@@ -212,21 +214,24 @@ struct SnapshotCreationView: View {
                     .font(.system(size: 60))
                     .foregroundColor(.prussianSuccess)
                     .padding(.top, 20)
-                
+
                 // Title and Message
                 VStack(spacing: 8) {
                     Text("Snapshot Captured!")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(.prussianBlueDark)
-                    
-                    Text("Sensor data has been recorded at \(snapshot?.timestamp.formatted(date: .omitted, time: .shortened) ?? "now")")
+
+                    Text(
+                        "Sensor data has been recorded at " +
+                        "\(snapshot?.timestamp.formatted(date: .omitted, time: .shortened) ?? "now")"
+                    )
                         .font(.body)
                         .foregroundColor(.prussianBlueLight)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
-                
+
                 // Enhanced Photo Section
                 VStack(spacing: 16) {
                     // Header with photo count
@@ -234,9 +239,9 @@ struct SnapshotCreationView: View {
                         Text("📷 Add Photos (Optional)")
                             .font(.headline)
                             .foregroundColor(.prussianBlueDark)
-                        
+
                         Spacer()
-                        
+
                         if !capturedImages.isEmpty || !photoPreviewImages.isEmpty {
                             let totalPhotos = capturedImages.count + photoPreviewImages.count
                             Text("\(totalPhotos)/5")
@@ -248,13 +253,13 @@ struct SnapshotCreationView: View {
                                 .cornerRadius(6)
                         }
                     }
-                    
+
                     // Photo Action Buttons
                     HStack(spacing: 12) {
                         // Camera Button
-                        Button(action: {
+                        Button {
                             showingCamera = true
-                        }) {
+                        } label: {
                             HStack {
                                 Image(systemName: "camera")
                                 Text("Camera")
@@ -267,7 +272,7 @@ struct SnapshotCreationView: View {
                             .cornerRadius(8)
                         }
                         .disabled(capturedImages.count + photoPreviewImages.count >= 5)
-                        
+
                         // Photo Library Button
                         PhotosPicker(
                             selection: $tempSelectedPhotos,
@@ -286,10 +291,10 @@ struct SnapshotCreationView: View {
                             .cornerRadius(8)
                         }
                         .disabled(capturedImages.count + photoPreviewImages.count >= 5)
-                        
+
                         Spacer()
                     }
-                    
+
                     // Photo Preview Grid
                     if !capturedImages.isEmpty || !photoPreviewImages.isEmpty {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
@@ -302,10 +307,10 @@ struct SnapshotCreationView: View {
                                         .frame(width: 80, height: 80)
                                         .clipped()
                                         .cornerRadius(8)
-                                    
-                                    Button(action: {
+
+                                    Button {
                                         capturedImages.remove(at: index)
-                                    }) {
+                                    } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.white)
                                             .background(Circle().fill(Color.black.opacity(0.6)))
@@ -314,7 +319,7 @@ struct SnapshotCreationView: View {
                                     .offset(x: 5, y: -5)
                                 }
                             }
-                            
+
                             // Show library photos
                             ForEach(Array(photoPreviewImages.enumerated()), id: \.offset) { index, image in
                                 ZStack(alignment: .topTrailing) {
@@ -324,13 +329,13 @@ struct SnapshotCreationView: View {
                                         .frame(width: 80, height: 80)
                                         .clipped()
                                         .cornerRadius(8)
-                                    
-                                    Button(action: {
+
+                                    Button {
                                         photoPreviewImages.remove(at: index)
                                         if index < tempSelectedPhotos.count {
                                             tempSelectedPhotos.remove(at: index)
                                         }
-                                    }) {
+                                    } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.white)
                                             .background(Circle().fill(Color.black.opacity(0.6)))
@@ -349,7 +354,7 @@ struct SnapshotCreationView: View {
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 8)
                     }
-                    
+
                     if isProcessingPhotos {
                         HStack {
                             ProgressView()
@@ -371,9 +376,9 @@ struct SnapshotCreationView: View {
                         }
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Action Buttons
                 VStack(spacing: 12) {
                     Button(action: saveSnapshot) {
@@ -389,7 +394,7 @@ struct SnapshotCreationView: View {
                         .cornerRadius(12)
                     }
                     .disabled(isProcessingPhotos)
-                    
+
                     Button("Skip Photos", action: saveSnapshotWithoutPhotos)
                         .font(.callout)
                         .foregroundColor(.prussianBlueLight)
@@ -426,18 +431,18 @@ struct SnapshotCreationView: View {
             }
         }
     }
-    
+
     private func saveSnapshot() {
         guard let snapshot = snapshot else { return }
-        
+
         // Add the snapshot first
         snapshotManager.addSnapshot(snapshot)
-        
+
         // Process captured images directly
         for image in capturedImages {
             snapshotManager.addPhoto(to: snapshot.id, image: image)
         }
-        
+
         // Then process photos from library if any
         if !tempSelectedPhotos.isEmpty {
             Task {
@@ -450,19 +455,19 @@ struct SnapshotCreationView: View {
             finishSaving()
         }
     }
-    
+
     private func saveSnapshotWithoutPhotos() {
         guard let snapshot = snapshot else { return }
         snapshotManager.addSnapshot(snapshot)
         finishSaving()
     }
-    
+
     private func finishSaving() {
         isPresented = false
         tempSelectedPhotos.removeAll()
         isProcessingPhotos = false
     }
-    
+
     private func processSelectedPhotos(for snapshotID: UUID) async {
         for photoItem in tempSelectedPhotos {
             do {
@@ -477,10 +482,10 @@ struct SnapshotCreationView: View {
             }
         }
     }
-    
+
     private func loadPhotoPreviewImages(from photoItems: [PhotosPickerItem]) async {
         var newPreviewImages: [UIImage] = []
-        
+
         for photoItem in photoItems {
             do {
                 if let data = try await photoItem.loadTransferable(type: Data.self),
@@ -491,7 +496,7 @@ struct SnapshotCreationView: View {
                 print("Failed to load preview image: \(error)")
             }
         }
-        
+
         await MainActor.run {
             photoPreviewImages = newPreviewImages
         }
@@ -503,7 +508,7 @@ struct ImagePicker: UIViewControllerRepresentable {
     enum SourceType {
         case camera
         case photoLibrary
-        
+
         var uiImagePickerSourceType: UIImagePickerController.SourceType {
             switch self {
             case .camera:
@@ -513,38 +518,38 @@ struct ImagePicker: UIViewControllerRepresentable {
             }
         }
     }
-    
+
     let sourceType: SourceType
     let onImagePicked: (UIImage) -> Void
     @Environment(\.presentationMode) var presentationMode
-    
+
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = sourceType.uiImagePickerSourceType
         picker.delegate = context.coordinator
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
         let parent: ImagePicker
-        
+
         init(_ parent: ImagePicker) {
             self.parent = parent
         }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let image = info[.originalImage] as? UIImage {
                 parent.onImagePicked(image)
             }
             parent.presentationMode.wrappedValue.dismiss()
         }
-        
+
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.presentationMode.wrappedValue.dismiss()
         }

@@ -6,14 +6,15 @@ struct WeatherResponse: Codable {
     let wind: WeatherWind?
     let visibility: Int?
     let name: String
-    
+
     struct WeatherCondition: Codable {
+        // swiftlint:disable:next identifier_name
         let id: Int
         let main: String
         let description: String
         let icon: String
     }
-    
+
     struct WeatherMain: Codable {
         let temp: Double
         let feelsLike: Double
@@ -21,7 +22,7 @@ struct WeatherResponse: Codable {
         let tempMax: Double
         let pressure: Int
         let humidity: Int
-        
+
         enum CodingKeys: String, CodingKey {
             case temp
             case feelsLike = "feels_like"
@@ -31,7 +32,7 @@ struct WeatherResponse: Codable {
             case humidity
         }
     }
-    
+
     struct WeatherWind: Codable {
         let speed: Double
         let deg: Int?
@@ -53,7 +54,7 @@ struct Weather {
     let icon: String
     let locationName: String
     let timestamp: Date
-    
+
     init(from response: WeatherResponse) {
         self.temperature = response.main.temp
         self.feelsLike = response.main.feelsLike
@@ -70,15 +71,15 @@ struct Weather {
         self.locationName = response.name
         self.timestamp = Date()
     }
-    
+
     var temperatureCelsius: Double {
         return temperature - 273.15
     }
-    
+
     var temperatureFahrenheit: Double {
         return (temperature - 273.15) * 9/5 + 32
     }
-    
+
     var systemIconName: String {
         switch icon.prefix(2) {
         case "01": return "sun.max.fill"

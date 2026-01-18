@@ -3,7 +3,7 @@ import CoreMotion
 
 struct MagnetometerView: View {
     @ObservedObject var magnetometerManager: MagnetometerManager
-    
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
@@ -16,7 +16,7 @@ struct MagnetometerView: View {
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
             }
-            
+
             if !magnetometerManager.isAvailable {
                 Text("Magnetometer not available on this device")
                     .foregroundColor(.prussianError)
@@ -37,9 +37,9 @@ struct MagnetometerView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Y-Axis")
                                 .font(.caption)
@@ -50,7 +50,7 @@ struct MagnetometerView: View {
                                 .foregroundColor(.prussianBlueDark)
                         }
                     }
-                    
+
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Z-Axis")
@@ -61,9 +61,9 @@ struct MagnetometerView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Magnitude")
                                 .font(.caption)
@@ -74,7 +74,7 @@ struct MagnetometerView: View {
                                 .foregroundColor(.prussianBlueDark)
                         }
                     }
-                    
+
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Heading")
@@ -85,9 +85,9 @@ struct MagnetometerView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.prussianBlueDark)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("Direction")
                                 .font(.caption)
@@ -98,7 +98,7 @@ struct MagnetometerView: View {
                                 .foregroundColor(.prussianBlueDark)
                         }
                     }
-                    
+
                     ProgressView(value: magnetometerManager.magnitude / 100.0)
                         .progressViewStyle(LinearProgressViewStyle(tint: magneticColor))
                 }
@@ -115,7 +115,7 @@ struct MagnetometerView: View {
         .cornerRadius(12)
         .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
     }
-    
+
     private var compassDirection: String {
         let heading = magnetometerManager.heading
         if heading >= 337.5 || heading < 22.5 {
@@ -136,7 +136,7 @@ struct MagnetometerView: View {
             return "NW"
         }
     }
-    
+
     private var magneticColor: Color {
         let magnitude = magnetometerManager.magnitude
         if magnitude > 80 {
@@ -157,7 +157,7 @@ struct MagnetometerView: View {
     manager.magnitude = 109.2
     manager.heading = 135.5
     manager.isAvailable = true
-    
+
     return MagnetometerView(magnetometerManager: manager)
         .padding()
 }
