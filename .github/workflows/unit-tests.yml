@@ -35,9 +35,12 @@ jobs:
           if [ $RESULT -ne 0 ]; then
             echo "xcodebuild failed. Extracting test failures from xcresult..."
             export XCRESULT_JSON="${RUNNER_TEMP}/triangulum-tests.json"
-            if ! xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact; then
+            SUMMARY_JSON="${RUNNER_TEMP}/triangulum-tests-summary.json"
+            if ! xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact > "$SUMMARY_JSON"; then
               echo "xcresulttool test-results summary failed."
               xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+            else
+              python3 -c "import json,sys; data=json.load(open(sys.argv[1])); failures=data.get('testFailures') or []; print(f\"Summary: {data.get('failedTests',0)} failed / {data.get('totalTestCount',0)} total\"); print('Failing tests (summary):' if failures else 'No test failures in summary.'); [print(f\"- {f.get('testName','')} ({f.get('targetName','')}): {f.get('failureText','')}\") for f in failures]" "$SUMMARY_JSON"
             fi
             if ! xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON"; then
               echo "xcresulttool failed to read $RESULT_BUNDLE"
@@ -54,4 +57,5 @@ jobs:
           path: |
             ${{ runner.temp }}/triangulum-tests.xcresult
             ${{ runner.temp }}/triangulum-tests.json
+            ${{ runner.temp }}/triangulum-tests-summary.json
           if-no-files-found: warn
