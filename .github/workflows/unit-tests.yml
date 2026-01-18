@@ -35,7 +35,23 @@ jobs:
           if [ $RESULT -ne 0 ]; then
             echo "xcodebuild failed. Extracting test failures from xcresult..."
             export XCRESULT_JSON="${RUNNER_TEMP}/triangulum-tests.json"
-            xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON"
-            python3 -c $'import json,os,sys\npath=os.environ.get("XCRESULT_JSON")\nif not path:\n    sys.exit(0)\nwith open(path,"r",encoding="utf-8") as handle:\n    data=json.load(handle)\nactions=data.get("actions",{}).get("_values") or []\nfailures=[]\nfor action in actions:\n    issues=action.get("actionResult",{}).get("issues",{})\n    summaries=issues.get("testFailureSummaries",{}).get("_values") or []\n    for summary in summaries:\n        name=summary.get("testCaseName",{}).get("_value")\n        message=summary.get("message",{}).get("_value")\n        location=summary.get("documentLocationInCreatingWorkspace",{}).get("url",{}).get("_value")\n        failures.append((name,message,location))\nif not failures:\n    print("No test failures found in xcresult.")\nelse:\n    print("Test failures:")\n    for name,message,location in failures:\n        if name or message:\n            print(f"- {name}: {message}")\n        if location:\n            print(f"  {location}")'
+            if ! xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact; then
+              echo "xcresulttool test-results summary failed."
+              xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+            fi
+            if ! xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON"; then
+              echo "xcresulttool failed to read $RESULT_BUNDLE"
+              xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json || true
+            fi
           fi
           exit $RESULT
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: |
+            ${{ runner.temp }}/triangulum-tests.xcresult
+            ${{ runner.temp }}/triangulum-tests.json
+          if-no-files-found: warn
