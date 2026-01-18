@@ -20,8 +20,17 @@ jobs:
       - name: Run Unit Tests
         run: |
           set -o pipefail
+          SIMULATORS_JSON="${RUNNER_TEMP}/simulators.json"
+          xcrun simctl list devices available -j > "$SIMULATORS_JSON"
+          SIMULATOR_UDID=$(python3 -c "import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data.get('devices',{}).values() for d in runtime if d.get('isAvailable')]; iphones=[d for d in devices if 'iPhone' in d.get('name','')]; pick=(iphones or devices); print(pick[0]['udid'] if pick else '')" < "$SIMULATORS_JSON")
+          if [ -z "$SIMULATOR_UDID" ]; then
+            echo "No available iOS simulators detected."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
           RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-tests.xcresult"
-          xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
+          xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
           RESULT=${PIPESTATUS[0]}
           if [ $RESULT -ne 0 ]; then
             echo "xcodebuild failed. Extracting test failures from xcresult..."
