@@ -4,7 +4,7 @@ import UIKit
 
 struct SensorSnapshot: Codable, Identifiable {
     // swiftlint:disable:next identifier_name
-    let id = UUID()
+    var id = UUID()
     let timestamp: Date
     let barometer: BarometerData
     let location: LocationData

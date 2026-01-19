@@ -378,10 +378,10 @@ struct WeatherInfoItem: View {
 
 struct SearchedCity: Codable, Identifiable {
     // swiftlint:disable:next identifier_name
-    let id = UUID()
+    var id = UUID()
     let name: String
     let country: String
-    let timestamp = Date()
+    var timestamp = Date()
 }
 
 // MARK: - Weather Search Manager

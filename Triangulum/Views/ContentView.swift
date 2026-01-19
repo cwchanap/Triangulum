@@ -418,7 +418,7 @@ struct SnapshotCreationView: View {
                 }
             }
         }
-        .onChange(of: tempSelectedPhotos) { newPhotos in
+        .onChange(of: tempSelectedPhotos) { _, newPhotos in
             if !newPhotos.isEmpty {
                 isProcessingPhotos = true
                 // Process selected photos and create preview images
@@ -474,7 +474,7 @@ struct SnapshotCreationView: View {
                 if let data = try await photoItem.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     await MainActor.run {
-                        snapshotManager.addPhoto(to: snapshotID, image: image)
+                        _ = snapshotManager.addPhoto(to: snapshotID, image: image)
                     }
                 }
             } catch {
