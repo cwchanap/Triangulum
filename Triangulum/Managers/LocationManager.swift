@@ -12,10 +12,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var heading: Double = 0.0
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var errorMessage: String = ""
+    private var lastHorizontalAccuracy: Double = -1
 
     /// Indicates whether a valid location fix has been received
     var hasValidLocation: Bool {
-        return isAvailable && accuracy > 0
+        return isAvailable && lastHorizontalAccuracy >= 0
     }
 
     override init() {
@@ -138,7 +139,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         latitude = location.coordinate.latitude
         longitude = location.coordinate.longitude
         altitude = location.altitude
-        // Guard against negative accuracy values, treating them as invalid (0)
+        // Track raw accuracy for validity and clamp for display
+        lastHorizontalAccuracy = location.horizontalAccuracy
         accuracy = max(0, location.horizontalAccuracy)
         errorMessage = ""
     }

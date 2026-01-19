@@ -110,7 +110,7 @@ struct LocationManagerTests {
         #expect(manager.latitude == 37.7749)
         #expect(manager.longitude == -122.4194)
         #expect(manager.altitude == mockLocation.altitude)
-        #expect(manager.accuracy == mockLocation.horizontalAccuracy)
+        #expect(manager.accuracy == max(0, mockLocation.horizontalAccuracy))
         #expect(manager.errorMessage == "")
     }
 
@@ -153,6 +153,36 @@ struct LocationManagerTests {
         #expect(manager.longitude == -74.0060)
         #expect(manager.altitude == 10.0)
         #expect(manager.accuracy == 5.0)
+    }
+
+    @Test func testValidLocationAllowsZeroAccuracy() {
+        let manager = LocationManager()
+        let location = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+                                  altitude: 0.0,
+                                  horizontalAccuracy: 0.0,
+                                  verticalAccuracy: 5.0,
+                                  timestamp: Date())
+
+        manager.isAvailable = true
+        manager.locationManager(CLLocationManager(), didUpdateLocations: [location])
+
+        #expect(manager.hasValidLocation)
+        #expect(manager.accuracy == 0.0)
+    }
+
+    @Test func testInvalidLocationRejectsNegativeAccuracy() {
+        let manager = LocationManager()
+        let location = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+                                  altitude: 0.0,
+                                  horizontalAccuracy: -1.0,
+                                  verticalAccuracy: 5.0,
+                                  timestamp: Date())
+
+        manager.isAvailable = true
+        manager.locationManager(CLLocationManager(), didUpdateLocations: [location])
+
+        #expect(manager.hasValidLocation == false)
+        #expect(manager.accuracy == 0.0)
     }
 
     @Test func testLocationUpdateWithEmptyArray() {
