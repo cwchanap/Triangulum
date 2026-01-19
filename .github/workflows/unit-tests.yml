@@ -40,7 +40,7 @@ jobs:
               echo "xcresulttool test-results summary failed."
               xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
             else
-              python3 -c "import json,sys; data=json.load(open(sys.argv[1])); failures=data.get('testFailures') or []; print(f\"Summary: {data.get('failedTests',0)} failed / {data.get('totalTestCount',0)} total\"); print('Failing tests (summary):' if failures else 'No test failures in summary.'); [print(f\"- {f.get('testName','')} ({f.get('targetName','')}): {f.get('failureText','')}\") for f in failures]" "$SUMMARY_JSON"
+              python3 -c $'import json,sys\npath=sys.argv[1]\ntry:\n    with open(path,"r",encoding="utf-8") as handle:\n        data=json.load(handle)\nexcept Exception as exc:\n    print(f"Failed to parse summary JSON: {exc}")\n    sys.exit(0)\n\nfailures=data.get("testFailures") or []\nfailed=data.get("failedTests",0)\ntotal=data.get("totalTestCount",0)\nprint(f"Summary: {failed} failed / {total} total")\nif failures:\n    print("Failing tests (summary):")\n    for failure in failures:\n        name=failure.get("testName","")\n        target=failure.get("targetName","")\n        text=failure.get("failureText","")\n        if target:\n            print(f"- {name} ({target}): {text}")\n        else:\n            print(f"- {name}: {text}")\nelse:\n    print("No test failures in summary.")' "$SUMMARY_JSON"
             fi
             if ! xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON"; then
               echo "xcresulttool failed to read $RESULT_BUNDLE"
