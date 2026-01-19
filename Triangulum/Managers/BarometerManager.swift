@@ -1,6 +1,7 @@
 import Foundation
 import CoreMotion
 import SwiftData
+import Combine
 
 class BarometerManager: ObservableObject {
     private let altimeter = CMAltimeter()
@@ -14,6 +15,8 @@ class BarometerManager: ObservableObject {
     @Published var isAttitudeAvailable: Bool = false
     @Published var errorMessage: String = ""
     @Published var historyRecordingError: Error?
+
+    private var cancellables = Set<AnyCancellable>()
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -32,6 +35,12 @@ class BarometerManager: ObservableObject {
             historyManager = PressureHistoryManager()
         }
         historyManager?.configure(with: modelContext)
+        cancellables.removeAll()
+        historyManager?.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     private func checkAvailability() {

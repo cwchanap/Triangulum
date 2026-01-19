@@ -61,9 +61,14 @@ struct LocationManagerTests {
 
     @Test func testAuthorizationStatusInitialization() {
         let manager = LocationManager()
-
-        #expect(manager.authorizationStatus != .notDetermined ||
-                    manager.authorizationStatus == .notDetermined)
+        let validStatuses: [CLAuthorizationStatus] = [
+            .notDetermined,
+            .authorizedWhenInUse,
+            .authorizedAlways,
+            .restricted,
+            .denied
+        ]
+        #expect(validStatuses.contains(manager.authorizationStatus))
     }
 
     @Test func testLocationUnavailableError() async {
