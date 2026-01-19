@@ -19,6 +19,9 @@ struct FootprintView: View {
     private var paginatedSnapshots: [SensorSnapshot] {
         let reversedSnapshots = Array(snapshotManager.snapshots.reversed())
         let startIndex = currentPage * itemsPerPage
+        if startIndex >= reversedSnapshots.count {
+            return []
+        }
         let endIndex = min(startIndex + itemsPerPage, reversedSnapshots.count)
         return Array(reversedSnapshots[startIndex..<endIndex])
     }

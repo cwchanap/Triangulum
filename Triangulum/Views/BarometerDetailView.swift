@@ -257,7 +257,7 @@ struct BarometerDetailView: View {
                 HStack(spacing: 0) {
                     // Pressure statistics
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Pressure (kPa)")
+                        Text("Sea-level Pressure (kPa)")
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.prussianBlueLight)
