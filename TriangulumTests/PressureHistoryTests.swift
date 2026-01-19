@@ -532,106 +532,61 @@ struct TrendCalculationIntegrationTests {
 
 struct TrendCalculationTests {
 
+    private func trend(for rate: Double) -> PressureTrend {
+        if rate > 1.0 {
+            return .risingFast
+        } else if rate > 0.5 {
+            return .rising
+        } else if rate < -1.0 {
+            return .fallingFast
+        } else if rate < -0.5 {
+            return .falling
+        } else {
+            return .steady
+        }
+    }
+
     @Test func testTrendThresholdRisingFast() {
         // Rate > 1.0 hPa/hr should be rising fast
         let rate = 1.5
-        let expectedTrend: PressureTrend = rate > 1.0 ? .risingFast : .rising
-        #expect(expectedTrend == .risingFast)
+        #expect(trend(for: rate) == .risingFast)
     }
 
     @Test func testTrendThresholdRising() {
         // Rate 0.5 to 1.0 hPa/hr should be rising
         let rate = 0.7
-        let expectedTrend: PressureTrend
-        if rate > 1.0 {
-            expectedTrend = .risingFast
-        } else if rate > 0.5 {
-            expectedTrend = .rising
-        } else {
-            expectedTrend = .steady
-        }
-        #expect(expectedTrend == .rising)
+        #expect(trend(for: rate) == .rising)
     }
 
     @Test func testTrendThresholdSteady() {
         // Rate -0.5 to 0.5 hPa/hr should be steady
         let rate = 0.3
-        let expectedTrend: PressureTrend
-        if rate > 1.0 {
-            expectedTrend = .risingFast
-        } else if rate > 0.5 {
-            expectedTrend = .rising
-        } else if rate < -1.0 {
-            expectedTrend = .fallingFast
-        } else if rate < -0.5 {
-            expectedTrend = .falling
-        } else {
-            expectedTrend = .steady
-        }
-        #expect(expectedTrend == .steady)
+        #expect(trend(for: rate) == .steady)
     }
 
     @Test func testTrendThresholdFalling() {
         // Rate -1.0 to -0.5 hPa/hr should be falling
         let rate = -0.7
-        let expectedTrend: PressureTrend
-        if rate > 1.0 {
-            expectedTrend = .risingFast
-        } else if rate > 0.5 {
-            expectedTrend = .rising
-        } else if rate < -1.0 {
-            expectedTrend = .fallingFast
-        } else if rate < -0.5 {
-            expectedTrend = .falling
-        } else {
-            expectedTrend = .steady
-        }
-        #expect(expectedTrend == .falling)
+        #expect(trend(for: rate) == .falling)
     }
 
     @Test func testTrendThresholdFallingFast() {
         // Rate < -1.0 hPa/hr should be falling fast
         let rate = -1.5
-        let expectedTrend: PressureTrend
-        if rate > 1.0 {
-            expectedTrend = .risingFast
-        } else if rate > 0.5 {
-            expectedTrend = .rising
-        } else if rate < -1.0 {
-            expectedTrend = .fallingFast
-        } else if rate < -0.5 {
-            expectedTrend = .falling
-        } else {
-            expectedTrend = .steady
-        }
-        #expect(expectedTrend == .fallingFast)
+        #expect(trend(for: rate) == .fallingFast)
     }
 
     @Test func testTrendThresholdBoundaries() {
         // Test exact boundary values
-        func getTrend(for rate: Double) -> PressureTrend {
-            if rate > 1.0 {
-                return .risingFast
-            } else if rate > 0.5 {
-                return .rising
-            } else if rate < -1.0 {
-                return .fallingFast
-            } else if rate < -0.5 {
-                return .falling
-            } else {
-                return .steady
-            }
-        }
-
         // Exactly at boundaries
-        #expect(getTrend(for: 0.5) == .steady)   // 0.5 is not > 0.5
-        #expect(getTrend(for: 0.51) == .rising)
-        #expect(getTrend(for: 1.0) == .rising)   // 1.0 is not > 1.0
-        #expect(getTrend(for: 1.01) == .risingFast)
-        #expect(getTrend(for: -0.5) == .steady)  // -0.5 is not < -0.5
-        #expect(getTrend(for: -0.51) == .falling)
-        #expect(getTrend(for: -1.0) == .falling) // -1.0 is not < -1.0
-        #expect(getTrend(for: -1.01) == .fallingFast)
+        #expect(trend(for: 0.5) == .steady)   // 0.5 is not > 0.5
+        #expect(trend(for: 0.51) == .rising)
+        #expect(trend(for: 1.0) == .rising)   // 1.0 is not > 1.0
+        #expect(trend(for: 1.01) == .risingFast)
+        #expect(trend(for: -0.5) == .steady)  // -0.5 is not < -0.5
+        #expect(trend(for: -0.51) == .falling)
+        #expect(trend(for: -1.0) == .falling) // -1.0 is not < -1.0
+        #expect(trend(for: -1.01) == .fallingFast)
     }
 }
 
@@ -752,6 +707,11 @@ struct DistanceCalculationTests {
 
 struct DeltaCalculationTests {
 
+    private func formatDelta(_ delta: Double) -> String {
+        let sign = delta >= 0 ? "+" : ""
+        return String(format: "%@%.2f", sign, delta)
+    }
+
     @Test func testPositiveDelta() {
         let value1 = 100.0
         let value2 = 105.0
@@ -780,15 +740,14 @@ struct DeltaCalculationTests {
 
     @Test func testDeltaFormatting() {
         let delta = 5.123456
-        let formatted = String(format: "+%.2f", delta)
+        let formatted = formatDelta(delta)
 
         #expect(formatted == "+5.12")
     }
 
     @Test func testNegativeDeltaFormatting() {
         let delta = -5.123456
-        let sign = delta >= 0 ? "+" : ""
-        let formatted = String(format: "%@%.2f", sign, delta)
+        let formatted = formatDelta(delta)
 
         #expect(formatted == "-5.12")
     }

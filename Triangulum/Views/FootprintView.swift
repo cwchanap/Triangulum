@@ -476,13 +476,13 @@ struct SnapshotDetailView: View {
                 }
             }
         }
-        .onChange(of: selectedPhotos) { newPhotos in
+        .onChange(of: selectedPhotos) { _, newPhotos in
             Task {
                 for photoItem in newPhotos {
                     if let data = try? await photoItem.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
                         await MainActor.run {
-                            snapshotManager.addPhoto(to: snapshot.id, image: image)
+                            _ = snapshotManager.addPhoto(to: snapshot.id, image: image)
                         }
                     }
                 }

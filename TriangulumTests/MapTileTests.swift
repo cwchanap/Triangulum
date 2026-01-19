@@ -67,7 +67,7 @@ struct MapTileTests {
     }
 
     @Test func testIsExpiredOldTile() {
-        let tile = MapTile(tileX: 1, tileY: 1, tileZ: 1, data: Data(), url: "test")
+        _ = MapTile(tileX: 1, tileY: 1, tileZ: 1, data: Data(), url: "test")
 
         // Manually set timestamp to 8 days ago (beyond 7 day expiration)
         let eightDaysAgo = Date().addingTimeInterval(-8 * 24 * 60 * 60)

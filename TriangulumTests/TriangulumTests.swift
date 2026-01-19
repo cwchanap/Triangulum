@@ -414,17 +414,21 @@ struct TriangulumTests {
 
     @Test func testPrussianBlueColorPalette() {
         // Test that all prussian blue colors are defined correctly
-        let prussianBlue = Color.prussianBlue
-        let prussianBlueLight = Color.prussianBlueLight
-        let prussianBlueDark = Color.prussianBlueDark
-        let prussianAccent = Color.prussianAccent
-        let prussianSoft = Color.prussianSoft
-        let prussianWarning = Color.prussianWarning
-        let prussianError = Color.prussianError
-        let prussianSuccess = Color.prussianSuccess
+        let colors = [
+            Color.prussianBlue,
+            Color.prussianBlueLight,
+            Color.prussianBlueDark,
+            Color.prussianAccent,
+            Color.prussianSoft,
+            Color.prussianWarning,
+            Color.prussianError,
+            Color.prussianSuccess
+        ]
 
-        // Verify colors are accessible by ensuring they can be described
-        #expect(String(describing: prussianBlue).isEmpty == false)
+        #expect(colors.count == 8)
+        for color in colors {
+            #expect(String(describing: color).isEmpty == false)
+        }
     }
 
     @Test func testColorComponentValues() {
@@ -449,7 +453,7 @@ struct TriangulumTests {
         // Test that the colors can be used in typical SwiftUI contexts
         // This ensures they're properly defined as Color objects
         let testView = Rectangle().fill(Color.prussianBlue)
-        #expect(testView != nil)
+        #expect(String(describing: testView).isEmpty == false)
     }
 
 }

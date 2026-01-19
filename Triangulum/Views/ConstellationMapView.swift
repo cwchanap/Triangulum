@@ -265,7 +265,7 @@ struct ConstellationMapView: View {
             for (text, az) in labels {
                 let theta = az * .pi / 180
                 let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad + azOffsetRad, altitudeDeg: 0 + altOffsetDeg)
-                var resolved = layer.resolve(Text(text).font(.caption).foregroundColor(fg))
+                let resolved = layer.resolve(Text(text).font(.caption).foregroundColor(fg))
                 layer.draw(resolved, at: point, anchor: .center)
             }
 
