@@ -68,52 +68,54 @@ class BarometerManager: ObservableObject {
             }
 
             let currentPressure = data.pressure.doubleValue
-
-            // Validate location availability before calculating sea level pressure
-            guard locationManager.hasValidLocation else {
-                self.errorMessage = "Waiting for location data for accurate pressure reading"
-                self.pressure = currentPressure
-                self.seaLevelPressure = nil
-                return
-            }
-
-            let currentAltitude = self.locationManager.altitude
-            let seaLevel = self.calculateSeaLevelPressure(
-                currentPressure: currentPressure,
-                altitude: currentAltitude
-            )
-
-            self.pressure = currentPressure
-            self.seaLevelPressure = seaLevel
-            self.errorMessage = ""
-
-            // Record to history for trend analysis and graphs
-            // historyManager is @MainActor, so we need to hop to main actor context
-            Task { @MainActor in
-                guard let historyManager = self.historyManager,
-                      let seaLevel = self.seaLevelPressure else {
-                    // History manager not configured - this is expected during initial setup
-                    // but should be logged if it persists after configureHistory() is called
-                    return
-                }
-
-                do {
-                    try await historyManager.recordReading(
-                        pressure: currentPressure,
-                        altitude: currentAltitude,
-                        seaLevelPressure: seaLevel
-                    )
-                    // Clear error on successful recording
-                    self.historyRecordingError = nil
-                } catch {
-                    print("⚠️ Failed to record barometer reading: \(error.localizedDescription)")
-                    // Surface the error to make it observable
-                    self.historyRecordingError = error
-                }
-            }
+            self.handlePressureUpdate(currentPressure: currentPressure)
         }
 
         startAttitudeUpdates()
+    }
+
+    func handlePressureUpdate(currentPressure: Double) {
+        guard locationManager.hasValidLocation else {
+            pressure = currentPressure
+            seaLevelPressure = nil
+            errorMessage = ""
+            return
+        }
+
+        let currentAltitude = locationManager.altitude
+        let seaLevel = calculateSeaLevelPressure(
+            currentPressure: currentPressure,
+            altitude: currentAltitude
+        )
+
+        pressure = currentPressure
+        seaLevelPressure = seaLevel
+        errorMessage = ""
+
+        // Record to history for trend analysis and graphs
+        // historyManager is @MainActor, so we need to hop to main actor context
+        Task { @MainActor in
+            guard let historyManager = self.historyManager,
+                  let seaLevel = self.seaLevelPressure else {
+                // History manager not configured - this is expected during initial setup
+                // but should be logged if it persists after configureHistory() is called
+                return
+            }
+
+            do {
+                try await historyManager.recordReading(
+                    pressure: currentPressure,
+                    altitude: currentAltitude,
+                    seaLevelPressure: seaLevel
+                )
+                // Clear error on successful recording
+                self.historyRecordingError = nil
+            } catch {
+                print("⚠️ Failed to record barometer reading: \(error.localizedDescription)")
+                // Surface the error to make it observable
+                self.historyRecordingError = error
+            }
+        }
     }
 
     func stopBarometerUpdates() {
