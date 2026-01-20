@@ -16,7 +16,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// Indicates whether a valid location fix has been received
     var hasValidLocation: Bool {
-        return isAvailable && lastHorizontalAccuracy >= 0
+        let isAuthorized = authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+        return isAvailable && lastHorizontalAccuracy >= 0 && isAuthorized
     }
 
     override init() {

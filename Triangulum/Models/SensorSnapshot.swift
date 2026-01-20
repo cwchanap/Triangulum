@@ -16,7 +16,7 @@ struct SensorSnapshot: Codable, Identifiable {
 
     struct BarometerData: Codable {
         let pressure: Double
-        let seaLevelPressure: Double
+        let seaLevelPressure: Double?
         let attitude: AttitudeData?
 
         struct AttitudeData: Codable {

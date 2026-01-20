@@ -20,7 +20,7 @@ struct BarometerManagerTests {
 
         #expect(manager.pressure == 0.0)
         #expect(manager.attitude == nil)
-        #expect(manager.seaLevelPressure == 0.0)
+        #expect(manager.seaLevelPressure == nil)
         #expect(manager.errorMessage == "")
     }
 
@@ -135,7 +135,7 @@ struct BarometerManagerTests {
 
         // Test that all @Published properties are initially set correctly
         #expect(manager.pressure == 0.0)
-        #expect(manager.seaLevelPressure == 0.0)
+        #expect(manager.seaLevelPressure == nil)
         #expect(manager.attitude == nil)
         #expect(manager.errorMessage.isEmpty)
         #expect(manager.isAvailable == CMAltimeter.isRelativeAltitudeAvailable())

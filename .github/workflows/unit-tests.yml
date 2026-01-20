@@ -22,7 +22,7 @@ jobs:
           set -o pipefail
           SIMULATORS_JSON="${RUNNER_TEMP}/simulators.json"
           xcrun simctl list devices available -j > "$SIMULATORS_JSON"
-          SIMULATOR_UDID=$(python3 -c "import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data.get('devices',{}).values() for d in runtime if d.get('isAvailable')]; iphones=[d for d in devices if 'iPhone' in d.get('name','')]; pick=(iphones or devices); print(pick[0]['udid'] if pick else '')" < "$SIMULATORS_JSON")
+          SIMULATOR_UDID=$(python3 -c "import json,sys; data=json.load(sys.stdin); runtimes=data.get('devices',{}); ios_devices=[d for key, devices in runtimes.items() if ('iOS' in key or 'SimRuntime.iOS' in key) for d in devices if d.get('isAvailable')]; iphones=[d for d in ios_devices if 'iPhone' in d.get('name','')]; pick=(iphones or ios_devices); print(pick[0]['udid'] if pick else '')" < "$SIMULATORS_JSON")
           if [ -z "$SIMULATOR_UDID" ]; then
             echo "No available iOS simulators detected."
             xcrun simctl list devices available

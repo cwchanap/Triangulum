@@ -178,9 +178,9 @@ struct SnapshotComparisonView: View {
 
             ComparisonRow(
                 label: "Sea Level",
-                value1: String(format: "%.2f kPa", snapshot1.barometer.seaLevelPressure),
-                value2: String(format: "%.2f kPa", snapshot2.barometer.seaLevelPressure),
-                delta: snapshot2.barometer.seaLevelPressure - snapshot1.barometer.seaLevelPressure,
+                value1: seaLevelPressureText(for: snapshot1),
+                value2: seaLevelPressureText(for: snapshot2),
+                delta: seaLevelPressureDelta,
                 unit: "kPa",
                 precision: 2
             )
@@ -335,6 +335,21 @@ struct SnapshotComparisonView: View {
             return "\(minutes) min apart"
         }
     }
+
+    private var seaLevelPressureDelta: Double? {
+        guard let pressure1 = snapshot1.barometer.seaLevelPressure,
+              let pressure2 = snapshot2.barometer.seaLevelPressure else {
+            return nil
+        }
+        return pressure2 - pressure1
+    }
+
+    private func seaLevelPressureText(for snapshot: SensorSnapshot) -> String {
+        guard let seaLevelPressure = snapshot.barometer.seaLevelPressure else {
+            return "--"
+        }
+        return String(format: "%.2f kPa", seaLevelPressure)
+    }
 }
 
 // MARK: - Comparison Row
@@ -343,7 +358,7 @@ struct ComparisonRow: View {
     let label: String
     let value1: String
     let value2: String
-    let delta: Double
+    let delta: Double?
     let unit: String
     let precision: Int
 
@@ -378,19 +393,31 @@ struct ComparisonRow: View {
         .padding(.vertical, 4)
     }
 
+    @ViewBuilder
     private var deltaView: some View {
-        let sign = delta >= 0 ? "+" : ""
-        let formattedDelta = String(format: "%@%.\(precision)f %@", sign, delta, unit)
-        let color: Color = delta > 0 ? .prussianSuccess : (delta < 0 ? .prussianWarning : .prussianBlueLight)
+        if let delta {
+            let sign = delta >= 0 ? "+" : ""
+            let formattedDelta = String(format: "%@%.\(precision)f %@", sign, delta, unit)
+            let color: Color = delta > 0 ? .prussianSuccess : (delta < 0 ? .prussianWarning : .prussianBlueLight)
 
-        return Text(formattedDelta)
-            .font(.caption)
-            .fontWeight(.medium)
-            .foregroundColor(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.1))
-            .cornerRadius(4)
+            Text(formattedDelta)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(color)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(color.opacity(0.1))
+                .cornerRadius(4)
+        } else {
+            Text("--")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.prussianBlueLight)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.prussianBlueLight.opacity(0.1))
+                .cornerRadius(4)
+        }
     }
 }
 
