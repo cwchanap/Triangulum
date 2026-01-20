@@ -164,6 +164,7 @@ struct LocationManagerTests {
                                   timestamp: Date())
 
         manager.isAvailable = true
+        manager.authorizationStatus = .authorizedWhenInUse
         manager.locationManager(CLLocationManager(), didUpdateLocations: [location])
 
         #expect(manager.hasValidLocation)
@@ -179,6 +180,7 @@ struct LocationManagerTests {
                                   timestamp: Date())
 
         manager.isAvailable = true
+        manager.authorizationStatus = .authorizedWhenInUse
         manager.locationManager(CLLocationManager(), didUpdateLocations: [location])
 
         #expect(manager.hasValidLocation == false)

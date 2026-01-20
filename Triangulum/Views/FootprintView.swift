@@ -30,67 +30,13 @@ struct FootprintView: View {
         snapshotManager.snapshots.filter { selectedForComparison.contains($0.id) }
     }
 
+    private var snapshotIDs: [UUID] {
+        snapshotManager.snapshots.map(\.id)
+    }
+
     var body: some View {
         NavigationView {
-            VStack {
-                if snapshotManager.snapshots.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 64))
-                            .foregroundColor(.prussianBlueLight)
-
-                        Text("No Snapshots Yet")
-                            .font(.title2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueDark)
-
-                        Text("Take your first snapshot from the main screen to see your sensor footprints here")
-                            .font(.body)
-                            .foregroundColor(.prussianBlueLight)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    VStack(spacing: 0) {
-                        // Compare mode header
-                        if isCompareMode {
-                            compareModeHeader
-                        }
-
-                        List {
-                            ForEach(paginatedSnapshots) { snapshot in
-                                SnapshotRowView(
-                                    snapshot: snapshot,
-                                    snapshotManager: snapshotManager,
-                                    isCompareMode: isCompareMode,
-                                    isSelected: selectedForComparison.contains(snapshot.id)
-                                )
-                                .onTapGesture {
-                                    if isCompareMode {
-                                        toggleSelection(snapshot)
-                                    } else {
-                                        selectedSnapshot = snapshot
-                                    }
-                                }
-                            }
-                            .onDelete(perform: isCompareMode ? nil : deleteSnapshots)
-                        }
-                        .listStyle(PlainListStyle())
-
-                        if totalPages > 1 {
-                            PaginationView(
-                                currentPage: $currentPage,
-                                totalPages: totalPages,
-                                totalItems: snapshotManager.snapshots.count,
-                                itemsPerPage: itemsPerPage
-                            )
-                            .padding()
-                            .background(Color.prussianSoft)
-                        }
-                    }
-                }
-            }
+            content
             .background(Color.prussianSoft.ignoresSafeArea())
             .navigationTitle("Sensor Footprints")
             .navigationBarTitleDisplayMode(.large)
@@ -136,40 +82,122 @@ struct FootprintView: View {
             .sheet(item: $selectedSnapshot) { snapshot in
                 SnapshotDetailView(snapshot: snapshot, snapshotManager: snapshotManager)
             }
+            .onChange(of: snapshotIDs) { _, ids in
+                let validIDs = Set(ids)
+                selectedForComparison = selectedForComparison.intersection(validIDs)
+            }
             .sheet(isPresented: $showingComparison) {
-                if selectedSnapshots.count == 2 {
-                    SnapshotComparisonView(
-                        snapshot1: selectedSnapshots[0],
-                        snapshot2: selectedSnapshots[1]
-                    )
-                    .onAppear {
-                        // Dismiss sheet if snapshots are removed while presented
-                        if selectedSnapshots.count != 2 {
-                            showingComparison = false
-                        }
-                    }
-                } else {
-                    // Fallback view when snapshots are unavailable
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 48))
-                            .foregroundColor(.prussianWarning)
+                comparisonSheet
+            }
+        }
+    }
 
-                        Text("Comparison Unavailable")
-                            .font(.headline)
-                            .foregroundColor(.prussianBlueDark)
+    @ViewBuilder
+    private var content: some View {
+        VStack {
+            if snapshotManager.snapshots.isEmpty {
+                emptyState
+            } else {
+                snapshotList
+            }
+        }
+    }
 
-                        Text("One or both selected snapshots have been removed")
-                            .font(.body)
-                            .foregroundColor(.prussianBlueLight)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .onAppear {
-                        // Auto-dismiss the sheet
-                        showingComparison = false
-                    }
+    private var emptyState: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 64))
+                .foregroundColor(.prussianBlueLight)
+
+            Text("No Snapshots Yet")
+                .font(.title2)
+                .fontWeight(.medium)
+                .foregroundColor(.prussianBlueDark)
+
+            Text("Take your first snapshot from the main screen to see your sensor footprints here")
+                .font(.body)
+                .foregroundColor(.prussianBlueLight)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var snapshotList: some View {
+        VStack(spacing: 0) {
+            if isCompareMode {
+                compareModeHeader
+            }
+
+            snapshotListView
+
+            if totalPages > 1 {
+                PaginationView(
+                    currentPage: $currentPage,
+                    totalPages: totalPages,
+                    totalItems: snapshotManager.snapshots.count,
+                    itemsPerPage: itemsPerPage
+                )
+                .padding()
+                .background(Color.prussianSoft)
+            }
+        }
+    }
+
+    private var snapshotListView: some View {
+        List {
+            ForEach(paginatedSnapshots) { snapshot in
+                SnapshotRowView(
+                    snapshot: snapshot,
+                    snapshotManager: snapshotManager,
+                    isCompareMode: isCompareMode,
+                    isSelected: selectedForComparison.contains(snapshot.id)
+                )
+                .onTapGesture {
+                    handleSnapshotTap(snapshot)
                 }
+            }
+            .onDelete { offsets in
+                guard !isCompareMode else { return }
+                deleteSnapshots(offsets: offsets)
+            }
+        }
+        .listStyle(PlainListStyle())
+    }
+
+    @ViewBuilder
+    private var comparisonSheet: some View {
+        if selectedSnapshots.count == 2 {
+            SnapshotComparisonView(
+                snapshot1: selectedSnapshots[0],
+                snapshot2: selectedSnapshots[1]
+            )
+            .onAppear {
+                // Dismiss sheet if snapshots are removed while presented
+                if selectedSnapshots.count != 2 {
+                    showingComparison = false
+                }
+            }
+        } else {
+            // Fallback view when snapshots are unavailable
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 48))
+                    .foregroundColor(.prussianWarning)
+
+                Text("Comparison Unavailable")
+                    .font(.headline)
+                    .foregroundColor(.prussianBlueDark)
+
+                Text("One or both selected snapshots have been removed")
+                    .font(.body)
+                    .foregroundColor(.prussianBlueLight)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            .onAppear {
+                // Auto-dismiss the sheet
+                showingComparison = false
             }
         }
     }
@@ -185,7 +213,7 @@ struct FootprintView: View {
 
                 Spacer()
 
-                Text("\(selectedForComparison.count)/2 selected")
+                Text("\(selectedSnapshots.count)/2 selected")
                     .font(.caption)
                     .foregroundColor(.prussianBlueLight)
                     .padding(.horizontal, 8)
@@ -194,7 +222,7 @@ struct FootprintView: View {
                     .cornerRadius(8)
             }
 
-            if selectedForComparison.count == 2 {
+            if selectedSnapshots.count == 2 {
                 Button {
                     showingComparison = true
                 } label: {
@@ -222,6 +250,14 @@ struct FootprintView: View {
             selectedForComparison.remove(snapshot.id)
         } else if selectedForComparison.count < 2 {
             selectedForComparison.insert(snapshot.id)
+        }
+    }
+
+    private func handleSnapshotTap(_ snapshot: SensorSnapshot) {
+        if isCompareMode {
+            toggleSelection(snapshot)
+        } else {
+            selectedSnapshot = snapshot
         }
     }
 
@@ -349,6 +385,13 @@ struct SnapshotDetailView: View {
     @State private var showingDeletePhotoAlert = false
     @State private var photoToDelete: UUID?
 
+    private var seaLevelPressureText: String {
+        guard let seaLevelPressure = snapshot.barometer.seaLevelPressure else {
+            return "--"
+        }
+        return String(format: "%.2f kPa", seaLevelPressure)
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -411,7 +454,7 @@ struct SnapshotDetailView: View {
                         DetailRowView(label: "Pressure", value: String(format: "%.2f kPa", snapshot.barometer.pressure))
                         DetailRowView(
                             label: "Sea Level Pressure",
-                            value: String(format: "%.2f kPa", snapshot.barometer.seaLevelPressure)
+                            value: seaLevelPressureText
                         )
 
                         if let attitude = snapshot.barometer.attitude {

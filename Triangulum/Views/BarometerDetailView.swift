@@ -88,7 +88,7 @@ struct BarometerDetailView: View {
                     Text("Sea Level")
                         .font(.caption)
                         .foregroundColor(.prussianBlueLight)
-                    Text("\(barometerManager.seaLevelPressure, specifier: "%.2f") kPa")
+                    Text(seaLevelPressureText)
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(.prussianBlueDark)
@@ -319,6 +319,13 @@ struct BarometerDetailView: View {
                 )
             )
             .shadow(color: Color.prussianBlue.opacity(0.1), radius: 4, x: 0, y: 2)
+    }
+
+    private var seaLevelPressureText: String {
+        guard let seaLevelPressure = barometerManager.seaLevelPressure else {
+            return "--"
+        }
+        return String(format: "%.2f kPa", seaLevelPressure)
     }
 
     // MARK: - Chart Configuration

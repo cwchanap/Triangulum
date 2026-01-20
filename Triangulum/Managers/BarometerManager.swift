@@ -10,7 +10,7 @@ class BarometerManager: ObservableObject {
 
     @Published var pressure: Double = 0.0
     @Published var attitude: CMAttitude?
-    @Published var seaLevelPressure: Double = 0.0
+    @Published var seaLevelPressure: Double?
     @Published var isAvailable: Bool = false
     @Published var isAttitudeAvailable: Bool = false
     @Published var errorMessage: String = ""
@@ -73,6 +73,7 @@ class BarometerManager: ObservableObject {
             guard locationManager.hasValidLocation else {
                 self.errorMessage = "Waiting for location data for accurate pressure reading"
                 self.pressure = currentPressure
+                self.seaLevelPressure = nil
                 return
             }
 
@@ -89,7 +90,8 @@ class BarometerManager: ObservableObject {
             // Record to history for trend analysis and graphs
             // historyManager is @MainActor, so we need to hop to main actor context
             Task { @MainActor in
-                guard let historyManager = self.historyManager else {
+                guard let historyManager = self.historyManager,
+                      let seaLevel = self.seaLevelPressure else {
                     // History manager not configured - this is expected during initial setup
                     // but should be logged if it persists after configureHistory() is called
                     return
