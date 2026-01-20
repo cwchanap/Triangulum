@@ -32,6 +32,20 @@ struct BarometerManagerTests {
         #expect(manager.isAttitudeAvailable == CMMotionManager().isDeviceMotionAvailable)
     }
 
+    @Test func testPressureUpdatesWithoutValidLocation() {
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
+
+        locationManager.isAvailable = true
+        locationManager.authorizationStatus = .authorizedWhenInUse
+
+        manager.handlePressureUpdate(currentPressure: 1001.5)
+
+        #expect(manager.pressure == 1001.5)
+        #expect(manager.seaLevelPressure == nil)
+        #expect(manager.errorMessage.isEmpty)
+    }
+
     @Test func testSeaLevelPressureCalculation() {
         let locationManager = LocationManager()
         let manager = BarometerManager(locationManager: locationManager)
