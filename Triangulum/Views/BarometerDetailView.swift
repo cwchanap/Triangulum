@@ -295,15 +295,31 @@ struct BarometerDetailView: View {
 
     private var emptyChartPlaceholder: some View {
         VStack(spacing: 8) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.largeTitle)
-                .foregroundColor(.prussianBlueLight.opacity(0.5))
-            Text("No data available")
-                .font(.caption)
-                .foregroundColor(.prussianBlueLight)
-            Text("Data will appear as readings are collected")
-                .font(.caption2)
-                .foregroundColor(.prussianBlueLight.opacity(0.7))
+            if let fetchError = historyManager?.fetchError {
+                // Show error state when data fetch failed
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.largeTitle)
+                    .foregroundColor(.prussianWarning)
+                Text("Failed to load data")
+                    .font(.caption)
+                    .foregroundColor(.prussianBlueLight)
+                Text(fetchError.localizedDescription)
+                    .font(.caption2)
+                    .foregroundColor(.prussianBlueLight.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else {
+                // Show empty state when no data has been collected yet
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.largeTitle)
+                    .foregroundColor(.prussianBlueLight.opacity(0.5))
+                Text("No data available")
+                    .font(.caption)
+                    .foregroundColor(.prussianBlueLight)
+                Text("Data will appear as readings are collected")
+                    .font(.caption2)
+                    .foregroundColor(.prussianBlueLight.opacity(0.7))
+            }
         }
         .frame(height: 200)
         .frame(maxWidth: .infinity)

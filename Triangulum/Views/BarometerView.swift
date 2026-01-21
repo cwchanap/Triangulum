@@ -65,6 +65,22 @@ struct BarometerView: View {
                             TrendIndicatorView(historyManager: historyManager)
                         }
 
+                        // History recording error indicator
+                        if let recordingError = barometerManager.historyRecordingError {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.prussianWarning)
+                                Text("Recording issue: \(recordingError.localizedDescription)")
+                                    .font(.caption2)
+                                    .foregroundColor(.prussianWarning)
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .background(Color.prussianWarning.opacity(0.1))
+                            .cornerRadius(6)
+                        }
+
                         // Attitude display
                         if let attitude = barometerManager.attitude {
                             VStack(spacing: 8) {

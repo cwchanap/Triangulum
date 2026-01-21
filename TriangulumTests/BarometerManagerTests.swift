@@ -210,4 +210,87 @@ struct BarometerManagerTests {
         // historyRecordingError should be nil initially
         #expect(manager.historyRecordingError == nil)
     }
+
+    @MainActor
+    @Test func testHandlePressureUpdateRecordsToHistory() async throws {
+        // Setup location manager with valid location
+        let locationManager = LocationManager()
+        locationManager.latitude = 37.7749
+        locationManager.longitude = -122.4194
+        locationManager.altitude = 100.0
+        locationManager.accuracy = 5.0
+        locationManager.isAvailable = true
+        locationManager.authorizationStatus = .authorizedWhenInUse
+
+        // Create barometer manager
+        let manager = BarometerManager(locationManager: locationManager)
+
+        // Configure history with in-memory context
+        let schema = Schema([PressureReading.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+        manager.configureHistory(with: context)
+
+        // Verify history manager is configured
+        guard let historyManager = manager.historyManager else {
+            throw TestError.historyManagerNotConfigured
+        }
+
+        // Trigger pressure update
+        manager.handlePressureUpdate(currentPressure: 101.325)
+
+        // Wait for async Task to complete
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Verify reading was recorded to history
+        let readings = historyManager.fetchReadings(for: .oneHour)
+        #expect(readings.count == 1)
+
+        // Verify the recorded data
+        if let reading = readings.first {
+            #expect(reading.pressure == 101.325)
+            #expect(reading.altitude == 100.0)
+            #expect(reading.seaLevelPressure > 0)  // Should have calculated sea level pressure
+        }
+
+        // Verify no recording error occurred
+        #expect(manager.historyRecordingError == nil)
+    }
+
+    @MainActor
+    @Test func testHandlePressureUpdateWithoutLocationDoesNotRecord() async throws {
+        // Setup location manager WITHOUT valid location
+        let locationManager = LocationManager()
+        locationManager.isAvailable = false  // No location available
+
+        // Create barometer manager
+        let manager = BarometerManager(locationManager: locationManager)
+
+        // Configure history with in-memory context
+        let schema = Schema([PressureReading.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = ModelContext(container)
+        manager.configureHistory(with: context)
+
+        guard let historyManager = manager.historyManager else {
+            throw TestError.historyManagerNotConfigured
+        }
+
+        // Trigger pressure update
+        manager.handlePressureUpdate(currentPressure: 101.325)
+
+        // Wait for async Task to complete
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Verify NO reading was recorded (because location is invalid)
+        let readings = historyManager.fetchReadings(for: .oneHour)
+        #expect(readings.isEmpty)
+    }
+}
+
+// Test error enum
+enum TestError: Error {
+    case historyManagerNotConfigured
 }
