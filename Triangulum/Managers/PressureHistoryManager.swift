@@ -96,11 +96,42 @@ struct PressureStatistics {
     let avgAltitude: Double
     let dataPointCount: Int
 
+    /// Creates statistics with validation
+    /// - Returns: nil if validation fails (e.g., min > max or avg outside min-max range)
+    init?(
+        minPressure: Double,
+        maxPressure: Double,
+        avgPressure: Double,
+        minAltitude: Double,
+        maxAltitude: Double,
+        avgAltitude: Double,
+        dataPointCount: Int
+    ) {
+        // Validate pressure invariants
+        guard minPressure <= maxPressure else { return nil }
+        guard avgPressure >= minPressure && avgPressure <= maxPressure else { return nil }
+
+        // Validate altitude invariants
+        guard minAltitude <= maxAltitude else { return nil }
+        guard avgAltitude >= minAltitude && avgAltitude <= maxAltitude else { return nil }
+
+        // Validate data point count
+        guard dataPointCount >= 0 else { return nil }
+
+        self.minPressure = minPressure
+        self.maxPressure = maxPressure
+        self.avgPressure = avgPressure
+        self.minAltitude = minAltitude
+        self.maxAltitude = maxAltitude
+        self.avgAltitude = avgAltitude
+        self.dataPointCount = dataPointCount
+    }
+
     static let empty = PressureStatistics(
         minPressure: 0, maxPressure: 0, avgPressure: 0,
         minAltitude: 0, maxAltitude: 0, avgAltitude: 0,
         dataPointCount: 0
-    )
+    )!
 }
 
 /// Manages historical pressure data collection, storage, and trend analysis
@@ -312,7 +343,7 @@ class PressureHistoryManager: ObservableObject {
             maxAltitude: altitudes.max() ?? 0,
             avgAltitude: altitudes.reduce(0, +) / Double(altitudes.count),
             dataPointCount: recentReadings.count
-        )
+        ) ?? .empty  // Fall back to empty if validation fails
     }
 
     // MARK: - Statistics Helpers
@@ -337,7 +368,7 @@ class PressureHistoryManager: ObservableObject {
             maxAltitude: altitudes.max() ?? 0,
             avgAltitude: altitudes.reduce(0, +) / Double(altitudes.count),
             dataPointCount: readings.count
-        )
+        ) ?? .empty  // Fall back to empty if validation fails
     }
 
     // MARK: - Data Cleanup

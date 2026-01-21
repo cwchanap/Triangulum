@@ -159,6 +159,8 @@ struct SnapshotPhoto: Codable, Identifiable {
 class SnapshotManager: ObservableObject {
     @Published private(set) var snapshots: [SensorSnapshot] = []
     @Published private(set) var photos: [UUID: SnapshotPhoto] = [:]
+    @Published private(set) var loadError: Error?
+    @Published private(set) var saveError: Error?
     private let userDefaults: UserDefaults
     private let snapshotsKey: String
     private let photosKey: String
@@ -257,8 +259,10 @@ class SnapshotManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(snapshots)
             userDefaults.set(data, forKey: snapshotsKey)
+            saveError = nil  // Clear error on successful save
         } catch {
-            print("Failed to save snapshots: \(error)")
+            print("❌ SnapshotManager: Failed to save snapshots: \(error.localizedDescription)")
+            saveError = error
         }
     }
 
@@ -269,11 +273,15 @@ class SnapshotManager: ObservableObject {
             let loadedSnapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
             await MainActor.run {
                 self.snapshots = loadedSnapshots
+                self.loadError = nil  // Clear error on successful load
             }
         } catch {
-            print("Failed to load snapshots: \(error)")
-            // Clear corrupted data to prevent future crashes
-            userDefaults.removeObject(forKey: snapshotsKey)
+            print("❌ SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
+            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            await MainActor.run {
+                self.loadError = error
+            }
+            // DO NOT auto-delete user data - preserve it for potential recovery
         }
     }
 
@@ -281,10 +289,12 @@ class SnapshotManager: ObservableObject {
         guard let data = userDefaults.data(forKey: snapshotsKey) else { return }
         do {
             snapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
+            loadError = nil  // Clear error on successful load
         } catch {
-            print("Failed to load snapshots: \(error)")
-            // Clear corrupted data to prevent future crashes
-            userDefaults.removeObject(forKey: snapshotsKey)
+            print("❌ SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
+            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            loadError = error
+            // DO NOT auto-delete user data - preserve it for potential recovery
         }
     }
 
@@ -292,8 +302,10 @@ class SnapshotManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(photos)
             userDefaults.set(data, forKey: photosKey)
+            saveError = nil  // Clear error on successful save
         } catch {
-            print("Failed to save photos: \(error)")
+            print("❌ SnapshotManager: Failed to save photos: \(error.localizedDescription)")
+            saveError = error
         }
     }
 
@@ -304,11 +316,15 @@ class SnapshotManager: ObservableObject {
             let loadedPhotos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
             await MainActor.run {
                 self.photos = loadedPhotos
+                self.loadError = nil  // Clear error on successful load
             }
         } catch {
-            print("Failed to load photos: \(error)")
-            // Clear corrupted data to prevent future crashes
-            userDefaults.removeObject(forKey: photosKey)
+            print("❌ SnapshotManager: Failed to load photos: \(error.localizedDescription)")
+            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            await MainActor.run {
+                self.loadError = error
+            }
+            // DO NOT auto-delete user data - preserve it for potential recovery
         }
     }
 
@@ -316,10 +332,24 @@ class SnapshotManager: ObservableObject {
         guard let data = userDefaults.data(forKey: photosKey) else { return }
         do {
             photos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
+            loadError = nil  // Clear error on successful load
         } catch {
-            print("Failed to load photos: \(error)")
-            // Clear corrupted data to prevent future crashes
-            userDefaults.removeObject(forKey: photosKey)
+            print("❌ SnapshotManager: Failed to load photos: \(error.localizedDescription)")
+            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            loadError = error
+            // DO NOT auto-delete user data - preserve it for potential recovery
         }
+    }
+
+    /// Manually clears corrupted data from storage
+    /// This should only be called after user confirmation when data cannot be recovered
+    func clearCorruptedData() {
+        print("⚠️ SnapshotManager: Clearing corrupted data by user request")
+        userDefaults.removeObject(forKey: snapshotsKey)
+        userDefaults.removeObject(forKey: photosKey)
+        snapshots.removeAll()
+        photos.removeAll()
+        loadError = nil
+        saveError = nil
     }
 }
