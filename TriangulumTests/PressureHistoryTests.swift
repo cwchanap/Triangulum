@@ -113,6 +113,10 @@ struct PressureStatisticsTests {
             dataPointCount: 10
         )
 
+        #expect(stats != nil)
+        guard let stats else {
+            return
+        }
         #expect(stats.minPressure == 100.0)
         #expect(stats.maxPressure == 105.0)
         #expect(stats.avgPressure == 102.5)

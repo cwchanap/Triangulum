@@ -215,12 +215,16 @@ struct BarometerManagerTests {
     @Test func testHandlePressureUpdateRecordsToHistory() async throws {
         // Setup location manager with valid location
         let locationManager = LocationManager()
-        locationManager.latitude = 37.7749
-        locationManager.longitude = -122.4194
-        locationManager.altitude = 100.0
-        locationManager.accuracy = 5.0
         locationManager.isAvailable = true
         locationManager.authorizationStatus = .authorizedWhenInUse
+        let location = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+            altitude: 100.0,
+            horizontalAccuracy: 5.0,
+            verticalAccuracy: 5.0,
+            timestamp: Date()
+        )
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [location])
 
         // Create barometer manager
         let manager = BarometerManager(locationManager: locationManager)
