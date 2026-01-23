@@ -244,11 +244,27 @@ struct BarometerManagerTests {
         // Trigger pressure update
         manager.handlePressureUpdate(currentPressure: 101.325)
 
-        // Wait for async Task to complete
-        try await Task.sleep(for: .milliseconds(100))
+        // Poll until reading is recorded to history or timeout
+        let timeout: TimeInterval = 2.0
+        let pollInterval: TimeInterval = 0.01
+        let startTime = Date()
+
+        var readings: [PressureReading] = []
+        while Date().timeIntervalSince(startTime) < timeout {
+            readings = historyManager.fetchReadings(for: .oneHour)
+            if readings.count >= 1 {
+                break
+            }
+
+            // Check for recording errors
+            if let error = manager.historyRecordingError {
+                throw TestError.historyRecordingFailed(error)
+            }
+
+            try await Task.sleep(for: .milliseconds(Int(pollInterval * 1000)))
+        }
 
         // Verify reading was recorded to history
-        let readings = historyManager.fetchReadings(for: .oneHour)
         #expect(readings.count == 1)
 
         // Verify the recorded data
@@ -285,16 +301,36 @@ struct BarometerManagerTests {
         // Trigger pressure update
         manager.handlePressureUpdate(currentPressure: 101.325)
 
-        // Wait for async Task to complete
-        try await Task.sleep(for: .milliseconds(100))
+        // Poll to verify no reading is recorded within timeout
+        let timeout: TimeInterval = 2.0
+        let pollInterval: TimeInterval = 0.01
+        let startTime = Date()
+
+        var readings: [PressureReading] = []
+        while Date().timeIntervalSince(startTime) < timeout {
+            readings = historyManager.fetchReadings(for: .oneHour)
+
+            // Check for recording errors (should not have any)
+            if let error = manager.historyRecordingError {
+                throw TestError.historyRecordingFailed(error)
+            }
+
+            // If we have readings, we know the async task completed
+            if !readings.isEmpty {
+                break
+            }
+
+            try await Task.sleep(for: .milliseconds(Int(pollInterval * 1000)))
+        }
 
         // Verify NO reading was recorded (because location is invalid)
-        let readings = historyManager.fetchReadings(for: .oneHour)
-        #expect(readings.isEmpty)
+        let finalReadings = historyManager.fetchReadings(for: .oneHour)
+        #expect(finalReadings.isEmpty)
     }
 }
 
 // Test error enum
 enum TestError: Error {
     case historyManagerNotConfigured
+    case historyRecordingFailed(Error)
 }
