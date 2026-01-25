@@ -100,7 +100,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
 
         manager.addSnapshot(snapshot)
@@ -120,7 +121,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         let snapshot2 = SensorSnapshot(
             barometerManager: testManagers.barometerManager,
@@ -128,7 +130,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
 
         manager.addSnapshot(snapshot1)
@@ -151,7 +154,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         manager.addSnapshot(snapshot)
 
@@ -174,7 +178,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         let snapshot2 = SensorSnapshot(
             barometerManager: testManagers.barometerManager,
@@ -182,7 +187,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
 
         manager.addSnapshot(snapshot1)
@@ -212,7 +218,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         manager.addSnapshot(snapshot)
 
@@ -247,7 +254,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         manager.addSnapshot(snapshot)
 
@@ -288,7 +296,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         manager.addSnapshot(snapshot)
 
@@ -361,7 +370,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
         manager.addSnapshot(snapshot)
 
@@ -388,7 +398,8 @@ struct SnapshotManagerTests {
             accelerometerManager: testManagers.accelerometerManager,
             gyroscopeManager: testManagers.gyroscopeManager,
             magnetometerManager: testManagers.magnetometerManager,
-            weatherManager: nil
+            weatherManager: nil,
+            satelliteManager: nil
         )
 
         // Verify all data is captured correctly

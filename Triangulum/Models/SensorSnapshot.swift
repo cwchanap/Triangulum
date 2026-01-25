@@ -12,6 +12,7 @@ struct SensorSnapshot: Codable, Identifiable {
     let gyroscope: GyroscopeData
     let magnetometer: MagnetometerData
     let weather: WeatherData?
+    let satellite: SatelliteSnapshotData?
     var photoIDs: [UUID] = []
 
     struct BarometerData: Codable {
@@ -72,7 +73,8 @@ struct SensorSnapshot: Codable, Identifiable {
         accelerometerManager: AccelerometerManager,
         gyroscopeManager: GyroscopeManager,
         magnetometerManager: MagnetometerManager,
-        weatherManager: WeatherManager?
+        weatherManager: WeatherManager?,
+        satelliteManager: SatelliteManager?
     ) {
         self.timestamp = Date()
 
@@ -129,6 +131,8 @@ struct SensorSnapshot: Codable, Identifiable {
                 locationName: weather.locationName
             )
         }
+
+        self.satellite = satelliteManager?.snapshotData()
     }
 }
 
