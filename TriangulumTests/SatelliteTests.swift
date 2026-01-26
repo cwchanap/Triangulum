@@ -293,6 +293,50 @@ struct SatellitePassTests {
     }
 }
 
+// MARK: - Satellite Manager Tests
+
+@MainActor
+struct SatelliteManagerTests {
+
+    @Test func testNextPassDebouncesWorkItem() async {
+        let locationManager = LocationManager()
+        locationManager.isAvailable = true
+        locationManager.authorizationStatus = .authorizedWhenInUse
+        locationManager.latitude = 37.7749
+        locationManager.longitude = -122.4194
+
+        let manager = SatelliteManager(locationManager: locationManager)
+
+        let issName = "ISS (ZARYA)"
+        let issLine1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
+        let issLine2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
+        guard let issTLE = TLE(name: issName, line1: issLine1, line2: issLine2) else {
+            Issue.record("Failed to build ISS TLE for test")
+            return
+        }
+
+        manager.applyTLEsForTesting([issTLE])
+
+        // Allow updateNextPass to schedule the initial work item
+        try? await Task.sleep(for: .milliseconds(50))
+        let firstWorkItem = manager.nextPassWorkItem
+
+        // Trigger another location update to replace the work item
+        locationManager.latitude = 37.7750
+        locationManager.longitude = -122.4195
+
+        try? await Task.sleep(for: .milliseconds(50))
+        let secondWorkItem = manager.nextPassWorkItem
+
+        #expect(firstWorkItem != nil)
+        #expect(secondWorkItem != nil)
+        if let firstWorkItem, let secondWorkItem {
+            #expect(firstWorkItem !== secondWorkItem)
+            #expect(firstWorkItem.isCancelled == true)
+        }
+    }
+}
+
 // MARK: - Satellite Tests
 
 struct SatelliteTests {
