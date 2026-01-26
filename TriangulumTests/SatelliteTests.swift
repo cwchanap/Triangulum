@@ -23,6 +23,7 @@ struct TLEParsingTests {
 
         #expect(tle != nil)
         #expect(tle?.name == "ISS (ZARYA)")
+        #expect(tle?.noradId == 25544)
         #expect(tle?.line1 == issLine1)
         #expect(tle?.line2 == issLine2)
     }
@@ -111,6 +112,7 @@ struct TLEParsingTests {
         let decoded = try JSONDecoder().decode(TLE.self, from: encoded)
 
         #expect(decoded.name == tle.name)
+        #expect(decoded.noradId == tle.noradId)
         #expect(decoded.line1 == tle.line1)
         #expect(decoded.line2 == tle.line2)
         #expect(decoded.inclination == tle.inclination)

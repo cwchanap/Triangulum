@@ -43,8 +43,10 @@ class SatelliteManager: ObservableObject {
         self.satellites = Satellite.tracked
 
         // Observe location changes
-        locationManager.objectWillChange
-            .sink { [weak self] _ in
+        locationManager.$latitude
+            .combineLatest(locationManager.$longitude)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in
                 self?.updateNextPass()
             }
             .store(in: &cancellables)
@@ -59,6 +61,8 @@ class SatelliteManager: ObservableObject {
     /// Start satellite tracking updates
     func startUpdates() {
         print("SatelliteManager: Starting updates")
+
+        stopUpdates()
 
         // Load cached TLEs or fetch new ones
         loadOrFetchTLEs()
@@ -226,9 +230,16 @@ class SatelliteManager: ObservableObject {
     private func applyTLEs(_ tles: [TLE]) {
         for tle in tles {
             // Find matching satellite and update its TLE
-            if let index = satellites.firstIndex(where: {
-                tle.name.uppercased().contains($0.id) ||
-                $0.name.uppercased().contains(tle.name.prefix(3).uppercased())
+            if let index = satellites.firstIndex(where: { satellite in
+                if tle.noradId > 0 {
+                    return satellite.noradId == tle.noradId
+                }
+
+                let tleName = tle.name.uppercased()
+                let satelliteName = satellite.name.uppercased()
+                return tleName == satelliteName ||
+                    tleName.contains(satelliteName) ||
+                    satelliteName.contains(tleName)
             }) {
                 satellites[index].tle = tle
             }
@@ -280,11 +291,20 @@ class SatelliteManager: ObservableObject {
     }
 
     private func updateNextPass() {
-        guard locationManager.isAvailable,
-              locationManager.latitude != 0 || locationManager.longitude != 0 else {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateNextPass()
+            }
+            return
+        }
+
+        guard locationManager.isAvailable else {
             nextISSPass = nil
             return
         }
+
+        let observerLat = locationManager.latitude
+        let observerLon = locationManager.longitude
 
         // Find ISS TLE
         guard let issTLE = satellites.first(where: { $0.id == "ISS" })?.tle else {
@@ -298,8 +318,8 @@ class SatelliteManager: ObservableObject {
 
             let pass = SGP4Propagator.findNextPass(
                 tle: issTLE,
-                observerLat: self.locationManager.latitude,
-                observerLon: self.locationManager.longitude,
+                observerLat: observerLat,
+                observerLon: observerLon,
                 minElevation: 10.0,
                 maxHours: 48.0
             )

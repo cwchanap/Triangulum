@@ -95,18 +95,17 @@ enum SGP4Propagator {
         let yOrb = r * sin(trueAnomaly)
 
         // Rotation matrices: orbital plane -> ECI
-        let argpPlusNu = propagatedArgp + trueAnomaly
-        let cosArgpNu = cos(argpPlusNu)
-        let sinArgpNu = sin(argpPlusNu)
+        let cosArgp = cos(propagatedArgp)
+        let sinArgp = sin(propagatedArgp)
         let cosRaan = cos(propagatedRaan)
         let sinRaan = sin(propagatedRaan)
 
         // ECI coordinates
-        let eciX = xOrb * (cosRaan * cosArgpNu - sinRaan * sinArgpNu * cosIncl) -
-                   yOrb * (cosRaan * sinArgpNu + sinRaan * cosArgpNu * cosIncl)
-        let eciY = xOrb * (sinRaan * cosArgpNu + cosRaan * sinArgpNu * cosIncl) -
-                   yOrb * (sinRaan * sinArgpNu - cosRaan * cosArgpNu * cosIncl)
-        let eciZ = xOrb * sinArgpNu * sinIncl + yOrb * cosArgpNu * sinIncl
+        let eciX = xOrb * (cosRaan * cosArgp - sinRaan * sinArgp * cosIncl) -
+               yOrb * (cosRaan * sinArgp + sinRaan * cosArgp * cosIncl)
+        let eciY = xOrb * (sinRaan * cosArgp + cosRaan * sinArgp * cosIncl) -
+               yOrb * (sinRaan * sinArgp - cosRaan * cosArgp * cosIncl)
+        let eciZ = xOrb * sinArgp * sinIncl + yOrb * cosArgp * sinIncl
 
         // Convert ECI to geodetic
         let geodetic = eciToGeodetic(eci: SIMD3(eciX, eciY, eciZ), at: date)
@@ -216,7 +215,13 @@ enum SGP4Propagator {
         // Altitude above ellipsoid
         let sinLat = sin(latitude)
         let n = a / sqrt(1.0 - e2 * sinLat * sinLat)
-        let altitude = xyDistance / cos(latitude) - n
+        let cosLat = cos(latitude)
+        let altitude: Double
+        if abs(cosLat) > 1e-8 {
+            altitude = xyDistance / cosLat - n
+        } else {
+            altitude = ecefZ / sinLat - n * (1.0 - e2)
+        }
 
         return (latitude: latitude * rad2deg, longitude: longitude, altitude: altitude)
     }
@@ -318,25 +323,111 @@ enum SGP4Propagator {
         let stepMinutes: Double = 1.0  // 1-minute steps
         let maxSteps = Int(maxHours * 60 / stepMinutes)
 
+        func sample(at date: Date) -> (elevation: Double, azimuth: Double)? {
+            let position = propagate(tle: tle, to: date,
+                                     observerLat: observerLat, observerLon: observerLon)
+            guard let elevation = position.altitudeDeg,
+                  let azimuth = position.azimuthDeg else { return nil }
+            return (elevation, azimuth)
+        }
+
+        func refineCrossing(from start: Date, to end: Date, startElevation: Double,
+                            endElevation: Double) -> (Date, Double, Double)? {
+            var lower = start
+            var upper = end
+            var lowerElev = startElevation
+
+            for _ in 0..<20 {
+                let mid = Date(timeIntervalSince1970: (lower.timeIntervalSince1970 + upper.timeIntervalSince1970) / 2)
+                guard let midSample = sample(at: mid) else { return nil }
+
+                if (lowerElev <= 0 && midSample.elevation > 0) || (lowerElev > 0 && midSample.elevation <= 0) {
+                    upper = mid
+                } else {
+                    lower = mid
+                    lowerElev = midSample.elevation
+                }
+            }
+
+            guard let refined = sample(at: upper) else { return nil }
+            return (upper, refined.azimuth, refined.elevation)
+        }
+
+        func refinePeak(from start: Date, to end: Date) -> (Date, Double)? {
+            var left = start
+            var right = end
+
+            for _ in 0..<20 {
+                let leftMid = Date(timeIntervalSince1970: (2 * left.timeIntervalSince1970 + right.timeIntervalSince1970) / 3)
+                let rightMid = Date(timeIntervalSince1970: (left.timeIntervalSince1970 + 2 * right.timeIntervalSince1970) / 3)
+
+                guard let leftSample = sample(at: leftMid),
+                      let rightSample = sample(at: rightMid) else { return nil }
+
+                if leftSample.elevation < rightSample.elevation {
+                    left = leftMid
+                } else {
+                    right = rightMid
+                }
+            }
+
+            let peakTime = Date(timeIntervalSince1970: (left.timeIntervalSince1970 + right.timeIntervalSince1970) / 2)
+            guard let peakSample = sample(at: peakTime) else { return nil }
+            return (peakTime, peakSample.elevation)
+        }
+
+        var searchStart = startDate
+        if let initial = sample(at: startDate), initial.elevation > 0 {
+            var backSteps = 0
+            var backDate = startDate
+
+            while backSteps < maxSteps {
+                let candidateDate = backDate.addingTimeInterval(-stepMinutes * 60)
+                guard let candidateSample = sample(at: candidateDate) else { break }
+                if candidateSample.elevation <= 0 {
+                    searchStart = candidateDate
+                    break
+                }
+                backDate = candidateDate
+                backSteps += 1
+            }
+
+            if backSteps == maxSteps {
+                searchStart = backDate
+            }
+        }
+
         var isAboveHorizon = false
         var riseTime: Date?
         var riseAzimuth: Double = 0
         var peakTime: Date?
         var peakElevation: Double = 0
+        var lastDate: Date?
+        var lastElevation: Double = 0
 
         for step in 0..<maxSteps {
-            let currentDate = startDate.addingTimeInterval(Double(step) * stepMinutes * 60)
-            let position = propagate(tle: tle, to: currentDate,
-                                     observerLat: observerLat, observerLon: observerLon)
-
-            guard let elevation = position.altitudeDeg,
-                  let azimuth = position.azimuthDeg else { continue }
+            let currentDate = searchStart.addingTimeInterval(Double(step) * stepMinutes * 60)
+            guard let sampleResult = sample(at: currentDate) else { continue }
+            let elevation = sampleResult.elevation
+            let azimuth = sampleResult.azimuth
 
             if elevation > 0 && !isAboveHorizon {
                 // Satellite just rose
                 isAboveHorizon = true
-                riseTime = currentDate
-                riseAzimuth = azimuth
+                if let prevDate = lastDate {
+                    if let refined = refineCrossing(from: prevDate, to: currentDate,
+                                                    startElevation: lastElevation,
+                                                    endElevation: elevation) {
+                        riseTime = refined.0
+                        riseAzimuth = refined.1
+                    } else {
+                        riseTime = currentDate
+                        riseAzimuth = azimuth
+                    }
+                } else {
+                    riseTime = currentDate
+                    riseAzimuth = azimuth
+                }
                 peakElevation = elevation
                 peakTime = currentDate
             } else if elevation > 0 && isAboveHorizon {
@@ -348,15 +439,31 @@ enum SGP4Propagator {
             } else if elevation <= 0 && isAboveHorizon {
                 // Satellite just set
                 if peakElevation >= minElevation, let rise = riseTime, let peak = peakTime {
+                    let refinedSet: (Date, Double, Double)?
+                    if let prevDate = lastDate {
+                        refinedSet = refineCrossing(from: prevDate, to: currentDate,
+                                                    startElevation: lastElevation,
+                                                    endElevation: elevation)
+                    } else {
+                        refinedSet = nil
+                    }
+
+                    let setTime = refinedSet?.0 ?? currentDate
+                    let setAzimuth = refinedSet?.1 ?? azimuth
+
+                    let refinedPeak = refinePeak(from: rise, to: setTime)
+                    let finalPeakTime = refinedPeak?.0 ?? peak
+                    let finalPeakElevation = refinedPeak?.1 ?? peakElevation
+
                     return SatellitePass(
                         satelliteId: tle.name,
                         satelliteName: tle.name,
                         riseTime: rise,
-                        peakTime: peak,
-                        setTime: currentDate,
-                        maxAltitudeDeg: peakElevation,
+                        peakTime: finalPeakTime,
+                        setTime: setTime,
+                        maxAltitudeDeg: finalPeakElevation,
                         riseAzimuthDeg: riseAzimuth,
-                        setAzimuthDeg: azimuth
+                        setAzimuthDeg: setAzimuth
                     )
                 }
 
@@ -366,6 +473,9 @@ enum SGP4Propagator {
                 peakTime = nil
                 peakElevation = 0
             }
+
+            lastDate = currentDate
+            lastElevation = elevation
         }
 
         return nil
