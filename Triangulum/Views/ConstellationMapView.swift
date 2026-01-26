@@ -536,7 +536,7 @@ struct ConstellationMapView: View {
             let size = baseSize * CGFloat(pulseFactor)
 
             // Color based on satellite type and visibility
-            let isVisible = altitude > 0
+            let isVisible = adjAlt > 0
             let baseColor: Color
             if satellite.id == "ISS" {
                 baseColor = nightVisionMode ? .red : .yellow

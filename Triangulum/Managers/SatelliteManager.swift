@@ -27,6 +27,8 @@ class SatelliteManager: ObservableObject {
 
     private var positionUpdateTimer: Timer?
     private var tleRefreshTimer: Timer?
+    private(set) var nextPassWorkItem: DispatchWorkItem?
+    private var nextPassToken = UUID()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - CelesTrak API
@@ -60,6 +62,13 @@ class SatelliteManager: ObservableObject {
 
     /// Start satellite tracking updates
     func startUpdates() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.startUpdates()
+            }
+            return
+        }
+
         print("SatelliteManager: Starting updates")
 
         stopUpdates()
@@ -105,6 +114,12 @@ class SatelliteManager: ObservableObject {
             nextISSPass: nextISSPass
         )
     }
+
+#if DEBUG
+    func applyTLEsForTesting(_ tles: [TLE]) {
+        applyTLEs(tles)
+    }
+#endif
 
     // MARK: - TLE Management
 
@@ -313,8 +328,14 @@ class SatelliteManager: ObservableObject {
         }
 
         // Calculate next pass (this is somewhat expensive, so we do it less frequently)
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        nextPassWorkItem?.cancel()
+
+        let token = UUID()
+        nextPassToken = token
+
+        let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
+            guard self.nextPassToken == token else { return }
 
             let pass = SGP4Propagator.findNextPass(
                 tle: issTLE,
@@ -324,7 +345,9 @@ class SatelliteManager: ObservableObject {
                 maxHours: 48.0
             )
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard self.nextPassToken == token else { return }
                 self.nextISSPass = pass
                 // Update ISS satellite with pass info
                 if let index = self.satellites.firstIndex(where: { $0.id == "ISS" }) {
@@ -332,5 +355,8 @@ class SatelliteManager: ObservableObject {
                 }
             }
         }
+
+        nextPassWorkItem = workItem
+        DispatchQueue.global(qos: .userInitiated).async(execute: workItem)
     }
 }

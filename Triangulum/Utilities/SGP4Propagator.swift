@@ -403,27 +403,28 @@ enum SGP4Propagator {
         var peakTime: Date?
         var peakElevation: Double = 0
         var lastDate: Date?
-        var lastElevation: Double = 0
+        var lastElevation: Double?
 
         for step in 0..<maxSteps {
             let currentDate = searchStart.addingTimeInterval(Double(step) * stepMinutes * 60)
-            guard let sampleResult = sample(at: currentDate) else { continue }
+            guard let sampleResult = sample(at: currentDate) else {
+                lastDate = nil
+                lastElevation = nil
+                continue
+            }
             let elevation = sampleResult.elevation
             let azimuth = sampleResult.azimuth
 
             if elevation > 0 && !isAboveHorizon {
                 // Satellite just rose
                 isAboveHorizon = true
-                if let prevDate = lastDate {
-                    if let refined = refineCrossing(from: prevDate, to: currentDate,
-                                                    startElevation: lastElevation,
-                                                    endElevation: elevation) {
-                        riseTime = refined.0
-                        riseAzimuth = refined.1
-                    } else {
-                        riseTime = currentDate
-                        riseAzimuth = azimuth
-                    }
+                let prevDate = lastDate ?? currentDate
+                let prevElevation = lastElevation ?? elevation
+                if let refined = refineCrossing(from: prevDate, to: currentDate,
+                                                startElevation: prevElevation,
+                                                endElevation: elevation) {
+                    riseTime = refined.0
+                    riseAzimuth = refined.1
                 } else {
                     riseTime = currentDate
                     riseAzimuth = azimuth
@@ -439,14 +440,11 @@ enum SGP4Propagator {
             } else if elevation <= 0 && isAboveHorizon {
                 // Satellite just set
                 if peakElevation >= minElevation, let rise = riseTime, let peak = peakTime {
-                    let refinedSet: (Date, Double, Double)?
-                    if let prevDate = lastDate {
-                        refinedSet = refineCrossing(from: prevDate, to: currentDate,
-                                                    startElevation: lastElevation,
+                    let prevDate = lastDate ?? currentDate
+                    let prevElevation = lastElevation ?? elevation
+                    let refinedSet = refineCrossing(from: prevDate, to: currentDate,
+                                                    startElevation: prevElevation,
                                                     endElevation: elevation)
-                    } else {
-                        refinedSet = nil
-                    }
 
                     let setTime = refinedSet?.0 ?? currentDate
                     let setAzimuth = refinedSet?.1 ?? azimuth
