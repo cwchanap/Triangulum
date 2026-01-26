@@ -13,6 +13,7 @@ import simd
 /// Represents a Two-Line Element set for satellite orbital data
 struct TLE: Codable, Equatable {
     let name: String
+    let noradId: Int
     let line1: String
     let line2: String
 
@@ -36,6 +37,8 @@ struct TLE: Codable, Equatable {
         guard line1.hasPrefix("1"), line2.hasPrefix("2") else { return nil }
 
         self.name = name.trimmingCharacters(in: .whitespaces)
+        let noradIdStr = TLE.substring(line1, start: 2, length: 5)
+        self.noradId = Int(noradIdStr.trimmingCharacters(in: .whitespaces)) ?? 0
         self.line1 = line1
         self.line2 = line2
 
@@ -100,13 +103,22 @@ struct TLE: Codable, Equatable {
         // Create date from year and day of year
         var components = DateComponents()
         components.year = year
-        components.day = Int(dayOfYear)
+        components.month = 1
+        components.day = 1
         components.hour = 0
         components.minute = 0
         components.second = 0
 
-        let calendar = Calendar(identifier: .gregorian)
+        var calendar = Calendar(identifier: .gregorian)
+        if let utc = TimeZone(secondsFromGMT: 0) ?? TimeZone(identifier: "UTC") {
+            calendar.timeZone = utc
+        }
         guard var date = calendar.date(from: components) else { return nil }
+
+        let wholeDays = Int(floor(dayOfYear) - 1)
+        if let shifted = calendar.date(byAdding: .day, value: wholeDays, to: date) {
+            date = shifted
+        }
 
         // Add fractional day
         let fractionalDay = dayOfYear - floor(dayOfYear)

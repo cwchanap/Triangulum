@@ -159,6 +159,18 @@ struct SatelliteView: View {
                 .padding(8)
                 .background(Color.green.opacity(0.1))
                 .cornerRadius(8)
+            } else {
+                HStack {
+                    Image(systemName: "clock.badge.checkmark")
+                        .foregroundColor(.prussianBlueLight)
+                    Text("Pass ended")
+                        .font(.headline)
+                        .foregroundColor(.prussianBlueLight)
+                    Spacer()
+                }
+                .padding(8)
+                .background(Color.prussianSoft.opacity(0.2))
+                .cornerRadius(8)
             }
         }
     }
