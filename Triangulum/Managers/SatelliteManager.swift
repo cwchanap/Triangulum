@@ -29,6 +29,8 @@ class SatelliteManager: ObservableObject {
     private var tleRefreshTimer: Timer?
     private(set) var nextPassWorkItem: DispatchWorkItem?
     private var nextPassToken = UUID()
+    private var tleRefreshTask: Task<Void, Never>?
+    private var tleRefreshToken = UUID()
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - CelesTrak API
@@ -97,20 +99,20 @@ class SatelliteManager: ObservableObject {
         positionUpdateTimer = nil
         tleRefreshTimer?.invalidate()
         tleRefreshTimer = nil
+        tleRefreshTask?.cancel()
+        tleRefreshTask = nil
     }
 
     /// Force refresh TLE data from CelesTrak
     func forceRefreshTLEs() {
-        Task {
-            await fetchTLEsFromCelestrak()
-        }
+        startTLEFetch()
     }
 
     /// Get snapshot data for sensor capture
     func snapshotData() -> SatelliteSnapshotData {
         SatelliteSnapshotData(
             capturedAt: Date(),
-            satellites: satellites.map { SatellitePositionSnapshot(from: $0) },
+            satellites: satellites.compactMap { SatellitePositionSnapshot(from: $0) },
             nextISSPass: nextISSPass
         )
     }
@@ -139,23 +141,35 @@ class SatelliteManager: ObservableObject {
             print("SatelliteManager: Using stale TLEs (age: \(staleTLEs.ageInHours) hours)")
 
             // Try to refresh in background
-            Task {
-                await fetchTLEsFromCelestrak()
-            }
+            startTLEFetch()
         } else {
             // No cache, must fetch
             print("SatelliteManager: No cached TLEs, fetching from CelesTrak")
-            Task {
-                await fetchTLEsFromCelestrak()
-            }
+            startTLEFetch()
         }
     }
 
     private func refreshTLEsIfNeeded() {
         if !tleCache.hasFreshCache {
             print("SatelliteManager: TLE cache expired, refreshing")
-            Task {
-                await fetchTLEsFromCelestrak()
+            startTLEFetch()
+        }
+    }
+
+    private func startTLEFetch() {
+        tleRefreshTask?.cancel()
+        let token = UUID()
+        tleRefreshToken = token
+        let task = Task { [weak self] in
+            guard let self = self else { return }
+            await self.fetchTLEsFromCelestrak()
+        }
+        tleRefreshTask = task
+        Task { [weak self] in
+            _ = await task.result
+            guard let self = self else { return }
+            if self.tleRefreshToken == token {
+                self.tleRefreshTask = nil
             }
         }
     }
@@ -182,7 +196,9 @@ class SatelliteManager: ObservableObject {
                 errorMessage = "Failed to fetch TLE data"
                 isAvailable = false
             } else {
-                tleCache.save(fetchedTLEs)
+                if !tleCache.save(fetchedTLEs) {
+                    errorMessage = "Failed to cache TLE data"
+                }
                 applyTLEs(fetchedTLEs)
                 tleAge = 0
                 isAvailable = true
@@ -243,9 +259,10 @@ class SatelliteManager: ObservableObject {
     }
 
     private func applyTLEs(_ tles: [TLE]) {
+        var updatedSatellites = satellites
         for tle in tles {
             // Find matching satellite and update its TLE
-            if let index = satellites.firstIndex(where: { satellite in
+            if let index = updatedSatellites.firstIndex(where: { satellite in
                 if tle.noradId > 0 {
                     return satellite.noradId == tle.noradId
                 }
@@ -256,9 +273,13 @@ class SatelliteManager: ObservableObject {
                     tleName.contains(satelliteName) ||
                     satelliteName.contains(tleName)
             }) {
-                satellites[index].tle = tle
+                var updated = updatedSatellites[index]
+                updated.tle = tle
+                updatedSatellites[index] = updated
             }
         }
+
+        satellites = updatedSatellites
 
         // Update positions immediately after applying TLEs
         updatePositions()
@@ -277,8 +298,10 @@ class SatelliteManager: ObservableObject {
         let observerLon = locationManager.longitude
         let now = Date()
 
-        for i in 0..<satellites.count {
-            guard let tle = satellites[i].tle else { continue }
+        var updatedSatellites = satellites
+
+        for i in 0..<updatedSatellites.count {
+            guard let tle = updatedSatellites[i].tle else { continue }
 
             let position = SGP4Propagator.propagate(
                 tle: tle,
@@ -287,8 +310,12 @@ class SatelliteManager: ObservableObject {
                 observerLon: observerLon
             )
 
-            satellites[i].currentPosition = position
+            var updated = updatedSatellites[i]
+            updated.currentPosition = position
+            updatedSatellites[i] = updated
         }
+
+        satellites = updatedSatellites
 
         // Update next ISS pass
         updateNextPass()
@@ -297,12 +324,18 @@ class SatelliteManager: ObservableObject {
     private func updatePositionsWithoutObserver() {
         let now = Date()
 
-        for i in 0..<satellites.count {
-            guard let tle = satellites[i].tle else { continue }
+        var updatedSatellites = satellites
+
+        for i in 0..<updatedSatellites.count {
+            guard let tle = updatedSatellites[i].tle else { continue }
 
             let position = SGP4Propagator.propagate(tle: tle, to: now)
-            satellites[i].currentPosition = position
+            var updated = updatedSatellites[i]
+            updated.currentPosition = position
+            updatedSatellites[i] = updated
         }
+
+        satellites = updatedSatellites
     }
 
     private func updateNextPass() {
@@ -351,7 +384,11 @@ class SatelliteManager: ObservableObject {
                 self.nextISSPass = pass
                 // Update ISS satellite with pass info
                 if let index = self.satellites.firstIndex(where: { $0.id == "ISS" }) {
-                    self.satellites[index].nextPass = pass
+                    var updatedSatellites = self.satellites
+                    var updated = updatedSatellites[index]
+                    updated.nextPass = pass
+                    updatedSatellites[index] = updated
+                    self.satellites = updatedSatellites
                 }
             }
         }

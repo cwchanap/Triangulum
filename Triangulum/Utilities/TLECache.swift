@@ -41,15 +41,17 @@ class TLECache {
 
     /// Save TLE data to cache
     /// - Parameter tles: Array of TLE data to cache
-    func save(_ tles: [TLE]) {
+    func save(_ tles: [TLE]) -> Bool {
         let cachedData = CachedTLEData(tles: tles, timestamp: Date())
 
         do {
             let data = try JSONEncoder().encode(cachedData)
             userDefaults.set(data, forKey: cacheKey)
             print("TLECache: Saved \(tles.count) TLEs to cache")
+            return true
         } catch {
             print("TLECache: Failed to save TLEs: \(error.localizedDescription)")
+            return false
         }
     }
 

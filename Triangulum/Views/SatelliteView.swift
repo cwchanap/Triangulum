@@ -267,7 +267,9 @@ struct SatelliteView: View {
 
     private func compassDirection(_ degrees: Double) -> String {
         let directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-        let index = Int((degrees + 22.5) / 45.0) % 8
+        let normalizedDegrees = degrees.truncatingRemainder(dividingBy: 360)
+        let clampedDegrees = normalizedDegrees < 0 ? normalizedDegrees + 360 : normalizedDegrees
+        let index = Int((clampedDegrees + 22.5) / 45.0) % 8
         return directions[index]
     }
 }
