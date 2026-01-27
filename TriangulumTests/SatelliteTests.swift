@@ -317,16 +317,14 @@ struct SatelliteManagerTests {
 
         manager.applyTLEsForTesting([issTLE])
 
-        // Allow updateNextPass to schedule the initial work item
-        try? await Task.sleep(for: .milliseconds(50))
-        let firstWorkItem = manager.nextPassWorkItem
+        // Wait for the initial work item to be scheduled
+        let firstWorkItem = await waitForWorkItemChange(manager: manager, from: nil)
 
         // Trigger another location update to replace the work item
         locationManager.latitude = 37.7750
         locationManager.longitude = -122.4195
 
-        try? await Task.sleep(for: .milliseconds(50))
-        let secondWorkItem = manager.nextPassWorkItem
+        let secondWorkItem = await waitForWorkItemChange(manager: manager, from: firstWorkItem)
 
         #expect(firstWorkItem != nil)
         #expect(secondWorkItem != nil)
@@ -334,6 +332,20 @@ struct SatelliteManagerTests {
             #expect(firstWorkItem !== secondWorkItem)
             #expect(firstWorkItem.isCancelled == true)
         }
+    }
+
+    private func waitForWorkItemChange(
+        manager: SatelliteManager,
+        from previous: DispatchWorkItem?,
+        timeoutSteps: Int = 50
+    ) async -> DispatchWorkItem? {
+        for _ in 0..<timeoutSteps {
+            if manager.nextPassWorkItem !== previous {
+                return manager.nextPassWorkItem
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return manager.nextPassWorkItem
     }
 }
 
@@ -420,7 +432,10 @@ struct SatellitePositionSnapshotTests {
         var satellite = Satellite(id: "TEST", name: "Test Sat", noradId: 12345)
         satellite.currentPosition = position
 
-        let snapshot = SatellitePositionSnapshot(from: satellite)
+        guard let snapshot = SatellitePositionSnapshot(from: satellite) else {
+            Issue.record("Failed to build snapshot from satellite position")
+            return
+        }
 
         #expect(snapshot.id == "TEST")
         #expect(snapshot.name == "Test Sat")
@@ -437,12 +452,7 @@ struct SatellitePositionSnapshotTests {
 
         let snapshot = SatellitePositionSnapshot(from: satellite)
 
-        #expect(snapshot.latitude == 0)
-        #expect(snapshot.longitude == 0)
-        #expect(snapshot.altitudeKm == 0)
-        #expect(snapshot.azimuthDeg == nil)
-        #expect(snapshot.elevationDeg == nil)
-        #expect(snapshot.isVisible == false)
+        #expect(snapshot == nil)
     }
 }
 
@@ -584,7 +594,7 @@ struct TLECacheTests {
             return
         }
 
-        cache.save([tle])
+            #expect(cache.save([tle]) == true)
 
         let loaded = cache.load()
         #expect(loaded != nil)
@@ -602,7 +612,7 @@ struct TLECacheTests {
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
         if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            cache.save([tle])
+            #expect(cache.save([tle]) == true)
 
             // After saving, should have fresh cache
             #expect(cache.hasFreshCache == true)
@@ -616,7 +626,7 @@ struct TLECacheTests {
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
         if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            cache.save([tle])
+            #expect(cache.save([tle]) == true)
         }
 
         cache.clear()
@@ -632,7 +642,7 @@ struct TLECacheTests {
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
         if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            cache.save([tle])
+            #expect(cache.save([tle]) == true)
         }
 
         let cachedData = cache.loadWithAge()
@@ -664,7 +674,7 @@ struct TLECacheTests {
         if let t1 = tle1 { tles.append(t1) }
         if let t2 = tle2 { tles.append(t2) }
 
-        cache.save(tles)
+        #expect(cache.save(tles) == true)
 
         let loaded = cache.load()
         #expect(loaded?.count == tles.count)
@@ -679,7 +689,7 @@ struct TLECacheTests {
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
         if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            cache.save([tle])
+            #expect(cache.save([tle]) == true)
         }
 
         #expect(cache.hasCache == true)
@@ -694,7 +704,7 @@ struct TLECacheTests {
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
         if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            cache.save([tle])
+            #expect(cache.save([tle]) == true)
         }
 
         #expect(cache.cacheAgeHours != nil)
@@ -716,7 +726,10 @@ struct SatelliteSnapshotDataTests {
         var satellite = Satellite(id: "ISS", name: "ISS (ZARYA)", noradId: 25544)
         satellite.currentPosition = position
 
-        let positionSnapshot = SatellitePositionSnapshot(from: satellite)
+        guard let positionSnapshot = SatellitePositionSnapshot(from: satellite) else {
+            Issue.record("Failed to build snapshot from satellite position")
+            return
+        }
 
         let snapshotData = SatelliteSnapshotData(
             capturedAt: Date(),

@@ -38,7 +38,8 @@ struct TLE: Codable, Equatable {
 
         self.name = name.trimmingCharacters(in: .whitespaces)
         let noradIdStr = TLE.substring(line1, start: 2, length: 5)
-        self.noradId = Int(noradIdStr.trimmingCharacters(in: .whitespaces)) ?? 0
+        guard let noradId = Int(noradIdStr.trimmingCharacters(in: .whitespaces)) else { return nil }
+        self.noradId = noradId
         self.line1 = line1
         self.line2 = line2
 
@@ -214,7 +215,7 @@ struct SatellitePass: Codable, Identifiable {
 
     /// Duration of the pass in seconds
     var duration: TimeInterval {
-        setTime.timeIntervalSince(riseTime)
+        max(0, setTime.timeIntervalSince(riseTime))
     }
 
     /// Formatted duration string
@@ -282,14 +283,15 @@ struct SatellitePositionSnapshot: Codable, Identifiable {
     let elevationDeg: Double?
     let isVisible: Bool
 
-    init(from satellite: Satellite) {
+    init?(from satellite: Satellite) {
+        guard let position = satellite.currentPosition else { return nil }
         self.id = satellite.id
         self.name = satellite.name
-        self.latitude = satellite.currentPosition?.latitude ?? 0
-        self.longitude = satellite.currentPosition?.longitude ?? 0
-        self.altitudeKm = satellite.currentPosition?.altitude ?? 0
-        self.azimuthDeg = satellite.currentPosition?.azimuthDeg
-        self.elevationDeg = satellite.currentPosition?.altitudeDeg
-        self.isVisible = satellite.currentPosition?.isVisible ?? false
+        self.latitude = position.latitude
+        self.longitude = position.longitude
+        self.altitudeKm = position.altitude
+        self.azimuthDeg = position.azimuthDeg
+        self.elevationDeg = position.altitudeDeg
+        self.isVisible = position.isVisible
     }
 }
