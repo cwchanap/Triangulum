@@ -671,8 +671,8 @@ struct TLECacheTests {
         )
 
         var tles: [TLE] = []
-        if let t1 = tle1 { tles.append(t1) }
-        if let t2 = tle2 { tles.append(t2) }
+        if let parsedTle1 = tle1 { tles.append(parsedTle1) }
+        if let parsedTle2 = tle2 { tles.append(parsedTle2) }
 
         #expect(cache.save(tles) == true)
 

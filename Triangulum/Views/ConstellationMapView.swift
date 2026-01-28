@@ -254,7 +254,11 @@ struct ConstellationMapView: View {
 
             // Satellites
             if skyShowSatellites {
-                drawSatellites(context: &layer, center: center, radius: radius, observer: observer, current: current)
+                SatelliteRenderer.draw(
+                    context: &layer, satellites: satelliteManager.satellites, center: center,
+                    radius: radius, heading: locationManager.heading, snapNorth: skySnapNorth,
+                    panOffset: pan, current: current, nightVisionMode: nightVisionMode,
+                    pointOnDome: pointOnDome)
             }
 
             // Altitude rings (30°, 60°)
@@ -502,59 +506,6 @@ struct ConstellationMapView: View {
             let percent = Int((k * 100).rounded())
             let label = Text("Moon \(percent)%").font(.system(size: 8)).foregroundColor(color)
             context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
-        }
-    }
-
-    // MARK: - Satellite Rendering
-
-    private func drawSatellites(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, current: Date) {
-        let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
-        let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0)
-        let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
-
-        for satellite in satelliteManager.satellites {
-            guard let position = satellite.currentPosition,
-                  let azimuth = position.azimuthDeg,
-                  let altitude = position.altitudeDeg else { continue }
-
-            // Only draw if above horizon (or slightly below for visibility)
-            let adjAlt = altitude + altOffsetDeg
-            guard adjAlt > -5 else { continue }
-
-            let azRad = azimuth * .pi / 180.0
-            let point = pointOnDome(
-                center: center,
-                radius: radius,
-                azimuthRad: azRad - headingRad + azOffsetRad,
-                altitudeDeg: max(0, adjAlt)
-            )
-
-            // Satellite marker - larger than stars, pulsing effect
-            let baseSize: CGFloat = 6.0
-            let pulsePhase = current.timeIntervalSince1970.truncatingRemainder(dividingBy: 2.0) / 2.0
-            let pulseFactor = 1.0 + 0.2 * sin(pulsePhase * 2.0 * .pi)
-            let size = baseSize * CGFloat(pulseFactor)
-
-            // Color based on satellite type and visibility
-            let isVisible = adjAlt > 0
-            let baseColor: Color
-            if satellite.id == "ISS" {
-                baseColor = nightVisionMode ? .red : .yellow
-            } else {
-                baseColor = nightVisionMode ? .red : .cyan
-            }
-            let color = isVisible ? baseColor : baseColor.opacity(0.4)
-
-            // Draw satellite marker
-            let rect = CGRect(x: point.x - size/2, y: point.y - size/2, width: size, height: size)
-            context.fill(Path(ellipseIn: rect), with: .color(color))
-
-            // Draw label
-            let labelColor = isVisible ? baseColor : baseColor.opacity(0.6)
-            let labelText = Text(satellite.id)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(labelColor)
-            context.draw(context.resolve(labelText), at: CGPoint(x: point.x + 8, y: point.y - 8), anchor: .topLeading)
         }
     }
 
