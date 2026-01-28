@@ -1,0 +1,399 @@
+//
+//  SatelliteManager.swift
+//  Triangulum
+//
+//  Manages satellite tracking: TLE fetching, position computation, and pass predictions
+//
+
+import Foundation
+import Combine
+
+class SatelliteManager: ObservableObject {
+    // MARK: - Published Properties
+
+    @Published private(set) var satellites: [Satellite] = []
+    @Published private(set) var isLoading: Bool = false
+    @Published private(set) var errorMessage: String = ""
+    @Published private(set) var isAvailable: Bool = false
+    @Published private(set) var nextISSPass: SatellitePass?
+    @Published private(set) var tleAge: Double?  // Hours since last TLE update
+
+    // MARK: - Dependencies
+
+    private let locationManager: LocationManager
+    private let tleCache: TLECache
+
+    // MARK: - Timers
+
+    private var positionUpdateTimer: Timer?
+    private var tleRefreshTimer: Timer?
+    private(set) var nextPassWorkItem: DispatchWorkItem?
+    private var nextPassToken = UUID()
+    private var tleRefreshTask: Task<Void, Never>?
+    private var tleRefreshToken = UUID()
+    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - CelesTrak API
+
+    private let celestrakBaseURL = "https://celestrak.org/NORAD/elements/gp.php"
+
+    // MARK: - Initialization
+
+    init(locationManager: LocationManager, tleCache: TLECache = .shared) {
+        self.locationManager = locationManager
+        self.tleCache = tleCache
+
+        // Initialize with tracked satellites
+        self.satellites = Satellite.tracked
+
+        // Observe location changes
+        locationManager.$latitude
+            .combineLatest(locationManager.$longitude)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in
+                self?.updateNextPass()
+            }
+            .store(in: &cancellables)
+    }
+
+    deinit {
+        stopUpdates()
+    }
+
+    // MARK: - Public API
+
+    /// Start satellite tracking updates
+    func startUpdates() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.startUpdates()
+            }
+            return
+        }
+
+        print("SatelliteManager: Starting updates")
+
+        stopUpdates()
+
+        // Load cached TLEs or fetch new ones
+        loadOrFetchTLEs()
+
+        // Update positions every 10 seconds
+        positionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            self?.updatePositions()
+        }
+
+        // Check for TLE refresh every hour
+        tleRefreshTimer = Timer.scheduledTimer(withTimeInterval: 3600.0, repeats: true) { [weak self] _ in
+            self?.refreshTLEsIfNeeded()
+        }
+
+        // Immediate position update
+        updatePositions()
+    }
+
+    /// Stop satellite tracking updates
+    func stopUpdates() {
+        print("SatelliteManager: Stopping updates")
+        positionUpdateTimer?.invalidate()
+        positionUpdateTimer = nil
+        tleRefreshTimer?.invalidate()
+        tleRefreshTimer = nil
+        tleRefreshTask?.cancel()
+        tleRefreshTask = nil
+    }
+
+    /// Force refresh TLE data from CelesTrak
+    func forceRefreshTLEs() {
+        startTLEFetch()
+    }
+
+    /// Get snapshot data for sensor capture
+    func snapshotData() -> SatelliteSnapshotData {
+        SatelliteSnapshotData(
+            capturedAt: Date(),
+            satellites: satellites.compactMap { SatellitePositionSnapshot(from: $0) },
+            nextISSPass: nextISSPass
+        )
+    }
+
+#if DEBUG
+    func applyTLEsForTesting(_ tles: [TLE]) {
+        applyTLEs(tles)
+    }
+#endif
+
+    // MARK: - TLE Management
+
+    private func loadOrFetchTLEs() {
+        // Try loading from cache first
+        if let cachedTLEs = tleCache.load() {
+            applyTLEs(cachedTLEs)
+            tleAge = tleCache.cacheAgeHours
+            isAvailable = true
+            print("SatelliteManager: Loaded \(cachedTLEs.count) TLEs from cache")
+        } else if let staleTLEs = tleCache.loadWithAge() {
+            // Use stale cache as fallback
+            applyTLEs(staleTLEs.tles)
+            tleAge = staleTLEs.ageInHours
+            isAvailable = true
+            errorMessage = "TLE data is \(Int(staleTLEs.ageInHours)) hours old"
+            print("SatelliteManager: Using stale TLEs (age: \(staleTLEs.ageInHours) hours)")
+
+            // Try to refresh in background
+            startTLEFetch()
+        } else {
+            // No cache, must fetch
+            print("SatelliteManager: No cached TLEs, fetching from CelesTrak")
+            startTLEFetch()
+        }
+    }
+
+    private func refreshTLEsIfNeeded() {
+        if !tleCache.hasFreshCache {
+            print("SatelliteManager: TLE cache expired, refreshing")
+            startTLEFetch()
+        }
+    }
+
+    private func startTLEFetch() {
+        tleRefreshTask?.cancel()
+        let token = UUID()
+        tleRefreshToken = token
+        let task = Task { [weak self] in
+            guard let self = self else { return }
+            await self.fetchTLEsFromCelestrak()
+        }
+        tleRefreshTask = task
+        Task { [weak self] in
+            _ = await task.result
+            guard let self = self else { return }
+            if self.tleRefreshToken == token {
+                self.tleRefreshTask = nil
+            }
+        }
+    }
+
+    private func fetchTLEsFromCelestrak() async {
+        await MainActor.run {
+            isLoading = true
+            errorMessage = ""
+        }
+
+        // Fetch TLE for each tracked satellite
+        var fetchedTLEs: [TLE] = []
+
+        for satellite in Satellite.tracked {
+            if let tle = await fetchSingleTLE(noradId: satellite.noradId, name: satellite.name) {
+                fetchedTLEs.append(tle)
+            }
+        }
+
+        await MainActor.run {
+            isLoading = false
+
+            if fetchedTLEs.isEmpty {
+                errorMessage = "Failed to fetch TLE data"
+                isAvailable = false
+            } else {
+                if !tleCache.save(fetchedTLEs) {
+                    errorMessage = "Failed to cache TLE data"
+                }
+                applyTLEs(fetchedTLEs)
+                tleAge = 0
+                isAvailable = true
+                errorMessage = ""
+                print("SatelliteManager: Fetched \(fetchedTLEs.count) TLEs from CelesTrak")
+            }
+        }
+    }
+
+    private func fetchSingleTLE(noradId: Int, name: String) async -> TLE? {
+        // CelesTrak GP API endpoint for single satellite
+        let urlString = "\(celestrakBaseURL)?CATNR=\(noradId)&FORMAT=TLE"
+
+        guard let url = URL(string: urlString) else {
+            print("SatelliteManager: Invalid URL for NORAD \(noradId)")
+            return nil
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                print("SatelliteManager: HTTP error for NORAD \(noradId)")
+                return nil
+            }
+
+            guard let content = String(data: data, encoding: .utf8) else {
+                print("SatelliteManager: Failed to decode response for NORAD \(noradId)")
+                return nil
+            }
+
+            // Parse TLE from response (3 lines: name, line1, line2)
+            let lines = content.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+
+            guard lines.count >= 3 else {
+                print("SatelliteManager: Invalid TLE format for NORAD \(noradId)")
+                return nil
+            }
+
+            let tleName = lines[0]
+            let line1 = lines[1]
+            let line2 = lines[2]
+
+            guard let tle = TLE(name: tleName, line1: line1, line2: line2) else {
+                print("SatelliteManager: Failed to parse TLE for NORAD \(noradId)")
+                return nil
+            }
+
+            return tle
+
+        } catch {
+            print("SatelliteManager: Network error for NORAD \(noradId): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func applyTLEs(_ tles: [TLE]) {
+        var updatedSatellites = satellites
+        for tle in tles {
+            // Find matching satellite and update its TLE
+            if let index = updatedSatellites.firstIndex(where: { satellite in
+                if tle.noradId > 0 {
+                    return satellite.noradId == tle.noradId
+                }
+
+                let tleName = tle.name.uppercased()
+                let satelliteName = satellite.name.uppercased()
+                return tleName == satelliteName ||
+                    tleName.contains(satelliteName) ||
+                    satelliteName.contains(tleName)
+            }) {
+                var updated = updatedSatellites[index]
+                updated.tle = tle
+                updatedSatellites[index] = updated
+            }
+        }
+
+        satellites = updatedSatellites
+
+        // Update positions immediately after applying TLEs
+        updatePositions()
+    }
+
+    // MARK: - Position Updates
+
+    private func updatePositions() {
+        guard locationManager.isAvailable else {
+            // Can still compute positions without observer location
+            updatePositionsWithoutObserver()
+            return
+        }
+
+        let observerLat = locationManager.latitude
+        let observerLon = locationManager.longitude
+        let now = Date()
+
+        var updatedSatellites = satellites
+
+        for i in 0..<updatedSatellites.count {
+            guard let tle = updatedSatellites[i].tle else { continue }
+
+            let position = SGP4Propagator.propagate(
+                tle: tle,
+                to: now,
+                observerLat: observerLat,
+                observerLon: observerLon
+            )
+
+            var updated = updatedSatellites[i]
+            updated.currentPosition = position
+            updatedSatellites[i] = updated
+        }
+
+        satellites = updatedSatellites
+
+        // Update next ISS pass
+        updateNextPass()
+    }
+
+    private func updatePositionsWithoutObserver() {
+        let now = Date()
+
+        var updatedSatellites = satellites
+
+        for i in 0..<updatedSatellites.count {
+            guard let tle = updatedSatellites[i].tle else { continue }
+
+            let position = SGP4Propagator.propagate(tle: tle, to: now)
+            var updated = updatedSatellites[i]
+            updated.currentPosition = position
+            updatedSatellites[i] = updated
+        }
+
+        satellites = updatedSatellites
+    }
+
+    private func updateNextPass() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateNextPass()
+            }
+            return
+        }
+
+        guard locationManager.isAvailable else {
+            nextISSPass = nil
+            return
+        }
+
+        let observerLat = locationManager.latitude
+        let observerLon = locationManager.longitude
+
+        // Find ISS TLE
+        guard let issTLE = satellites.first(where: { $0.id == "ISS" })?.tle else {
+            nextISSPass = nil
+            return
+        }
+
+        // Calculate next pass (this is somewhat expensive, so we do it less frequently)
+        nextPassWorkItem?.cancel()
+
+        let token = UUID()
+        nextPassToken = token
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard self.nextPassToken == token else { return }
+
+            let pass = SGP4Propagator.findNextPass(
+                tle: issTLE,
+                observerLat: observerLat,
+                observerLon: observerLon,
+                minElevation: 10.0,
+                maxHours: 48.0
+            )
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard self.nextPassToken == token else { return }
+                self.nextISSPass = pass
+                // Update ISS satellite with pass info
+                if let index = self.satellites.firstIndex(where: { $0.id == "ISS" }) {
+                    var updatedSatellites = self.satellites
+                    var updated = updatedSatellites[index]
+                    updated.nextPass = pass
+                    updatedSatellites[index] = updated
+                    self.satellites = updatedSatellites
+                }
+            }
+        }
+
+        nextPassWorkItem = workItem
+        DispatchQueue.global(qos: .userInitiated).async(execute: workItem)
+    }
+}

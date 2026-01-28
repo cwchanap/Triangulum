@@ -4,6 +4,8 @@ import simd
 
 struct ConstellationMapView: View {
     @ObservedObject var locationManager: LocationManager
+    @ObservedObject var satelliteManager: SatelliteManager
+    @AppStorage("skyShowSatellites") private var skyShowSatellites = true
     @State private var now: Date = Date()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -168,6 +170,9 @@ struct ConstellationMapView: View {
                 LegendLine(color: (nightVisionMode ? Color.red : Color.white).opacity(0.8), label: "Constellation")
                 LegendDot(color: nightVisionMode ? .red : .yellow, label: "Sun")
                 LegendDot(color: nightVisionMode ? .red : .gray.opacity(0.9), label: "Moon")
+                if skyShowSatellites {
+                    LegendDot(color: nightVisionMode ? .red : .cyan, label: "Satellite")
+                }
             }
             Spacer(minLength: 8)
             // Compact zoom controls (icon-only)
@@ -186,6 +191,7 @@ struct ConstellationMapView: View {
                 Toggle("Night Vision", isOn: $nightVisionMode)
                 Toggle("Star Labels", isOn: $skyShowStarLabels)
                 Toggle("Constellation Labels", isOn: $skyShowConstellationLabels)
+                Toggle("Satellites", isOn: $skyShowSatellites)
                 Toggle("Large Compass", isOn: $skyShowLargeCompass)
                 Toggle("Snap North", isOn: $skySnapNorth)
                 Picker("Catalog", selection: $skyCatalog) {
@@ -245,6 +251,15 @@ struct ConstellationMapView: View {
 
             // Sun and Moon markers
             drawSunAndMoon(context: &layer, center: center, radius: radius, observer: observer, current: current)
+
+            // Satellites
+            if skyShowSatellites {
+                SatelliteRenderer.draw(
+                    context: &layer, satellites: satelliteManager.satellites, center: center,
+                    radius: radius, heading: locationManager.heading, snapNorth: skySnapNorth,
+                    panOffset: pan, current: current, nightVisionMode: nightVisionMode,
+                    pointOnDome: pointOnDome)
+            }
 
             // Altitude rings (30°, 60°)
             let fg = nightVisionMode ? Color.red : Color.white
@@ -875,5 +890,9 @@ private struct MoonPhaseGlyph: View {
 #endif
 
 #Preview {
-    ConstellationMapView(locationManager: LocationManager())
+    let locationManager = LocationManager()
+    return ConstellationMapView(
+        locationManager: locationManager,
+        satelliteManager: SatelliteManager(locationManager: locationManager)
+    )
 }

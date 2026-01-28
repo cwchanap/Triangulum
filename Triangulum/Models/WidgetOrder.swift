@@ -11,6 +11,7 @@ enum WidgetType: String, CaseIterable, Identifiable {
     case barometer
     case location
     case weather
+    case satellite
     case accelerometer
     case gyroscope
     case magnetometer
@@ -23,6 +24,7 @@ enum WidgetType: String, CaseIterable, Identifiable {
         case .barometer: return "Barometer"
         case .location: return "Location"
         case .weather: return "Weather"
+        case .satellite: return "Satellite"
         case .accelerometer: return "Accelerometer"
         case .gyroscope: return "Gyroscope"
         case .magnetometer: return "Magnetometer"
@@ -34,6 +36,7 @@ enum WidgetType: String, CaseIterable, Identifiable {
         case .barometer: return "barometer"
         case .location: return "location.fill"
         case .weather: return "cloud.sun.fill"
+        case .satellite: return "antenna.radiowaves.left.and.right"
         case .accelerometer: return "gyroscope"
         case .gyroscope: return "gyroscope"
         case .magnetometer: return "magnet.fill"

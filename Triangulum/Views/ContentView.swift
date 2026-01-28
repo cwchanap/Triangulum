@@ -15,6 +15,7 @@ struct ContentView: View {
     @StateObject private var locationManager: LocationManager
     @StateObject private var barometerManager: BarometerManager
     @StateObject private var weatherManager: WeatherManager
+    @StateObject private var satelliteManager: SatelliteManager
     @StateObject private var accelerometerManager = AccelerometerManager()
     @StateObject private var gyroscopeManager = GyroscopeManager()
     @StateObject private var magnetometerManager = MagnetometerManager()
@@ -29,6 +30,7 @@ struct ContentView: View {
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
     @AppStorage("showWeatherWidget") private var showWeatherWidget = true
+    @AppStorage("showSatelliteWidget") private var showSatelliteWidget = true
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
@@ -38,6 +40,7 @@ struct ContentView: View {
         _locationManager = StateObject(wrappedValue: locationManager)
         _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: locationManager))
         _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: locationManager))
+        _satelliteManager = StateObject(wrappedValue: SatelliteManager(locationManager: locationManager))
     }
 
     var body: some View {
@@ -92,7 +95,10 @@ struct ContentView: View {
                             .foregroundColor(.white)
                     }
 
-                    NavigationLink(destination: ConstellationMapView(locationManager: locationManager)) {
+                    NavigationLink(destination: ConstellationMapView(
+                        locationManager: locationManager,
+                        satelliteManager: satelliteManager
+                    )) {
                         Image(systemName: "star.fill")
                             .font(.title2)
                             .foregroundColor(.white)
@@ -126,6 +132,7 @@ struct ContentView: View {
 
             barometerManager.startBarometerUpdates()
             locationManager.startLocationUpdates()
+            satelliteManager.startUpdates()
             // TODO: Temporarily disabled until privacy permissions are properly configured
             // accelerometerManager.startAccelerometerUpdates()
             // gyroscopeManager.startGyroscopeUpdates()
@@ -134,6 +141,7 @@ struct ContentView: View {
         .onDisappear {
             barometerManager.stopBarometerUpdates()
             locationManager.stopLocationUpdates()
+            satelliteManager.stopUpdates()
             // accelerometerManager.stopAccelerometerUpdates()
             // gyroscopeManager.stopGyroscopeUpdates()
             // magnetometerManager.stopMagnetometerUpdates()
@@ -155,6 +163,7 @@ struct ContentView: View {
         case .barometer: return showBarometerWidget
         case .location: return showLocationWidget
         case .weather: return showWeatherWidget
+        case .satellite: return showSatelliteWidget
         case .accelerometer: return showAccelerometerWidget
         case .gyroscope: return showGyroscopeWidget
         case .magnetometer: return showMagnetometerWidget
@@ -170,6 +179,8 @@ struct ContentView: View {
             LocationView(locationManager: locationManager)
         case .weather:
             WeatherView(weatherManager: weatherManager)
+        case .satellite:
+            SatelliteView(satelliteManager: satelliteManager)
         case .accelerometer:
             AccelerometerView(accelerometerManager: accelerometerManager)
         case .gyroscope:
@@ -186,7 +197,8 @@ struct ContentView: View {
             accelerometerManager: accelerometerManager,
             gyroscopeManager: gyroscopeManager,
             magnetometerManager: magnetometerManager,
-            weatherManager: weatherManager
+            weatherManager: weatherManager,
+            satelliteManager: satelliteManager
         )
         currentSnapshot = snapshot
         showEnhancedSnapshotDialog = true

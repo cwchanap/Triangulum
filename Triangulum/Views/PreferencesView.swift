@@ -11,6 +11,7 @@ struct PreferencesView: View {
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
     @AppStorage("showWeatherWidget") private var showWeatherWidget = true
+    @AppStorage("showSatelliteWidget") private var showSatelliteWidget = true
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
@@ -34,6 +35,9 @@ struct PreferencesView: View {
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
 
                     Toggle("Weather", isOn: $showWeatherWidget)
+                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+
+                    Toggle("Satellite Tracker", isOn: $showSatelliteWidget)
                         .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
 
                     Toggle("Accelerometer", isOn: $showAccelerometerWidget)

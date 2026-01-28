@@ -534,7 +534,8 @@ class ComparisonAnnotation: NSObject, MKAnnotation {
         accelerometerManager: AccelerometerManager(),
         gyroscopeManager: GyroscopeManager(),
         magnetometerManager: MagnetometerManager(),
-        weatherManager: nil
+        weatherManager: nil,
+        satelliteManager: nil
     )
 
     let snapshot2 = SensorSnapshot(
@@ -543,10 +544,11 @@ class ComparisonAnnotation: NSObject, MKAnnotation {
         accelerometerManager: AccelerometerManager(),
         gyroscopeManager: GyroscopeManager(),
         magnetometerManager: MagnetometerManager(),
-        weatherManager: nil
+        weatherManager: nil,
+        satelliteManager: nil
     )
 
-    return SnapshotComparisonView(
+    SnapshotComparisonView(
         snapshot1: snapshot1,
         snapshot2: snapshot2
     )
