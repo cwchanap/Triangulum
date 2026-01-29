@@ -189,22 +189,22 @@ class SatelliteManager: ObservableObject {
             }
         }
 
-        let fetchedTLEs = fetchedTLEs
+        let fetchedTLEsSnapshot = fetchedTLEs
         await MainActor.run {
             isLoading = false
 
-            if fetchedTLEs.isEmpty {
+            if fetchedTLEsSnapshot.isEmpty {
                 errorMessage = "Failed to fetch TLE data"
                 isAvailable = false
             } else {
-                if !tleCache.save(fetchedTLEs) {
+                if !tleCache.save(fetchedTLEsSnapshot) {
                     errorMessage = "Failed to cache TLE data"
                 }
-                applyTLEs(fetchedTLEs)
+                applyTLEs(fetchedTLEsSnapshot)
                 tleAge = 0
                 isAvailable = true
                 errorMessage = ""
-                print("SatelliteManager: Fetched \(fetchedTLEs.count) TLEs from CelesTrak")
+                print("SatelliteManager: Fetched \(fetchedTLEsSnapshot.count) TLEs from CelesTrak")
             }
         }
     }
