@@ -189,6 +189,7 @@ class SatelliteManager: ObservableObject {
             }
         }
 
+        let fetchedTLEs = fetchedTLEs
         await MainActor.run {
             isLoading = false
 
