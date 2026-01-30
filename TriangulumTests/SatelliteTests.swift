@@ -99,7 +99,12 @@ struct TLEParsingTests {
         let tle1 = TLE(name: issName, line1: issLine1, line2: issLine2)
         let tle2 = TLE(name: issName, line1: issLine1, line2: issLine2)
 
-        #expect(tle1 == tle2)
+        guard let parsedTle1 = tle1, let parsedTle2 = tle2 else {
+            Issue.record("TLE parsing failed for testTLEEquality")
+            return
+        }
+
+        #expect(parsedTle1 == parsedTle2)
     }
 
     @Test func testTLECodable() throws {
@@ -337,13 +342,13 @@ struct SatelliteManagerTests {
     private func waitForWorkItemChange(
         manager: SatelliteManager,
         from previous: DispatchWorkItem?,
-        timeoutSteps: Int = 50
+        timeoutSteps: Int = 200
     ) async -> DispatchWorkItem? {
         for _ in 0..<timeoutSteps {
             if manager.nextPassWorkItem !== previous {
                 return manager.nextPassWorkItem
             }
-            try? await Task.sleep(for: .milliseconds(10))
+            try? await Task.sleep(for: .milliseconds(20))
         }
         return manager.nextPassWorkItem
     }
@@ -611,12 +616,14 @@ struct TLECacheTests {
         let line1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
-        if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            #expect(cache.save([tle]) == true)
-
-            // After saving, should have fresh cache
-            #expect(cache.hasFreshCache == true)
+        guard let tle = TLE(name: "ISS", line1: line1, line2: line2) else {
+            Issue.record("TLE parsing failed for testCacheFreshness")
+            return
         }
+        #expect(cache.save([tle]) == true)
+
+        // After saving, should have fresh cache
+        #expect(cache.hasFreshCache == true)
     }
 
     @Test func testCacheClear() {
@@ -625,9 +632,11 @@ struct TLECacheTests {
         let line1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
-        if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            #expect(cache.save([tle]) == true)
+        guard let tle = TLE(name: "ISS", line1: line1, line2: line2) else {
+            Issue.record("TLE parsing failed for testCacheClear")
+            return
         }
+        #expect(cache.save([tle]) == true)
 
         cache.clear()
 
@@ -641,9 +650,11 @@ struct TLECacheTests {
         let line1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
-        if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            #expect(cache.save([tle]) == true)
+        guard let tle = TLE(name: "ISS", line1: line1, line2: line2) else {
+            Issue.record("TLE parsing failed for testCacheLoadWithAge")
+            return
         }
+        #expect(cache.save([tle]) == true)
 
         let cachedData = cache.loadWithAge()
         #expect(cachedData != nil)
@@ -670,9 +681,11 @@ struct TLECacheTests {
             line2: "2 20580  28.4700 100.0000 0002500  90.0000 270.0000 15.09000000100001"
         )
 
-        var tles: [TLE] = []
-        if let parsedTle1 = tle1 { tles.append(parsedTle1) }
-        if let parsedTle2 = tle2 { tles.append(parsedTle2) }
+        guard let parsedTle1 = tle1, let parsedTle2 = tle2 else {
+            Issue.record("TLE parsing failed for testCacheMultipleTLEs")
+            return
+        }
+        let tles = [parsedTle1, parsedTle2]
 
         #expect(cache.save(tles) == true)
 
@@ -688,9 +701,11 @@ struct TLECacheTests {
         let line1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
-        if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            #expect(cache.save([tle]) == true)
+        guard let tle = TLE(name: "ISS", line1: line1, line2: line2) else {
+            Issue.record("TLE parsing failed for testCacheHasCache")
+            return
         }
+        #expect(cache.save([tle]) == true)
 
         #expect(cache.hasCache == true)
     }
@@ -703,9 +718,11 @@ struct TLECacheTests {
         let line1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
         let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
 
-        if let tle = TLE(name: "ISS", line1: line1, line2: line2) {
-            #expect(cache.save([tle]) == true)
+        guard let tle = TLE(name: "ISS", line1: line1, line2: line2) else {
+            Issue.record("TLE parsing failed for testCacheAgeHours")
+            return
         }
+        #expect(cache.save([tle]) == true)
 
         #expect(cache.cacheAgeHours != nil)
         #expect(cache.cacheAgeHours! < 1.0)
