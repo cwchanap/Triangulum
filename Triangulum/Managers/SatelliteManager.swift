@@ -31,6 +31,7 @@ class SatelliteManager: ObservableObject {
     private var nextPassToken = UUID()
     private var tleRefreshTask: Task<Void, Never>?
     private var tleRefreshToken = UUID()
+    private var updatesEnabled = true
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - CelesTrak API
@@ -74,6 +75,7 @@ class SatelliteManager: ObservableObject {
         print("SatelliteManager: Starting updates")
 
         stopUpdates()
+        updatesEnabled = true
 
         // Load cached TLEs or fetch new ones
         loadOrFetchTLEs()
@@ -95,12 +97,15 @@ class SatelliteManager: ObservableObject {
     /// Stop satellite tracking updates
     func stopUpdates() {
         print("SatelliteManager: Stopping updates")
+        updatesEnabled = false
         positionUpdateTimer?.invalidate()
         positionUpdateTimer = nil
         tleRefreshTimer?.invalidate()
         tleRefreshTimer = nil
         tleRefreshTask?.cancel()
         tleRefreshTask = nil
+        nextPassWorkItem?.cancel()
+        nextPassWorkItem = nil
     }
 
     /// Force refresh TLE data from CelesTrak
@@ -197,13 +202,16 @@ class SatelliteManager: ObservableObject {
                 errorMessage = "Failed to fetch TLE data"
                 isAvailable = false
             } else {
-                if !tleCache.save(fetchedTLEsSnapshot) {
+                let saved = tleCache.save(fetchedTLEsSnapshot)
+                if !saved {
                     errorMessage = "Failed to cache TLE data"
                 }
                 applyTLEs(fetchedTLEsSnapshot)
                 tleAge = 0
                 isAvailable = true
-                errorMessage = ""
+                if saved {
+                    errorMessage = ""
+                }
                 print("SatelliteManager: Fetched \(fetchedTLEsSnapshot.count) TLEs from CelesTrak")
             }
         }
@@ -344,6 +352,10 @@ class SatelliteManager: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 self?.updateNextPass()
             }
+            return
+        }
+
+        guard updatesEnabled else {
             return
         }
 
