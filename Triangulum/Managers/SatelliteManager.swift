@@ -180,10 +180,14 @@ class SatelliteManager: ObservableObject {
     }
 
     private func fetchTLEsFromCelestrak() async {
-        await MainActor.run {
-            isLoading = true
-            errorMessage = ""
+        let token = tleRefreshToken
+        let shouldFetch = await MainActor.run { () -> Bool in
+            guard self.tleRefreshToken == token else { return false }
+            self.isLoading = true
+            self.errorMessage = ""
+            return true
         }
+        guard shouldFetch else { return }
 
         // Fetch TLE for each tracked satellite
         var fetchedTLEs: [TLE] = []
@@ -196,21 +200,23 @@ class SatelliteManager: ObservableObject {
 
         let fetchedTLEsSnapshot = fetchedTLEs
         await MainActor.run {
-            isLoading = false
+            guard self.tleRefreshToken == token else { return }
+            self.isLoading = false
 
             if fetchedTLEsSnapshot.isEmpty {
-                errorMessage = "Failed to fetch TLE data"
-                isAvailable = false
+                self.errorMessage = "Failed to fetch TLE data"
+                let hasExistingTLEs = self.satellites.contains { $0.tle != nil }
+                self.isAvailable = hasExistingTLEs
             } else {
-                let saved = tleCache.save(fetchedTLEsSnapshot)
+                let saved = self.tleCache.save(fetchedTLEsSnapshot)
                 if !saved {
-                    errorMessage = "Failed to cache TLE data"
+                    self.errorMessage = "Failed to cache TLE data"
                 }
-                applyTLEs(fetchedTLEsSnapshot)
-                tleAge = 0
-                isAvailable = true
+                self.applyTLEs(fetchedTLEsSnapshot)
+                self.tleAge = 0
+                self.isAvailable = true
                 if saved {
-                    errorMessage = ""
+                    self.errorMessage = ""
                 }
                 print("SatelliteManager: Fetched \(fetchedTLEsSnapshot.count) TLEs from CelesTrak")
             }
@@ -297,9 +303,10 @@ class SatelliteManager: ObservableObject {
     // MARK: - Position Updates
 
     private func updatePositions() {
-        guard locationManager.isAvailable else {
+        guard locationManager.hasValidLocation else {
             // Can still compute positions without observer location
             updatePositionsWithoutObserver()
+            clearNextPassData()
             return
         }
 
@@ -347,6 +354,19 @@ class SatelliteManager: ObservableObject {
         satellites = updatedSatellites
     }
 
+    private func clearNextPassData() {
+        nextPassWorkItem?.cancel()
+        nextPassWorkItem = nil
+        nextPassToken = UUID()
+        nextISSPass = nil
+
+        var updatedSatellites = satellites
+        for index in updatedSatellites.indices {
+            updatedSatellites[index].nextPass = nil
+        }
+        satellites = updatedSatellites
+    }
+
     private func updateNextPass() {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
@@ -359,8 +379,8 @@ class SatelliteManager: ObservableObject {
             return
         }
 
-        guard locationManager.isAvailable else {
-            nextISSPass = nil
+        guard locationManager.hasValidLocation else {
+            clearNextPassData()
             return
         }
 

@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import CoreLocation
 @testable import Triangulum
 
 // MARK: - TLE Parsing Tests
@@ -307,10 +308,14 @@ struct SatelliteManagerTests {
         let locationManager = LocationManager()
         locationManager.isAvailable = true
         locationManager.authorizationStatus = .authorizedWhenInUse
-        locationManager.latitude = 37.7749
-        locationManager.longitude = -122.4194
 
         let manager = SatelliteManager(locationManager: locationManager)
+        let initialLocation = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+                                         altitude: 0.0,
+                                         horizontalAccuracy: 5.0,
+                                         verticalAccuracy: 5.0,
+                                         timestamp: Date())
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [initialLocation])
 
         let issName = "ISS (ZARYA)"
         let issLine1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
@@ -326,8 +331,12 @@ struct SatelliteManagerTests {
         let firstWorkItem = await waitForWorkItemChange(manager: manager, from: nil)
 
         // Trigger another location update to replace the work item
-        locationManager.latitude = 37.7750
-        locationManager.longitude = -122.4195
+        let updatedLocation = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7750, longitude: -122.4195),
+                                         altitude: 0.0,
+                                         horizontalAccuracy: 5.0,
+                                         verticalAccuracy: 5.0,
+                                         timestamp: Date())
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [updatedLocation])
 
         let secondWorkItem = await waitForWorkItemChange(manager: manager, from: firstWorkItem)
 
