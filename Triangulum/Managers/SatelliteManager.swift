@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import CoreLocation
 
 class SatelliteManager: ObservableObject {
     // MARK: - Published Properties
@@ -33,6 +34,10 @@ class SatelliteManager: ObservableObject {
     private var tleRefreshToken = UUID()
     private var updatesEnabled = true
     private var cancellables = Set<AnyCancellable>()
+    private var lastNextPassUpdate: Date?
+    private var lastNextPassLocation: CLLocationCoordinate2D?
+    private let nextPassRefreshInterval: TimeInterval = 15 * 60
+    private let nextPassLocationThresholdMeters: CLLocationDistance = 1000
 
     // MARK: - CelesTrak API
 
@@ -138,6 +143,8 @@ class SatelliteManager: ObservableObject {
             applyTLEs(cachedTLEs)
             tleAge = tleCache.cacheAgeHours
             isAvailable = true
+            isLoading = false
+            errorMessage = ""
             print("SatelliteManager: Loaded \(cachedTLEs.count) TLEs from cache")
         } else if let staleTLEs = tleCache.loadWithAge() {
             // Use stale cache as fallback
@@ -361,6 +368,8 @@ class SatelliteManager: ObservableObject {
         nextPassWorkItem = nil
         nextPassToken = UUID()
         nextISSPass = nil
+        lastNextPassUpdate = nil
+        lastNextPassLocation = nil
 
         var updatedSatellites = satellites
         for index in updatedSatellites.indices {
@@ -388,6 +397,20 @@ class SatelliteManager: ObservableObject {
 
         let observerLat = locationManager.latitude
         let observerLon = locationManager.longitude
+        let now = Date()
+
+        if let lastUpdate = lastNextPassUpdate,
+           let lastLocation = lastNextPassLocation,
+           let nextPass = nextISSPass,
+           nextPass.setTime > now,
+           now.timeIntervalSince(lastUpdate) < nextPassRefreshInterval {
+            let currentLocation = CLLocation(latitude: observerLat, longitude: observerLon)
+            let previousLocation = CLLocation(latitude: lastLocation.latitude, longitude: lastLocation.longitude)
+            let distance = currentLocation.distance(from: previousLocation)
+            if distance < nextPassLocationThresholdMeters {
+                return
+            }
+        }
 
         // Find ISS TLE
         guard let issTLE = satellites.first(where: { $0.id == "ISS" })?.tle else {
@@ -400,9 +423,12 @@ class SatelliteManager: ObservableObject {
 
         let token = UUID()
         nextPassToken = token
+        lastNextPassUpdate = now
+        lastNextPassLocation = CLLocationCoordinate2D(latitude: observerLat, longitude: observerLon)
 
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self = self else { return }
+        var workItem: DispatchWorkItem?
+        workItem = DispatchWorkItem { [weak self] in
+            guard let self = self, let workItem = workItem else { return }
             guard self.nextPassToken == token else { return }
 
             let pass = SGP4Propagator.findNextPass(
@@ -410,7 +436,10 @@ class SatelliteManager: ObservableObject {
                 observerLat: observerLat,
                 observerLon: observerLon,
                 minElevation: 10.0,
-                maxHours: 48.0
+                maxHours: 48.0,
+                shouldCancel: { [weak self, weak workItem] in
+                    workItem?.isCancelled == true || self?.nextPassToken != token
+                }
             )
 
             DispatchQueue.main.async { [weak self] in
@@ -429,6 +458,8 @@ class SatelliteManager: ObservableObject {
         }
 
         nextPassWorkItem = workItem
-        DispatchQueue.global(qos: .userInitiated).async(execute: workItem)
+        if let workItem = workItem {
+            DispatchQueue.global(qos: .userInitiated).async(execute: workItem)
+        }
     }
 }

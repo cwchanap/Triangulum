@@ -11,6 +11,12 @@ struct SatelliteView: View {
     @ObservedObject var satelliteManager: SatelliteManager
     @State private var currentTime = Date()
 
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -260,9 +266,7 @@ struct SatelliteView: View {
     }
 
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        Self.timeFormatter.string(from: date)
     }
 
     private func compassDirection(_ degrees: Double) -> String {

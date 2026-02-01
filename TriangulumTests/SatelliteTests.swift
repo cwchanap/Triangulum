@@ -202,7 +202,7 @@ struct SatellitePassTests {
         let peakTime = riseTime.addingTimeInterval(2.5 * 60) // 2.5 minutes
 
         let pass = SatellitePass(
-            satelliteId: "ISS",
+            satelliteId: "25544",
             satelliteName: "ISS (ZARYA)",
             riseTime: riseTime,
             peakTime: peakTime,
@@ -220,7 +220,7 @@ struct SatellitePassTests {
         let setTime = riseTime.addingTimeInterval(5 * 60 + 30) // 5:30
 
         let pass = SatellitePass(
-            satelliteId: "ISS",
+            satelliteId: "25544",
             satelliteName: "ISS (ZARYA)",
             riseTime: riseTime,
             peakTime: riseTime.addingTimeInterval(2.5 * 60),
@@ -238,7 +238,7 @@ struct SatellitePassTests {
         let setTime = riseTime.addingTimeInterval(45) // 45 seconds
 
         let pass = SatellitePass(
-            satelliteId: "ISS",
+            satelliteId: "25544",
             satelliteName: "ISS (ZARYA)",
             riseTime: riseTime,
             peakTime: riseTime.addingTimeInterval(22),
@@ -253,7 +253,7 @@ struct SatellitePassTests {
 
     @Test func testPassIdentifiable() {
         let pass1 = SatellitePass(
-            satelliteId: "ISS",
+            satelliteId: "25544",
             satelliteName: "ISS (ZARYA)",
             riseTime: Date(),
             peakTime: Date(),
@@ -264,7 +264,7 @@ struct SatellitePassTests {
         )
 
         let pass2 = SatellitePass(
-            satelliteId: "ISS",
+            satelliteId: "25544",
             satelliteName: "ISS (ZARYA)",
             riseTime: Date(),
             peakTime: Date(),
@@ -280,7 +280,7 @@ struct SatellitePassTests {
 
     @Test func testPassCodable() throws {
         let pass = SatellitePass(
-            satelliteId: "HST",
+            satelliteId: "20580",
             satelliteName: "Hubble Space Telescope",
             riseTime: Date(),
             peakTime: Date().addingTimeInterval(120),
@@ -582,7 +582,27 @@ struct SGP4PropagatorTests {
             #expect(pass.peakTime < pass.setTime)
             #expect(pass.maxAltitudeDeg >= 10.0)
             #expect(pass.duration > 0)
+            #expect(pass.satelliteId == "25544")
         }
+    }
+
+    @Test func testFindNextPassCancellation() {
+        guard let tle = TLE(name: "ISS", line1: issLine1, line2: issLine2) else {
+            Issue.record("TLE parsing failed")
+            return
+        }
+
+        let pass = SGP4Propagator.findNextPass(
+            tle: tle,
+            observerLat: 37.7749,
+            observerLon: -122.4194,
+            startDate: Date(),
+            minElevation: 10.0,
+            maxHours: 48.0,
+            shouldCancel: { true }
+        )
+
+        #expect(pass == nil)
     }
 }
 
@@ -773,7 +793,7 @@ struct SatelliteSnapshotDataTests {
 
     @Test func testSnapshotDataWithPass() throws {
         let pass = SatellitePass(
-            satelliteId: "ISS",
+            satelliteId: "25544",
             satelliteName: "ISS (ZARYA)",
             riseTime: Date(),
             peakTime: Date().addingTimeInterval(120),
@@ -793,7 +813,7 @@ struct SatelliteSnapshotDataTests {
         let decoded = try JSONDecoder().decode(SatelliteSnapshotData.self, from: encoded)
 
         #expect(decoded.nextISSPass != nil)
-        #expect(decoded.nextISSPass?.satelliteId == "ISS")
+        #expect(decoded.nextISSPass?.satelliteId == "25544")
         #expect(decoded.nextISSPass?.maxAltitudeDeg == 45.0)
     }
 }
