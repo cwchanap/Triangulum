@@ -319,7 +319,8 @@ enum SGP4Propagator {
     /// - Returns: Next visible pass, or nil if none found
     static func findNextPass(tle: TLE, observerLat: Double, observerLon: Double,
                              startDate: Date = Date(), minElevation: Double = 10.0,
-                             maxHours: Double = 48.0) -> SatellitePass? {
+                             maxHours: Double = 48.0,
+                             shouldCancel: (() -> Bool)? = nil) -> SatellitePass? {
         let stepMinutes: Double = 1.0  // 1-minute steps
         let maxSteps = Int(maxHours * 60 / stepMinutes)
 
@@ -406,6 +407,9 @@ enum SGP4Propagator {
         var lastElevation: Double?
 
         for step in 0..<maxSteps {
+            if shouldCancel?() == true {
+                return nil
+            }
             let currentDate = searchStart.addingTimeInterval(Double(step) * stepMinutes * 60)
             guard let sampleResult = sample(at: currentDate) else {
                 lastDate = nil
@@ -454,7 +458,7 @@ enum SGP4Propagator {
                     let finalPeakElevation = refinedPeak?.1 ?? peakElevation
 
                     return SatellitePass(
-                        satelliteId: tle.name,
+                        satelliteId: String(tle.noradId),
                         satelliteName: tle.name,
                         riseTime: rise,
                         peakTime: finalPeakTime,

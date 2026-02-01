@@ -47,21 +47,41 @@ enum WidgetType: String, CaseIterable, Identifiable {
 class WidgetOrderManager: ObservableObject {
     @Published private(set) var widgetOrder: [WidgetType] = []
 
-    private let userDefaults = UserDefaults.standard
+    private let userDefaults: UserDefaults
     private let widgetOrderKey = "widgetOrder"
 
-    init() {
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
         loadWidgetOrder()
     }
 
     private func loadWidgetOrder() {
+        var needsSave = false
+
         if let savedOrder = userDefaults.stringArray(forKey: widgetOrderKey) {
-            widgetOrder = savedOrder.compactMap { WidgetType(rawValue: $0) }
+            let savedTypes = savedOrder.compactMap { WidgetType(rawValue: $0) }
+            var mergedOrder = savedTypes
+
+            let missingTypes = WidgetType.allCases.filter { !savedTypes.contains($0) }
+            if !missingTypes.isEmpty {
+                mergedOrder.append(contentsOf: missingTypes)
+                needsSave = true
+            }
+
+            if savedTypes.count != savedOrder.count {
+                needsSave = true
+            }
+
+            widgetOrder = mergedOrder
         }
 
         // If no saved order or missing widgets, use default order
-        if widgetOrder.isEmpty || widgetOrder.count != WidgetType.allCases.count {
+        if widgetOrder.isEmpty {
             widgetOrder = WidgetType.allCases
+            needsSave = true
+        }
+
+        if needsSave {
             saveWidgetOrder()
         }
     }
