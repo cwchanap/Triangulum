@@ -98,6 +98,8 @@ class SatelliteManager: ObservableObject {
     func stopUpdates() {
         print("SatelliteManager: Stopping updates")
         updatesEnabled = false
+        nextPassToken = UUID()
+        tleRefreshToken = UUID()
         positionUpdateTimer?.invalidate()
         positionUpdateTimer = nil
         tleRefreshTimer?.invalidate()
