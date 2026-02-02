@@ -31,11 +31,11 @@ jobs:
           DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
           RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-tests.xcresult"
           if command -v xcpretty >/dev/null 2>&1; then
-            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
+            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
             RESULT=${PIPESTATUS[0]}
           else
             echo "xcpretty not found; using raw xcodebuild output"
-            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE"
+            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE"
             RESULT=$?
           fi
           if [ $RESULT -ne 0 ]; then
@@ -68,3 +68,56 @@ jobs:
             ${{ runner.temp }}/triangulum-tests.json
             ${{ runner.temp }}/triangulum-tests-summary.json
           if-no-files-found: warn
+
+      - name: Install xcresultparser
+        if: always()
+        run: brew install xcresultparser
+
+      - name: Export Coverage Report
+        if: always()
+        run: |
+          RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-tests.xcresult"
+          COVERAGE_DIR="$GITHUB_WORKSPACE/coverage"
+          COVERAGE_REPORT="$COVERAGE_DIR/cobertura.xml"
+          if [ ! -d "$RESULT_BUNDLE" ]; then
+            echo "No xcresult bundle found at $RESULT_BUNDLE"
+            exit 0
+          fi
+          if ! xcrun xccov view --report "$RESULT_BUNDLE" >/dev/null 2>&1; then
+            echo "No coverage report available in $RESULT_BUNDLE"
+            exit 0
+          fi
+          mkdir -p "$COVERAGE_DIR"
+          xcresultparser --output-format cobertura --project-root "$GITHUB_WORKSPACE" "$RESULT_BUNDLE" > "$COVERAGE_REPORT"
+          cp -R "$RESULT_BUNDLE" "$COVERAGE_DIR/triangulum-tests.xcresult"
+
+      - name: Upload Coverage Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-results
+          path: coverage
+          if-no-files-found: warn
+
+  codecov:
+    name: Upload Coverage to Codecov
+    runs-on: macos-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download coverage results
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-results
+          path: coverage-results
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage-results/cobertura.xml
+          disable_search: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
