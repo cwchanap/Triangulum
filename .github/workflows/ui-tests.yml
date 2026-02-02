@@ -1,4 +1,4 @@
-name: Unit Tests
+name: UI Tests
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  unit-tests:
+  ui-tests:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -17,7 +17,7 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Run Unit Tests
+      - name: Run UI Tests
         run: |
           set -o pipefail
           SIMULATORS_JSON="${RUNNER_TEMP}/simulators.json"
@@ -29,19 +29,19 @@ jobs:
             exit 1
           fi
           DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
-          RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-tests.xcresult"
+          RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-uitests.xcresult"
           if command -v xcpretty >/dev/null 2>&1; then
-            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
+            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
             RESULT=${PIPESTATUS[0]}
           else
             echo "xcpretty not found; using raw xcodebuild output"
-            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE"
+            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE"
             RESULT=$?
           fi
           if [ $RESULT -ne 0 ]; then
             echo "xcodebuild failed. Extracting test failures from xcresult..."
-            export XCRESULT_JSON="${RUNNER_TEMP}/triangulum-tests.json"
-            SUMMARY_JSON="${RUNNER_TEMP}/triangulum-tests-summary.json"
+            export XCRESULT_JSON="${RUNNER_TEMP}/triangulum-uitests.json"
+            SUMMARY_JSON="${RUNNER_TEMP}/triangulum-uitests-summary.json"
             if ! xcrun xcresulttool get test-results summary --legacy --path "$RESULT_BUNDLE" --compact > "$SUMMARY_JSON"; then
               echo "xcresulttool test-results summary failed (legacy)."
               xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact > "$SUMMARY_JSON" || true
@@ -58,13 +58,13 @@ jobs:
           fi
           exit $RESULT
 
-      - name: Upload Test Results
+      - name: Upload UI Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-results
+          name: ui-test-results
           path: |
-            ${{ runner.temp }}/triangulum-tests.xcresult
-            ${{ runner.temp }}/triangulum-tests.json
-            ${{ runner.temp }}/triangulum-tests-summary.json
+            ${{ runner.temp }}/triangulum-uitests.xcresult
+            ${{ runner.temp }}/triangulum-uitests.json
+            ${{ runner.temp }}/triangulum-uitests-summary.json
           if-no-files-found: warn
