@@ -50,10 +50,13 @@ jobs:
               python3 -c $'import json,sys\npath=sys.argv[1]\ntry:\n    with open(path,"r",encoding="utf-8") as handle:\n        data=json.load(handle)\nexcept Exception as exc:\n    print(f"Failed to parse summary JSON: {exc}")\n    sys.exit(0)\n\nfailures=data.get("testFailures") or []\nfailed=data.get("failedTests",0)\ntotal=data.get("totalTestCount",0)\nprint(f"Summary: {failed} failed / {total} total")\nif failures:\n    print("Failing tests (summary):")\n    for failure in failures:\n        name=failure.get("testName","")\n        target=failure.get("targetName","")\n        text=failure.get("failureText","")\n        if target:\n            print(f"- {name} ({target}): {text}")\n        else:\n            print(f"- {name}: {text}")\nelse:\n    print("No test failures in summary.")' "$SUMMARY_JSON"
             fi
             if ! xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON"; then
-              echo "xcresulttool failed to read $RESULT_BUNDLE"
-              xcrun xcresulttool get object --legacy --path "$RESULT_BUNDLE" --format json || true
-            else
+              echo "xcresulttool legacy mode failed to read $RESULT_BUNDLE"
+              xcrun xcresulttool get object --path "$RESULT_BUNDLE" --format json > "$XCRESULT_JSON" || true
+            fi
+            if [ -s "$XCRESULT_JSON" ]; then
               python3 -c $'import json,sys\npath=sys.argv[1]\ntry:\n    with open(path,"r",encoding="utf-8") as handle:\n        data=json.load(handle)\nexcept Exception as exc:\n    print(f"Failed to parse xcresult JSON: {exc}")\n    sys.exit(0)\n\nfailures=[]\n\ndef walk(obj):\n    if isinstance(obj, dict):\n        name=obj.get("testName",{}).get("_value") if isinstance(obj.get("testName"), dict) else obj.get("testName")\n        text=obj.get("failureText",{}).get("_value") if isinstance(obj.get("failureText"), dict) else obj.get("failureText")\n        if name and text:\n            failures.append((name, text))\n        for value in obj.values():\n            walk(value)\n    elif isinstance(obj, list):\n        for item in obj:\n            walk(item)\n\nwalk(data)\nif failures:\n    print("Failing tests (xcresult scan):")\n    for name, text in failures:\n        print(f"- {name}: {text}")\n' "$XCRESULT_JSON"
+            else
+              echo "xcresult JSON not available; skipping failure scan."
             fi
           fi
           exit $RESULT
