@@ -528,7 +528,7 @@ class ComparisonAnnotation: NSObject, MKAnnotation {
     let locationManager = LocationManager()
     let barometerManager = BarometerManager(locationManager: locationManager)
 
-    let snapshot1 = SensorSnapshot(
+    let snapshot1 = SensorSnapshot.capture(
         barometerManager: barometerManager,
         locationManager: locationManager,
         accelerometerManager: AccelerometerManager(),
@@ -538,7 +538,7 @@ class ComparisonAnnotation: NSObject, MKAnnotation {
         satelliteManager: nil
     )
 
-    let snapshot2 = SensorSnapshot(
+    let snapshot2 = SensorSnapshot.capture(
         barometerManager: barometerManager,
         locationManager: locationManager,
         accelerometerManager: AccelerometerManager(),

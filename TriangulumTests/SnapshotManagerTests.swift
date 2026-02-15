@@ -94,7 +94,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -115,7 +115,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot1 = SensorSnapshot(
+        let snapshot1 = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -124,7 +124,7 @@ struct SnapshotManagerTests {
             weatherManager: nil,
             satelliteManager: nil
         )
-        let snapshot2 = SensorSnapshot(
+        let snapshot2 = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -148,7 +148,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -172,7 +172,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot1 = SensorSnapshot(
+        let snapshot1 = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -181,7 +181,7 @@ struct SnapshotManagerTests {
             weatherManager: nil,
             satelliteManager: nil
         )
-        let snapshot2 = SensorSnapshot(
+        let snapshot2 = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -212,7 +212,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -248,7 +248,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -290,7 +290,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -364,7 +364,7 @@ struct SnapshotManagerTests {
         let manager = createTestManager()
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
@@ -392,7 +392,7 @@ struct SnapshotManagerTests {
     @Test func testSnapshotDataStructureIntegrity() {
         let testManagers = createTestManagers()
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: testManagers.barometerManager,
             locationManager: testManagers.locationManager,
             accelerometerManager: testManagers.accelerometerManager,
