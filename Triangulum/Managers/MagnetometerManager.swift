@@ -2,7 +2,7 @@ import Foundation
 import CoreMotion
 
 class MagnetometerManager: ObservableObject {
-    private let motionManager = CMMotionManager()
+    private let motionManager: CMMotionManager
 
     @Published var magneticFieldX: Double = 0.0
     @Published var magneticFieldY: Double = 0.0
@@ -12,7 +12,8 @@ class MagnetometerManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var errorMessage: String = ""
 
-    init() {
+    init(motionManager: CMMotionManager = MotionService.shared) {
+        self.motionManager = motionManager
         checkAvailability()
     }
 
@@ -37,8 +38,8 @@ class MagnetometerManager: ObservableObject {
             guard let self = self else { return }
 
             if let error = error {
-                if error.localizedDescription.contains("not authorized") ||
-                    error.localizedDescription.contains("permission") {
+                let nsError = error as NSError
+                if nsError.domain == CMErrorDomain {
                     self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
                 } else {
                     self.errorMessage = "Error reading magnetometer: \(error.localizedDescription)"
