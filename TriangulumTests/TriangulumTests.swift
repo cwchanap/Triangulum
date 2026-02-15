@@ -271,7 +271,7 @@ struct TriangulumTests {
         magnetometerManager.magnitude = 53.85
         magnetometerManager.heading = 135.0
 
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: barometerManager,
             locationManager: locationManager,
             accelerometerManager: accelerometerManager,
@@ -330,7 +330,7 @@ struct TriangulumTests {
         magnetometerManager.magneticFieldX = 25.0
         magnetometerManager.heading = 90.0
 
-        let originalSnapshot = SensorSnapshot(
+        let originalSnapshot = SensorSnapshot.capture(
             barometerManager: barometerManager,
             locationManager: locationManager,
             accelerometerManager: accelerometerManager,

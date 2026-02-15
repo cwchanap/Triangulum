@@ -192,7 +192,7 @@ struct ContentView: View {
     }
 
     private func takeSnapshot() {
-        let snapshot = SensorSnapshot(
+        let snapshot = SensorSnapshot.capture(
             barometerManager: barometerManager,
             locationManager: locationManager,
             accelerometerManager: accelerometerManager,

@@ -69,6 +69,30 @@ struct SensorSnapshot: Codable, Identifiable {
     }
 
     init(
+        timestamp: Date = Date(),
+        barometer: BarometerData,
+        location: LocationData,
+        accelerometer: AccelerometerData,
+        gyroscope: GyroscopeData,
+        magnetometer: MagnetometerData,
+        weather: WeatherData? = nil,
+        satellite: SatelliteSnapshotData? = nil,
+        photoIDs: [UUID] = []
+    ) {
+        self.timestamp = timestamp
+        self.barometer = barometer
+        self.location = location
+        self.accelerometer = accelerometer
+        self.gyroscope = gyroscope
+        self.magnetometer = magnetometer
+        self.weather = weather
+        self.satellite = satellite
+        self.photoIDs = photoIDs
+    }
+}
+
+extension SensorSnapshot {
+    static func capture(
         barometerManager: BarometerManager,
         locationManager: LocationManager,
         accelerometerManager: AccelerometerManager,
@@ -76,10 +100,8 @@ struct SensorSnapshot: Codable, Identifiable {
         magnetometerManager: MagnetometerManager,
         weatherManager: WeatherManager?,
         satelliteManager: SatelliteManager?
-    ) {
-        self.timestamp = Date()
-
-        self.barometer = BarometerData(
+    ) -> SensorSnapshot {
+        let barometer = BarometerData(
             pressure: barometerManager.pressure,
             seaLevelPressure: barometerManager.seaLevelPressure,
             attitude: barometerManager.attitude.map { attitude in
@@ -91,28 +113,28 @@ struct SensorSnapshot: Codable, Identifiable {
             }
         )
 
-        self.location = LocationData(
+        let location = LocationData(
             latitude: locationManager.latitude,
             longitude: locationManager.longitude,
             altitude: locationManager.altitude,
             accuracy: locationManager.accuracy
         )
 
-        self.accelerometer = AccelerometerData(
+        let accelerometer = AccelerometerData(
             accelerationX: accelerometerManager.accelerationX,
             accelerationY: accelerometerManager.accelerationY,
             accelerationZ: accelerometerManager.accelerationZ,
             magnitude: accelerometerManager.magnitude
         )
 
-        self.gyroscope = GyroscopeData(
+        let gyroscope = GyroscopeData(
             rotationX: gyroscopeManager.rotationX,
             rotationY: gyroscopeManager.rotationY,
             rotationZ: gyroscopeManager.rotationZ,
             magnitude: gyroscopeManager.magnitude
         )
 
-        self.magnetometer = MagnetometerData(
+        let magnetometer = MagnetometerData(
             magneticFieldX: magnetometerManager.magneticFieldX,
             magneticFieldY: magnetometerManager.magneticFieldY,
             magneticFieldZ: magnetometerManager.magneticFieldZ,
@@ -120,7 +142,7 @@ struct SensorSnapshot: Codable, Identifiable {
             heading: magnetometerManager.heading
         )
 
-        self.weather = weatherManager?.currentWeather.map { weather in
+        let weather = weatherManager?.currentWeather.map { weather in
             WeatherData(
                 temperature: weather.temperature,
                 feelsLike: weather.feelsLike,
@@ -133,7 +155,17 @@ struct SensorSnapshot: Codable, Identifiable {
             )
         }
 
-        self.satellite = satelliteManager?.snapshotData()
+        let satellite = satelliteManager?.snapshotData()
+
+        return SensorSnapshot(
+            barometer: barometer,
+            location: location,
+            accelerometer: accelerometer,
+            gyroscope: gyroscope,
+            magnetometer: magnetometer,
+            weather: weather,
+            satellite: satellite
+        )
     }
 }
 
@@ -161,6 +193,7 @@ struct SnapshotPhoto: Codable, Identifiable {
     }
 }
 
+@MainActor
 class SnapshotManager: ObservableObject {
     @Published private(set) var snapshots: [SensorSnapshot] = []
     @Published private(set) var photos: [UUID: SnapshotPhoto] = [:]
@@ -232,6 +265,11 @@ class SnapshotManager: ObservableObject {
             return false
         }
 
+        guard snapshots[snapshotIndex].photoIDs.count < 5 else {
+            Logger.snapshot.warning("Cannot add photo - snapshot already has maximum 5 photos")
+            return false
+        }
+
         guard let photo = SnapshotPhoto(image: image) else {
             Logger.snapshot.error("SnapshotManager: Failed to create photo from image")
             return false
@@ -276,16 +314,12 @@ class SnapshotManager: ObservableObject {
 
         do {
             let loadedSnapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
-            await MainActor.run {
-                self.snapshots = loadedSnapshots
-                self.loadError = nil  // Clear error on successful load
-            }
+            self.snapshots = loadedSnapshots
+            self.loadError = nil  // Clear error on successful load
         } catch {
             Logger.snapshot.error("SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
             Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
-            await MainActor.run {
-                self.loadError = error
-            }
+            self.loadError = error
             // DO NOT auto-delete user data - preserve it for potential recovery
         }
     }
@@ -319,16 +353,12 @@ class SnapshotManager: ObservableObject {
 
         do {
             let loadedPhotos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
-            await MainActor.run {
-                self.photos = loadedPhotos
-                self.loadError = nil  // Clear error on successful load
-            }
+            self.photos = loadedPhotos
+            self.loadError = nil  // Clear error on successful load
         } catch {
             Logger.snapshot.error("SnapshotManager: Failed to load photos: \(error.localizedDescription)")
             Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
-            await MainActor.run {
-                self.loadError = error
-            }
+            self.loadError = error
             // DO NOT auto-delete user data - preserve it for potential recovery
         }
     }
