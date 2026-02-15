@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import os
 
 struct SimpleOSMMapView: UIViewRepresentable {
     var center: CLLocationCoordinate2D
@@ -70,11 +71,11 @@ struct SimpleOSMMapView: UIViewRepresentable {
         if enableCaching {
             // Use cached tile overlay
             tileOverlay = CachedTileOverlay(urlTemplate: osmTemplate)
-            print("SimpleOSMMapView: Added CACHED OSM tile overlay")
+            Logger.map.debug("SimpleOSMMapView: Added CACHED OSM tile overlay")
         } else {
             // Use standard tile overlay
             tileOverlay = MKTileOverlay(urlTemplate: osmTemplate)
-            print("SimpleOSMMapView: Added standard OSM tile overlay")
+            Logger.map.debug("SimpleOSMMapView: Added standard OSM tile overlay")
         }
 
         // Configure overlay with more permissive settings
@@ -133,22 +134,22 @@ struct SimpleOSMMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let cachedTileOverlay = overlay as? CachedTileOverlay {
                 let renderer = CachedTileOverlayRenderer(tileOverlay: cachedTileOverlay)
-                print("SimpleOSMMapView: Creating CACHED tile renderer")
+                Logger.map.debug("SimpleOSMMapView: Creating CACHED tile renderer")
                 return renderer
             } else if let tileOverlay = overlay as? MKTileOverlay {
                 let renderer = MKTileOverlayRenderer(tileOverlay: tileOverlay)
-                print("SimpleOSMMapView: Creating standard tile renderer")
+                Logger.map.debug("SimpleOSMMapView: Creating standard tile renderer")
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)
         }
 
         func mapViewDidFinishLoadingMap(_ mapView: MKMapView) {
-            print("SimpleOSMMapView: Map finished loading")
+            Logger.map.debug("SimpleOSMMapView: Map finished loading")
         }
 
         func mapView(_ mapView: MKMapView, didFailToLocateUserWithError error: Error) {
-            print("SimpleOSMMapView: Failed to locate user: \(error)")
+            Logger.map.error("SimpleOSMMapView: Failed to locate user: \(error.localizedDescription)")
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {

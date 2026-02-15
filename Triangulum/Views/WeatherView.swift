@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 struct WeatherView: View {
     @ObservedObject var weatherManager: WeatherManager
@@ -25,7 +26,7 @@ struct WeatherView: View {
                 }
 
                 Button {
-                    print("DEBUG: Manual refresh button pressed")
+                    Logger.weather.debug("Manual refresh button pressed")
                     weatherManager.refreshWeather()
                 } label: {
                     Image(systemName: "arrow.clockwise")

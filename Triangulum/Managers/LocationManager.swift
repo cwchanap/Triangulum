@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import os
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
@@ -38,21 +39,21 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 let currentStatus = self.locationManager.authorizationStatus
                 self.authorizationStatus = currentStatus
 
-                print("DEBUG: Location services enabled system-wide: \(servicesEnabled)")
-                print("DEBUG: Current authorization status: \(currentStatus.rawValue)")
-                print("DEBUG: Authorization status description: \(self.authorizationStatusDescription)")
+                Logger.location.debug("Location services enabled system-wide: \(servicesEnabled)")
+                Logger.location.debug("Current authorization status: \(currentStatus.rawValue)")
+                Logger.location.debug("Authorization status description: \(self.authorizationStatusDescription)")
 
                 // Available if system-wide location services are enabled
                 self.isAvailable = servicesEnabled
 
-                print("DEBUG: Location manager isAvailable: \(self.isAvailable)")
+                Logger.location.debug("Location manager isAvailable: \(self.isAvailable)")
 
                 // Auto-request permission if services are available but not determined
                 if servicesEnabled && currentStatus == .notDetermined {
-                    print("DEBUG: Auto-requesting location permission")
+                    Logger.location.debug("Auto-requesting location permission")
                     self.requestLocationPermission()
                 } else if servicesEnabled && (currentStatus == .authorizedWhenInUse || currentStatus == .authorizedAlways) {
-                    print("DEBUG: Starting location updates - already authorized")
+                    Logger.location.debug("Starting location updates - already authorized")
                     self.startLocationUpdates()
                 }
             }

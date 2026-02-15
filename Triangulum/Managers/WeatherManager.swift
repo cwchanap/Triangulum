@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import os
 
 class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
@@ -50,7 +51,7 @@ class WeatherManager: ObservableObject {
         // Require both latitude and longitude to be non-zero
         let hasLocationData = CLLocationCoordinate2DIsValid(coordinate) && (coordinate.latitude != 0 && coordinate.longitude != 0)
 
-        print("DEBUG: Check - API: \(hasAPIKey), Location: \(locationAvailable), Coords: \(hasLocationData)")
+        Logger.weather.debug("Check - API: \(hasAPIKey), Location: \(locationAvailable), Coords: \(hasLocationData)")
 
         if !hasAPIKey {
             isInitializing = false
@@ -81,13 +82,13 @@ class WeatherManager: ObservableObject {
 
         // Fetch weather if we don't have any data yet
         if currentWeather == nil && !isLoading {
-            print("DEBUG: Auto-fetching weather data")
+            Logger.weather.debug("Auto-fetching weather data")
             fetchWeather()
         }
     }
 
     func fetchWeather() {
-        print("DEBUG: fetchWeather called")
+        Logger.weather.debug("fetchWeather called")
 
         guard Config.hasValidAPIKey else {
             errorMessage = "API key required"
@@ -109,12 +110,12 @@ class WeatherManager: ObservableObject {
         let apiKey = Config.openWeatherAPIKey
 
         let urlString = "\(baseURL)?lat=\(lat)&lon=\(lon)&appid=\(apiKey)"
-        print("DEBUG: API URL: \(baseURL)?lat=\(lat)&lon=\(lon)&appid=\(String(apiKey.prefix(8)))...")
+        Logger.weather.debug("Fetching weather for lat=\(lat), lon=\(lon)")
 
         guard let url = URL(string: urlString) else {
             errorMessage = "Invalid API URL"
             isLoading = false
-            print("DEBUG: Failed to create URL")
+            Logger.weather.error("Failed to create URL")
             return
         }
 
@@ -125,15 +126,15 @@ class WeatherManager: ObservableObject {
                 if let error = error {
                     let errorMsg = "Network error: \(error.localizedDescription)"
                     self?.errorMessage = errorMsg
-                    print("DEBUG: \(errorMsg)")
+                    Logger.weather.error("\(errorMsg)")
                     return
                 }
 
                 if let httpResponse = response as? HTTPURLResponse {
-                    print("DEBUG: HTTP Status Code: \(httpResponse.statusCode)")
+                    Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
                     if httpResponse.statusCode != 200 {
                         if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                            print("DEBUG: Error response: \(responseString)")
+                            Logger.weather.error("Error response: \(responseString)")
                             self?.errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
                         }
                         return
@@ -142,22 +143,22 @@ class WeatherManager: ObservableObject {
 
                 guard let data = data else {
                     self?.errorMessage = "No data received"
-                    print("DEBUG: No data received")
+                    Logger.weather.error("No data received")
                     return
                 }
 
-                print("DEBUG: Received data of size: \(data.count) bytes")
+                Logger.weather.debug("Received data of size: \(data.count) bytes")
 
                 do {
                     let weatherResponse = try JSONDecoder().decode(WeatherResponse.self, from: data)
                     self?.currentWeather = Weather(from: weatherResponse)
                     self?.errorMessage = ""
-                    print("DEBUG: Weather data parsed successfully")
+                    Logger.weather.info("Weather data parsed successfully")
                 } catch {
                     self?.errorMessage = "Failed to parse weather data"
-                    print("DEBUG: Weather parsing error: \(error)")
+                    Logger.weather.error("Weather parsing error: \(error)")
                     if let responseString = String(data: data, encoding: .utf8) {
-                        print("DEBUG: Response data: \(responseString)")
+                        Logger.weather.error("Response data: \(responseString)")
                     }
                 }
             }
@@ -165,7 +166,7 @@ class WeatherManager: ObservableObject {
     }
 
     func refreshWeather() {
-        print("DEBUG: Manual refresh requested")
+        Logger.weather.debug("Manual refresh requested")
         fetchWeather()
     }
 

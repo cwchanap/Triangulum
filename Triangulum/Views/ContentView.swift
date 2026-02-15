@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 import UIKit
+import os
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -490,7 +491,7 @@ struct SnapshotCreationView: View {
                     }
                 }
             } catch {
-                print("Failed to process photo: \(error)")
+                Logger.snapshot.error("Failed to process photo: \(error.localizedDescription)")
             }
         }
     }
@@ -505,7 +506,7 @@ struct SnapshotCreationView: View {
                     newPreviewImages.append(image)
                 }
             } catch {
-                print("Failed to load preview image: \(error)")
+                Logger.snapshot.error("Failed to load preview image: \(error.localizedDescription)")
             }
         }
 
