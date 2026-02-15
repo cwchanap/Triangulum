@@ -2,7 +2,7 @@ import Foundation
 import CoreMotion
 
 class GyroscopeManager: ObservableObject {
-    private let motionManager = CMMotionManager()
+    private let motionManager: CMMotionManager
 
     @Published var rotationX: Double = 0.0
     @Published var rotationY: Double = 0.0
@@ -11,7 +11,8 @@ class GyroscopeManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var errorMessage: String = ""
 
-    init() {
+    init(motionManager: CMMotionManager = MotionService.shared) {
+        self.motionManager = motionManager
         checkAvailability()
     }
 
@@ -36,8 +37,8 @@ class GyroscopeManager: ObservableObject {
             guard let self = self else { return }
 
             if let error = error {
-                if error.localizedDescription.contains("not authorized") ||
-                    error.localizedDescription.contains("permission") {
+                let nsError = error as NSError
+                if nsError.domain == CMErrorDomain {
                     self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
                 } else {
                     self.errorMessage = "Error reading gyroscope: \(error.localizedDescription)"

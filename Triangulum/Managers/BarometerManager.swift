@@ -6,7 +6,7 @@ import os
 
 class BarometerManager: ObservableObject {
     private let altimeter = CMAltimeter()
-    private let motionManager = CMMotionManager()
+    private let motionManager: CMMotionManager
     private let locationManager: LocationManager
 
     @Published var pressure: Double = 0.0
@@ -24,8 +24,9 @@ class BarometerManager: ObservableObject {
     @MainActor
     private(set) var historyManager: PressureHistoryManager?
 
-    init(locationManager: LocationManager) {
+    init(locationManager: LocationManager, motionManager: CMMotionManager = MotionService.shared) {
         self.locationManager = locationManager
+        self.motionManager = motionManager
         checkAvailability()
     }
 

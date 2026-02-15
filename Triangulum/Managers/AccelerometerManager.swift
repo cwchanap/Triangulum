@@ -2,7 +2,7 @@ import Foundation
 import CoreMotion
 
 class AccelerometerManager: ObservableObject {
-    private let motionManager = CMMotionManager()
+    private let motionManager: CMMotionManager
 
     @Published var accelerationX: Double = 0.0
     @Published var accelerationY: Double = 0.0
@@ -11,7 +11,8 @@ class AccelerometerManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var errorMessage: String = ""
 
-    init() {
+    init(motionManager: CMMotionManager = MotionService.shared) {
+        self.motionManager = motionManager
         checkAvailability()
     }
 
