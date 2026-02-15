@@ -189,7 +189,7 @@ struct SatellitePosition: Codable {
 
 /// Represents a predicted visible pass of a satellite
 struct SatellitePass: Codable, Identifiable {
-    // swiftlint:disable:next identifier_name
+
     let id: UUID
     let satelliteId: String
     let satelliteName: String
@@ -230,7 +230,7 @@ struct SatellitePass: Codable, Identifiable {
 
 /// A tracked satellite with its orbital data and current position
 struct Satellite: Identifiable, Codable {
-    // swiftlint:disable:next identifier_name
+
     let id: String
     let name: String
     let noradId: Int
@@ -250,7 +250,7 @@ struct Satellite: Identifiable, Codable {
         tracked.map { $0.noradId }
     }
 
-    // swiftlint:disable:next identifier_name
+
     init(id: String, name: String, noradId: Int, tle: TLE? = nil,
          currentPosition: SatellitePosition? = nil, nextPass: SatellitePass? = nil) {
         self.id = id
@@ -273,7 +273,7 @@ struct SatelliteSnapshotData: Codable {
 
 /// Individual satellite position for snapshot
 struct SatellitePositionSnapshot: Codable, Identifiable {
-    // swiftlint:disable:next identifier_name
+
     let id: String
     let name: String
     let latitude: Double

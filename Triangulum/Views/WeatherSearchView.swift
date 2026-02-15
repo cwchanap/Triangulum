@@ -377,7 +377,7 @@ struct WeatherInfoItem: View {
 // MARK: - Data Models
 
 struct SearchedCity: Codable, Identifiable {
-    // swiftlint:disable:next identifier_name
+
     var id = UUID()
     let name: String
     let country: String

@@ -4,7 +4,7 @@ import UIKit
 import os
 
 struct SensorSnapshot: Codable, Identifiable {
-    // swiftlint:disable:next identifier_name
+
     var id = UUID()
     let timestamp: Date
     let barometer: BarometerData
@@ -92,7 +92,7 @@ struct SensorSnapshot: Codable, Identifiable {
 }
 
 extension SensorSnapshot {
-    static func capture(
+    @MainActor static func capture(
         barometerManager: BarometerManager,
         locationManager: LocationManager,
         accelerometerManager: AccelerometerManager,
@@ -170,7 +170,7 @@ extension SensorSnapshot {
 }
 
 struct SnapshotPhoto: Codable, Identifiable {
-    // swiftlint:disable:next identifier_name
+
     let id: UUID
     let imageData: Data
     let timestamp: Date

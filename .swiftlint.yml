@@ -61,6 +61,12 @@ identifier_name:
     - sx
     - u1
     - u2
+    - id
+    - mu
+    - j2
+    - ma
+    - a1
+    - e2
 
 function_body_length:
   warning: 100
