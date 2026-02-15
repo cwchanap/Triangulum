@@ -44,6 +44,15 @@ class WeatherManager: ObservableObject {
         weatherCheckTimer = nil
     }
 
+    private func stopFrequentPolling() {
+        weatherCheckTimer?.invalidate()
+        weatherCheckTimer = nil
+        Logger.weather.debug("Stopped frequent polling, switching to 15-minute refresh")
+        weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
+            self?.checkAndFetchWeather()
+        }
+    }
+
     private func checkAndFetchWeather() {
         let hasAPIKey = Config.hasValidAPIKey
         let locationAvailable = locationManager.isAvailable
@@ -83,11 +92,13 @@ class WeatherManager: ObservableObject {
         // Fetch weather if we don't have any data yet
         if currentWeather == nil && !isLoading {
             Logger.weather.debug("Auto-fetching weather data")
-            fetchWeather()
+            Task {
+                await fetchWeather()
+            }
         }
     }
 
-    func fetchWeather() {
+    func fetchWeather() async {
         Logger.weather.debug("fetchWeather called")
 
         guard Config.hasValidAPIKey else {
@@ -119,55 +130,45 @@ class WeatherManager: ObservableObject {
             return
         }
 
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            isLoading = false
 
-                if let error = error {
-                    let errorMsg = "Network error: \(error.localizedDescription)"
-                    self?.errorMessage = errorMsg
-                    Logger.weather.error("\(errorMsg)")
-                    return
-                }
-
-                if let httpResponse = response as? HTTPURLResponse {
-                    Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
-                    if httpResponse.statusCode != 200 {
-                        if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                            Logger.weather.error("Error response: \(responseString)")
-                            self?.errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
-                        }
-                        return
-                    }
-                }
-
-                guard let data = data else {
-                    self?.errorMessage = "No data received"
-                    Logger.weather.error("No data received")
-                    return
-                }
-
-                Logger.weather.debug("Received data of size: \(data.count) bytes")
-
-                do {
-                    let weatherResponse = try JSONDecoder().decode(WeatherResponse.self, from: data)
-                    self?.currentWeather = Weather(from: weatherResponse)
-                    self?.errorMessage = ""
-                    Logger.weather.info("Weather data parsed successfully")
-                } catch {
-                    self?.errorMessage = "Failed to parse weather data"
-                    Logger.weather.error("Weather parsing error: \(error)")
+            if let httpResponse = response as? HTTPURLResponse {
+                Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
+                if httpResponse.statusCode != 200 {
                     if let responseString = String(data: data, encoding: .utf8) {
-                        Logger.weather.error("Response data: \(responseString)")
+                        Logger.weather.error("Error response: \(responseString)")
+                        errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
                     }
+                    return
                 }
             }
-        }.resume()
+
+            Logger.weather.debug("Received data of size: \(data.count) bytes")
+
+            let weatherResponse = try JSONDecoder().decode(WeatherResponse.self, from: data)
+            currentWeather = Weather(from: weatherResponse)
+            errorMessage = ""
+            Logger.weather.info("Weather data parsed successfully")
+            stopFrequentPolling()
+        } catch let decodingError as DecodingError {
+            isLoading = false
+            errorMessage = "Failed to parse weather data"
+            Logger.weather.error("Weather parsing error: \(decodingError)")
+        } catch {
+            isLoading = false
+            let errorMsg = "Network error: \(error.localizedDescription)"
+            errorMessage = errorMsg
+            Logger.weather.error("\(errorMsg)")
+        }
     }
 
     func refreshWeather() {
         Logger.weather.debug("Manual refresh requested")
-        fetchWeather()
+        Task {
+            await fetchWeather()
+        }
     }
 
     /// Call this when API key is updated to recheck availability

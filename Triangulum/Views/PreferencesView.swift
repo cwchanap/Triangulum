@@ -171,8 +171,21 @@ struct PreferencesView: View {
             }
             Button("Close", role: .cancel) { }
         } message: {
-            Text(Config.openWeatherAPIKey.isEmpty ? "No API key found" : Config.openWeatherAPIKey)
+            Text(maskedAPIKey)
         }
+    }
+
+    private var maskedAPIKey: String {
+        let key = Config.openWeatherAPIKey
+        if key.isEmpty {
+            return "No API key found"
+        }
+        if key.count <= 8 {
+            return "****"
+        }
+        let prefix = String(key.prefix(4))
+        let suffix = String(key.suffix(4))
+        return "\(prefix)...\(suffix)"
     }
 
     private func updateAPIKeyStatus() {

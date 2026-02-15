@@ -83,7 +83,9 @@ struct WeatherView: View {
                         .foregroundColor(.prussianBlueLight)
                         .font(.caption)
                     Button("Fetch Weather") {
-                        weatherManager.fetchWeather()
+                        Task {
+                            await weatherManager.fetchWeather()
+                        }
                     }
                     .font(.caption)
                     .foregroundColor(.prussianAccent)
@@ -212,7 +214,9 @@ struct WeatherView: View {
                         .foregroundColor(.prussianBlueLight)
                         .font(.caption)
                     Button("Fetch Weather") {
-                        weatherManager.fetchWeather()
+                        Task {
+                            await weatherManager.fetchWeather()
+                        }
                     }
                     .font(.caption)
                     .foregroundColor(.prussianAccent)
@@ -234,7 +238,9 @@ struct WeatherView: View {
         }
         .onAppear {
             if weatherManager.currentWeather == nil && weatherManager.isAvailable {
-                weatherManager.fetchWeather()
+                Task {
+                    await weatherManager.fetchWeather()
+                }
             }
         }
     }
