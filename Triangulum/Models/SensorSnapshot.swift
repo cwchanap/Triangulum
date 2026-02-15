@@ -188,6 +188,13 @@ struct SnapshotPhoto: Codable, Identifiable {
         self.timestamp = Date()
     }
 
+    /// Creates a snapshot photo with explicit values (used when loading from disk)
+    init(id: UUID, imageData: Data, timestamp: Date) {
+        self.id = id
+        self.imageData = imageData
+        self.timestamp = timestamp
+    }
+
     var image: UIImage? {
         UIImage(data: imageData)
     }
@@ -201,16 +208,19 @@ class SnapshotManager: ObservableObject {
     @Published private(set) var saveError: Error?
     private let userDefaults: UserDefaults
     private let snapshotsKey: String
-    private let photosKey: String
+
+    private static var photosDirectory: URL {
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let photosDir = documentsDir.appendingPathComponent("snapshot_photos", isDirectory: true)
+        try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
+        return photosDir
+    }
 
     init() {
         self.userDefaults = UserDefaults.standard
         self.snapshotsKey = "sensor_snapshots"
-        self.photosKey = "snapshot_photos"
-        // Load data asynchronously to avoid blocking main thread
         Task {
             await loadSnapshotsAsync()
-            await loadPhotosAsync()
         }
     }
 
@@ -218,10 +228,8 @@ class SnapshotManager: ObservableObject {
     init(userDefaults: UserDefaults, keyPrefix: String = "") {
         self.userDefaults = userDefaults
         self.snapshotsKey = "\(keyPrefix)sensor_snapshots"
-        self.photosKey = "\(keyPrefix)snapshot_photos"
         // Load synchronously for tests to ensure data is available immediately
         loadSnapshots()
-        loadPhotos()
     }
 
     /// Clears all data from storage - useful for test cleanup
@@ -229,7 +237,8 @@ class SnapshotManager: ObservableObject {
         snapshots.removeAll()
         photos.removeAll()
         userDefaults.removeObject(forKey: snapshotsKey)
-        userDefaults.removeObject(forKey: photosKey)
+        try? FileManager.default.removeItem(at: Self.photosDirectory)
+        try? FileManager.default.createDirectory(at: Self.photosDirectory, withIntermediateDirectories: true)
     }
 
     func addSnapshot(_ snapshot: SensorSnapshot) {
@@ -246,11 +255,12 @@ class SnapshotManager: ObservableObject {
     func clearAllSnapshots() {
         let allPhotoIDs = snapshots.flatMap { $0.photoIDs }
         for photoID in allPhotoIDs {
-            photos.removeValue(forKey: photoID)
+            let fileURL = Self.photosDirectory.appendingPathComponent("\(photoID).jpg")
+            try? FileManager.default.removeItem(at: fileURL)
         }
+        photos.removeAll()
         snapshots.removeAll()
         saveSnapshots()
-        savePhotos()
     }
 
     /// Adds a photo to a snapshot
@@ -261,7 +271,7 @@ class SnapshotManager: ObservableObject {
     @discardableResult
     func addPhoto(to snapshotID: UUID, image: UIImage) -> Bool {
         guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else {
-            Logger.snapshot.warning("SnapshotManager: Cannot add photo - snapshot not found: \(snapshotID)")
+            Logger.snapshot.warning("Cannot add photo - snapshot not found: \(snapshotID)")
             return false
         }
 
@@ -271,31 +281,53 @@ class SnapshotManager: ObservableObject {
         }
 
         guard let photo = SnapshotPhoto(image: image) else {
-            Logger.snapshot.error("SnapshotManager: Failed to create photo from image")
+            Logger.snapshot.error("Failed to create photo from image")
             return false
         }
 
+        savePhotoToFile(photo)
         photos[photo.id] = photo
         snapshots[snapshotIndex].photoIDs.append(photo.id)
-
         saveSnapshots()
-        savePhotos()
         return true
     }
 
     func removePhoto(_ photoID: UUID, from snapshotID: UUID) {
         guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else { return }
 
+        let fileURL = Self.photosDirectory.appendingPathComponent("\(photoID).jpg")
+        try? FileManager.default.removeItem(at: fileURL)
         photos.removeValue(forKey: photoID)
         snapshots[snapshotIndex].photoIDs.removeAll { $0 == photoID }
-
         saveSnapshots()
-        savePhotos()
     }
 
     func getPhotos(for snapshotID: UUID) -> [SnapshotPhoto] {
         guard let snapshot = snapshots.first(where: { $0.id == snapshotID }) else { return [] }
-        return snapshot.photoIDs.compactMap { photos[$0] }
+        return snapshot.photoIDs.compactMap { id in
+            if let cached = photos[id] { return cached }
+            if let loaded = loadPhotoFromFile(id: id) {
+                photos[id] = loaded
+                return loaded
+            }
+            return nil
+        }
+    }
+
+    private func savePhotoToFile(_ photo: SnapshotPhoto) {
+        let fileURL = Self.photosDirectory.appendingPathComponent("\(photo.id).jpg")
+        do {
+            try photo.imageData.write(to: fileURL, options: .atomic)
+        } catch {
+            Logger.snapshot.error("Failed to save photo \(photo.id): \(error.localizedDescription)")
+            saveError = error
+        }
+    }
+
+    private func loadPhotoFromFile(id: UUID) -> SnapshotPhoto? {
+        let fileURL = Self.photosDirectory.appendingPathComponent("\(id).jpg")
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return SnapshotPhoto(id: id, imageData: data, timestamp: Date())
     }
 
     private func saveSnapshots() {
@@ -337,51 +369,13 @@ class SnapshotManager: ObservableObject {
         }
     }
 
-    private func savePhotos() {
-        do {
-            let data = try JSONEncoder().encode(photos)
-            userDefaults.set(data, forKey: photosKey)
-            saveError = nil  // Clear error on successful save
-        } catch {
-            Logger.snapshot.error("SnapshotManager: Failed to save photos: \(error.localizedDescription)")
-            saveError = error
-        }
-    }
-
-    private func loadPhotosAsync() async {
-        guard let data = userDefaults.data(forKey: photosKey) else { return }
-
-        do {
-            let loadedPhotos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
-            self.photos = loadedPhotos
-            self.loadError = nil  // Clear error on successful load
-        } catch {
-            Logger.snapshot.error("SnapshotManager: Failed to load photos: \(error.localizedDescription)")
-            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
-            self.loadError = error
-            // DO NOT auto-delete user data - preserve it for potential recovery
-        }
-    }
-
-    private func loadPhotos() {
-        guard let data = userDefaults.data(forKey: photosKey) else { return }
-        do {
-            photos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
-            loadError = nil  // Clear error on successful load
-        } catch {
-            Logger.snapshot.error("SnapshotManager: Failed to load photos: \(error.localizedDescription)")
-            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
-            loadError = error
-            // DO NOT auto-delete user data - preserve it for potential recovery
-        }
-    }
-
     /// Manually clears corrupted data from storage
     /// This should only be called after user confirmation when data cannot be recovered
     func clearCorruptedData() {
-        Logger.snapshot.warning("SnapshotManager: Clearing corrupted data by user request")
+        Logger.snapshot.warning("Clearing corrupted data by user request")
         userDefaults.removeObject(forKey: snapshotsKey)
-        userDefaults.removeObject(forKey: photosKey)
+        try? FileManager.default.removeItem(at: Self.photosDirectory)
+        try? FileManager.default.createDirectory(at: Self.photosDirectory, withIntermediateDirectories: true)
         snapshots.removeAll()
         photos.removeAll()
         loadError = nil
