@@ -44,16 +44,7 @@ struct SatelliteView: View {
                 contentView
             }
         }
-        .padding()
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [Color.white, Color.prussianSoft.opacity(0.3)]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .widgetCard()
         .onReceive(timer) { time in
             currentTime = time
         }
