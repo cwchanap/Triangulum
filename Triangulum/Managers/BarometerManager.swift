@@ -2,6 +2,7 @@ import Foundation
 import CoreMotion
 import SwiftData
 import Combine
+import os
 
 class BarometerManager: ObservableObject {
     private let altimeter = CMAltimeter()
@@ -63,7 +64,7 @@ class BarometerManager: ObservableObject {
             }
 
             guard let data = data else {
-                print("⚠️ BarometerManager: Received nil data without error from altimeter")
+                Logger.sensor.warning("BarometerManager: Received nil data without error from altimeter")
                 return
             }
 
@@ -111,7 +112,7 @@ class BarometerManager: ObservableObject {
                 // Clear error on successful recording
                 self.historyRecordingError = nil
             } catch {
-                print("⚠️ Failed to record barometer reading: \(error.localizedDescription)")
+                Logger.sensor.warning("Failed to record barometer reading: \(error.localizedDescription)")
                 // Surface the error to make it observable
                 self.historyRecordingError = error
             }
@@ -136,7 +137,7 @@ class BarometerManager: ObservableObject {
             }
 
             guard let motion = motion else {
-                print("⚠️ BarometerManager: Received nil motion data without error")
+                Logger.sensor.warning("BarometerManager: Received nil motion data without error")
                 return
             }
             self.attitude = motion.attitude

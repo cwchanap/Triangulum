@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import CoreLocation
+import os
 
 class SatelliteManager: ObservableObject {
     // MARK: - Published Properties
@@ -77,7 +78,7 @@ class SatelliteManager: ObservableObject {
             return
         }
 
-        print("SatelliteManager: Starting updates")
+        Logger.satellite.info("Starting updates")
 
         stopUpdates()
         updatesEnabled = true
@@ -101,7 +102,7 @@ class SatelliteManager: ObservableObject {
 
     /// Stop satellite tracking updates
     func stopUpdates() {
-        print("SatelliteManager: Stopping updates")
+        Logger.satellite.info("Stopping updates")
         updatesEnabled = false
         nextPassToken = UUID()
         tleRefreshToken = UUID()
@@ -145,27 +146,27 @@ class SatelliteManager: ObservableObject {
             isAvailable = true
             isLoading = false
             errorMessage = ""
-            print("SatelliteManager: Loaded \(cachedTLEs.count) TLEs from cache")
+            Logger.satellite.info("Loaded \(cachedTLEs.count) TLEs from cache")
         } else if let staleTLEs = tleCache.loadWithAge() {
             // Use stale cache as fallback
             applyTLEs(staleTLEs.tles)
             tleAge = staleTLEs.ageInHours
             isAvailable = true
             errorMessage = "TLE data is \(Int(staleTLEs.ageInHours)) hours old"
-            print("SatelliteManager: Using stale TLEs (age: \(staleTLEs.ageInHours) hours)")
+            Logger.satellite.debug("Using stale TLEs (age: \(staleTLEs.ageInHours) hours)")
 
             // Try to refresh in background
             startTLEFetch()
         } else {
             // No cache, must fetch
-            print("SatelliteManager: No cached TLEs, fetching from CelesTrak")
+            Logger.satellite.info("No cached TLEs, fetching from CelesTrak")
             startTLEFetch()
         }
     }
 
     private func refreshTLEsIfNeeded() {
         if !tleCache.hasFreshCache {
-            print("SatelliteManager: TLE cache expired, refreshing")
+            Logger.satellite.debug("TLE cache expired, refreshing")
             startTLEFetch()
         }
     }
@@ -227,7 +228,7 @@ class SatelliteManager: ObservableObject {
                 if saved {
                     self.errorMessage = ""
                 }
-                print("SatelliteManager: Fetched \(fetchedTLEsSnapshot.count) TLEs from CelesTrak")
+                Logger.satellite.info("Fetched \(fetchedTLEsSnapshot.count) TLEs from CelesTrak")
             }
         }
     }
@@ -237,7 +238,7 @@ class SatelliteManager: ObservableObject {
         let urlString = "\(celestrakBaseURL)?CATNR=\(noradId)&FORMAT=TLE"
 
         guard let url = URL(string: urlString) else {
-            print("SatelliteManager: Invalid URL for NORAD \(noradId)")
+            Logger.satellite.error("Invalid URL for NORAD \(noradId)")
             return nil
         }
 
@@ -246,12 +247,12 @@ class SatelliteManager: ObservableObject {
 
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("SatelliteManager: HTTP error for NORAD \(noradId)")
+                Logger.satellite.error("HTTP error for NORAD \(noradId)")
                 return nil
             }
 
             guard let content = String(data: data, encoding: .utf8) else {
-                print("SatelliteManager: Failed to decode response for NORAD \(noradId)")
+                Logger.satellite.error("Failed to decode response for NORAD \(noradId)")
                 return nil
             }
 
@@ -261,7 +262,7 @@ class SatelliteManager: ObservableObject {
                 .filter { !$0.isEmpty }
 
             guard lines.count >= 3 else {
-                print("SatelliteManager: Invalid TLE format for NORAD \(noradId)")
+                Logger.satellite.error("Invalid TLE format for NORAD \(noradId)")
                 return nil
             }
 
@@ -270,14 +271,14 @@ class SatelliteManager: ObservableObject {
             let line2 = lines[2]
 
             guard let tle = TLE(name: tleName, line1: line1, line2: line2) else {
-                print("SatelliteManager: Failed to parse TLE for NORAD \(noradId)")
+                Logger.satellite.error("Failed to parse TLE for NORAD \(noradId)")
                 return nil
             }
 
             return tle
 
         } catch {
-            print("SatelliteManager: Network error for NORAD \(noradId): \(error.localizedDescription)")
+            Logger.satellite.error("Network error for NORAD \(noradId): \(error.localizedDescription)")
             return nil
         }
     }

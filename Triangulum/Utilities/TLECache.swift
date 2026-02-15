@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 /// Cached TLE data structure for persistence
 struct CachedTLEData: Codable {
@@ -47,10 +48,10 @@ class TLECache {
         do {
             let data = try JSONEncoder().encode(cachedData)
             userDefaults.set(data, forKey: cacheKey)
-            print("TLECache: Saved \(tles.count) TLEs to cache")
+            Logger.satellite.info("TLECache: Saved \(tles.count) TLEs to cache")
             return true
         } catch {
-            print("TLECache: Failed to save TLEs: \(error.localizedDescription)")
+            Logger.satellite.error("TLECache: Failed to save TLEs: \(error.localizedDescription)")
             return false
         }
     }
@@ -59,16 +60,16 @@ class TLECache {
     /// - Returns: Cached TLE data if available and not expired, nil otherwise
     func load() -> [TLE]? {
         guard let cachedData = loadCachedData() else {
-            print("TLECache: No cached data found")
+            Logger.satellite.debug("TLECache: No cached data found")
             return nil
         }
 
         if cachedData.isExpired {
-            print("TLECache: Cache expired (age: \(String(format: "%.1f", cachedData.ageInHours)) hours)")
+            Logger.satellite.info("TLECache: Cache expired (age: \(String(format: "%.1f", cachedData.ageInHours)) hours)")
             return nil
         }
 
-        print("TLECache: Loaded \(cachedData.tles.count) TLEs from cache (age: \(String(format: "%.1f", cachedData.ageInHours)) hours)")
+        Logger.satellite.info("TLECache: Loaded \(cachedData.tles.count) TLEs from cache (age: \(String(format: "%.1f", cachedData.ageInHours)) hours)")
         return cachedData.tles
     }
 
@@ -97,7 +98,7 @@ class TLECache {
     /// Clear the cache
     func clear() {
         userDefaults.removeObject(forKey: cacheKey)
-        print("TLECache: Cache cleared")
+        Logger.satellite.info("TLECache: Cache cleared")
     }
 
     // MARK: - Private
@@ -110,7 +111,7 @@ class TLECache {
         do {
             return try JSONDecoder().decode(CachedTLEData.self, from: data)
         } catch {
-            print("TLECache: Failed to decode cached data: \(error.localizedDescription)")
+            Logger.satellite.error("TLECache: Failed to decode cached data: \(error.localizedDescription)")
             return nil
         }
     }

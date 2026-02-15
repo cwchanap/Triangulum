@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 @main
 struct TriangulumApp: App {
@@ -22,7 +23,7 @@ struct TriangulumApp: App {
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            print("Failed to create ModelContainer: \(error)")
+            Logger.app.error("Failed to create ModelContainer: \(error)")
             // Try to create an in-memory container as fallback
             let fallbackConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             do {

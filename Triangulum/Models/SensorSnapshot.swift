@@ -1,6 +1,7 @@
 import Foundation
 import CoreMotion
 import UIKit
+import os
 
 struct SensorSnapshot: Codable, Identifiable {
     // swiftlint:disable:next identifier_name
@@ -147,7 +148,7 @@ struct SnapshotPhoto: Codable, Identifiable {
     /// - Returns: nil if JPEG conversion fails
     init?(image: UIImage) {
         guard let data = image.jpegData(compressionQuality: 0.8), !data.isEmpty else {
-            print("❌ SnapshotPhoto: Failed to convert image to JPEG data")
+            Logger.snapshot.error("SnapshotPhoto: Failed to convert image to JPEG data")
             return nil
         }
         self.id = UUID()
@@ -227,12 +228,12 @@ class SnapshotManager: ObservableObject {
     @discardableResult
     func addPhoto(to snapshotID: UUID, image: UIImage) -> Bool {
         guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else {
-            print("⚠️ SnapshotManager: Cannot add photo - snapshot not found: \(snapshotID)")
+            Logger.snapshot.warning("SnapshotManager: Cannot add photo - snapshot not found: \(snapshotID)")
             return false
         }
 
         guard let photo = SnapshotPhoto(image: image) else {
-            print("❌ SnapshotManager: Failed to create photo from image")
+            Logger.snapshot.error("SnapshotManager: Failed to create photo from image")
             return false
         }
 
@@ -265,7 +266,7 @@ class SnapshotManager: ObservableObject {
             userDefaults.set(data, forKey: snapshotsKey)
             saveError = nil  // Clear error on successful save
         } catch {
-            print("❌ SnapshotManager: Failed to save snapshots: \(error.localizedDescription)")
+            Logger.snapshot.error("SnapshotManager: Failed to save snapshots: \(error.localizedDescription)")
             saveError = error
         }
     }
@@ -280,8 +281,8 @@ class SnapshotManager: ObservableObject {
                 self.loadError = nil  // Clear error on successful load
             }
         } catch {
-            print("❌ SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
-            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            Logger.snapshot.error("SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
+            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
             await MainActor.run {
                 self.loadError = error
             }
@@ -295,8 +296,8 @@ class SnapshotManager: ObservableObject {
             snapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
             loadError = nil  // Clear error on successful load
         } catch {
-            print("❌ SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
-            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            Logger.snapshot.error("SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
+            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
             loadError = error
             // DO NOT auto-delete user data - preserve it for potential recovery
         }
@@ -308,7 +309,7 @@ class SnapshotManager: ObservableObject {
             userDefaults.set(data, forKey: photosKey)
             saveError = nil  // Clear error on successful save
         } catch {
-            print("❌ SnapshotManager: Failed to save photos: \(error.localizedDescription)")
+            Logger.snapshot.error("SnapshotManager: Failed to save photos: \(error.localizedDescription)")
             saveError = error
         }
     }
@@ -323,8 +324,8 @@ class SnapshotManager: ObservableObject {
                 self.loadError = nil  // Clear error on successful load
             }
         } catch {
-            print("❌ SnapshotManager: Failed to load photos: \(error.localizedDescription)")
-            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            Logger.snapshot.error("SnapshotManager: Failed to load photos: \(error.localizedDescription)")
+            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
             await MainActor.run {
                 self.loadError = error
             }
@@ -338,8 +339,8 @@ class SnapshotManager: ObservableObject {
             photos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: data)
             loadError = nil  // Clear error on successful load
         } catch {
-            print("❌ SnapshotManager: Failed to load photos: \(error.localizedDescription)")
-            print("⚠️ Corrupted data preserved - use clearCorruptedData() to remove if needed")
+            Logger.snapshot.error("SnapshotManager: Failed to load photos: \(error.localizedDescription)")
+            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
             loadError = error
             // DO NOT auto-delete user data - preserve it for potential recovery
         }
@@ -348,7 +349,7 @@ class SnapshotManager: ObservableObject {
     /// Manually clears corrupted data from storage
     /// This should only be called after user confirmation when data cannot be recovered
     func clearCorruptedData() {
-        print("⚠️ SnapshotManager: Clearing corrupted data by user request")
+        Logger.snapshot.warning("SnapshotManager: Clearing corrupted data by user request")
         userDefaults.removeObject(forKey: snapshotsKey)
         userDefaults.removeObject(forKey: photosKey)
         snapshots.removeAll()

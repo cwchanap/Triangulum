@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import os
 
 struct OSMMapView: UIViewRepresentable {
     var center: CLLocationCoordinate2D
@@ -18,7 +19,7 @@ struct OSMMapView: UIViewRepresentable {
         overlay.minimumZ = 0
 
         // Add debugging
-        print("OSMMapView: Adding tile overlay with template: \(template)")
+        Logger.map.debug("OSMMapView: Adding tile overlay with template: \(template)")
 
         mapView.addOverlay(overlay, level: .aboveLabels)
 
@@ -63,18 +64,18 @@ struct OSMMapView: UIViewRepresentable {
 
     final class Coordinator: NSObject, MKMapViewDelegate {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            print("OSMMapView: rendererFor overlay called: \(type(of: overlay))")
+            Logger.map.debug("OSMMapView: rendererFor overlay called: \(String(describing: type(of: overlay)))")
             if let tileOverlay = overlay as? MKTileOverlay {
                 let renderer = MKTileOverlayRenderer(tileOverlay: tileOverlay)
-                print("OSMMapView: Created tile overlay renderer")
+                Logger.map.debug("OSMMapView: Created tile overlay renderer")
                 return renderer
             }
-            print("OSMMapView: Using default overlay renderer")
+            Logger.map.debug("OSMMapView: Using default overlay renderer")
             return MKOverlayRenderer(overlay: overlay)
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            print("OSMMapView: Region changed to: \(mapView.region)")
+            Logger.map.debug("OSMMapView: Region changed to center: \(mapView.region.center.latitude), \(mapView.region.center.longitude)")
         }
     }
 

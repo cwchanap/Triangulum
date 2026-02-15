@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Combine
+import os
 
 /// Errors that can occur during pressure history recording
 enum HistoryError: LocalizedError {
@@ -223,7 +224,7 @@ class PressureHistoryManager: ObservableObject {
     /// - Returns: Array of readings, or empty array if context not configured or fetch fails
     func fetchReadings(for timeRange: TimeRange) -> [PressureReading] {
         guard let modelContext = modelContext else {
-            print("⚠️ PressureHistoryManager: Cannot fetch readings - context not configured")
+            Logger.sensor.warning("PressureHistoryManager: Cannot fetch readings - context not configured")
             return []
         }
 
@@ -239,7 +240,7 @@ class PressureHistoryManager: ObservableObject {
             fetchError = nil  // Clear error on successful fetch
             return results
         } catch {
-            print("❌ PressureHistoryManager: Failed to fetch readings: \(error.localizedDescription)")
+            Logger.sensor.error("PressureHistoryManager: Failed to fetch readings: \(error.localizedDescription)")
             fetchError = error  // Surface error for UI observability
             return []
         }
@@ -318,7 +319,7 @@ class PressureHistoryManager: ObservableObject {
             }
 
         } catch {
-            print("Failed to calculate trend: \(error)")
+            Logger.sensor.error("PressureHistoryManager: Failed to calculate trend: \(error.localizedDescription)")
             trend = .unknown
             changeRate = 0
         }
@@ -376,7 +377,7 @@ class PressureHistoryManager: ObservableObject {
     /// Removes readings older than the retention period
     private func cleanupOldData() {
         guard let modelContext = modelContext else {
-            print("⚠️ PressureHistoryManager: Cannot cleanup - context not configured")
+            Logger.sensor.warning("PressureHistoryManager: Cannot cleanup - context not configured")
             return
         }
 
@@ -395,13 +396,13 @@ class PressureHistoryManager: ObservableObject {
             if !oldReadings.isEmpty {
                 do {
                     try modelContext.save()
-                    print("✓ PressureHistoryManager: Cleaned up \(oldReadings.count) old pressure readings")
+                    Logger.sensor.info("PressureHistoryManager: Cleaned up \(oldReadings.count) old pressure readings")
                 } catch {
-                    print("❌ PressureHistoryManager: Failed to save after deletions: \(error.localizedDescription)")
+                    Logger.sensor.error("PressureHistoryManager: Failed to save after deletions: \(error.localizedDescription)")
                 }
             }
         } catch {
-            print("❌ PressureHistoryManager: Failed to cleanup old readings: \(error.localizedDescription)")
+            Logger.sensor.error("PressureHistoryManager: Failed to cleanup old readings: \(error.localizedDescription)")
         }
     }
 }
