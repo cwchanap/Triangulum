@@ -17,7 +17,7 @@ struct PreferencesView: View {
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
     @AppStorage("showMapWidget") private var showMapWidget = true
     @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
-    @StateObject private var locationManager = LocationManager()
+    @ObservedObject var locationManager: LocationManager
 
     @State private var apiKeyInput = ""
     @State private var showingAPIKeyAlert = false
@@ -194,5 +194,5 @@ struct PreferencesView: View {
 }
 
 #Preview {
-    PreferencesView()
+    PreferencesView(locationManager: LocationManager())
 }
