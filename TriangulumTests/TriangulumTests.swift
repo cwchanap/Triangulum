@@ -239,7 +239,7 @@ struct TriangulumTests {
 
     // MARK: - SensorSnapshot Tests
 
-    @Test func testSensorSnapshotInitialization() {
+    @Test @MainActor func testSensorSnapshotInitialization() {
         let locationManager = LocationManager()
         let barometerManager = BarometerManager(locationManager: locationManager)
         let accelerometerManager = AccelerometerManager()
@@ -315,7 +315,7 @@ struct TriangulumTests {
         #expect(snapshot.timestamp.timeIntervalSinceNow < 1.0) // Should be very recent
     }
 
-    @Test func testSensorSnapshotCodable() throws {
+    @Test @MainActor func testSensorSnapshotCodable() throws {
         let locationManager = LocationManager()
         let barometerManager = BarometerManager(locationManager: locationManager)
         let accelerometerManager = AccelerometerManager()
