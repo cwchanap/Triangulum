@@ -13,7 +13,6 @@ import simd
 enum SGP4Propagator {
     // MARK: - Constants
 
-    // swiftlint:disable:next identifier_name
     private static let mu: Double = 398600.4418  // Earth's gravitational parameter (km³/s²)
 
     /// Earth's equatorial radius (km)
@@ -22,7 +21,6 @@ enum SGP4Propagator {
     /// Earth's flattening factor (WGS84)
     private static let flattening: Double = 1.0 / 298.257223563
 
-    // swiftlint:disable:next identifier_name
     private static let j2: Double = 1.08262668e-3  // J2 perturbation coefficient
 
     /// Minutes per day
@@ -52,13 +50,11 @@ enum SGP4Propagator {
         let incl = tle.inclination * deg2rad
         let raan = tle.rightAscension * deg2rad
         let argp = tle.argumentOfPerigee * deg2rad
-        // swiftlint:disable:next identifier_name
         let ma = tle.meanAnomaly * deg2rad
         let ecc = tle.eccentricity
         let meanMotion = tle.meanMotion * 2.0 * .pi / minutesPerDay  // rad/min
 
         // Semi-major axis from mean motion (Kepler's 3rd law)
-        // swiftlint:disable:next identifier_name
         let a1 = pow(mu / (meanMotion * meanMotion), 1.0 / 3.0) * pow(60.0, 2.0 / 3.0)
 
         // J2 secular perturbations
@@ -149,7 +145,6 @@ enum SGP4Propagator {
     /// - Returns: Eccentric anomaly in radians
     private static func solveKepler(meanAnomaly: Double, eccentricity: Double) -> Double {
         // Normalize mean anomaly to [0, 2π)
-        // swiftlint:disable:next identifier_name
         var ma = meanAnomaly.truncatingRemainder(dividingBy: 2.0 * .pi)
         if ma < 0 { ma += 2.0 * .pi }
 
@@ -193,7 +188,6 @@ enum SGP4Propagator {
 
         // Iterate for WGS84 ellipsoid
         let a = earthRadius
-        // swiftlint:disable:next identifier_name
         let e2 = flattening * (2.0 - flattening)
 
         for _ in 0..<10 {
@@ -244,7 +238,6 @@ enum SGP4Propagator {
         let cosLat = cos(latRad)
         let sinLat = sin(latRad)
         let a = earthRadius
-        // swiftlint:disable:next identifier_name
         let e2 = flattening * (2.0 - flattening)
         let n = a / sqrt(1.0 - e2 * sinLat * sinLat)
 

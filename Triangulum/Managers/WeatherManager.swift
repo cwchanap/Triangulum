@@ -2,6 +2,7 @@ import Foundation
 import CoreLocation
 import os
 
+@MainActor
 class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
     var locationManager: LocationManager
@@ -23,19 +24,21 @@ class WeatherManager: ObservableObject {
         setupLocationObserver()
     }
 
-    deinit {
-        stopMonitoring()
+    nonisolated deinit {
     }
 
     private func setupLocationObserver() {
-        // Check immediately
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // Check after a brief delay
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
             self?.checkAndFetchWeather()
         }
 
         // Then check periodically
         weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            self?.checkAndFetchWeather()
+            Task { @MainActor in
+                self?.checkAndFetchWeather()
+            }
         }
     }
 
@@ -49,7 +52,9 @@ class WeatherManager: ObservableObject {
         weatherCheckTimer = nil
         Logger.weather.debug("Stopped frequent polling, switching to 15-minute refresh")
         weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
-            self?.checkAndFetchWeather()
+            Task { @MainActor in
+                self?.checkAndFetchWeather()
+            }
         }
     }
 

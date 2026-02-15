@@ -16,7 +16,7 @@ enum WidgetType: String, CaseIterable, Identifiable {
     case gyroscope
     case magnetometer
 
-    // swiftlint:disable:next identifier_name
+
     var id: String { rawValue }
 
     var displayName: String {

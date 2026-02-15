@@ -13,7 +13,6 @@ import os
 struct TriangulumApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
             SensorReading.self,
             MapTile.self,
             PressureReading.self

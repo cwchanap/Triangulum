@@ -2,21 +2,20 @@ import SwiftUI
 import MapKit
 
 struct MapView: View {
+    private static let defaultCoordinate = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+
     @ObservedObject var locationManager: LocationManager
     @AppStorage("mapProvider") private var mapProvider = "apple" // "apple" or "osm"
     @State private var position: MapCameraPosition = .region(
         MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+            center: Self.defaultCoordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
         )
     )
     @State private var isTrackingUser = false
     @State private var isCacheMode = false
     // OSM-specific centering and search state
-    @State private var osmCenter: CLLocationCoordinate2D = CLLocationCoordinate2D(
-        latitude: 37.7749,
-        longitude: -122.4194
-    )
+    @State private var osmCenter: CLLocationCoordinate2D = Self.defaultCoordinate
     @State private var osmSpan: MKCoordinateSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
     @State private var osmRecenterToken: UUID = UUID()
     @State private var searchText: String = ""
@@ -69,8 +68,7 @@ struct MapView: View {
             .padding(.top)
 
             // Search bar: OSM uses Nominatim, Apple uses MKLocalSearch
-            if true {
-                HStack(spacing: 8) {
+            HStack(spacing: 8) {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").foregroundColor(.prussianBlueLight)
                         TextField("Search places", text: $searchText)
@@ -114,7 +112,6 @@ struct MapView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 6)
-            }
 
             // Autocomplete suggestions (provider-specific)
             if mapProvider == "osm" && !osmSuggestions.isEmpty {
@@ -524,12 +521,9 @@ struct MapView: View {
 
     private func isFirstLocationUpdate() -> Bool {
         // Check if we're still showing the default San Francisco location
-        let defaultLat = 37.7749
-        let defaultLon = -122.4194
-
         if mapProvider == "osm" {
-            return abs(osmCenter.latitude - defaultLat) < 0.0001 &&
-                abs(osmCenter.longitude - defaultLon) < 0.0001
+            return abs(osmCenter.latitude - Self.defaultCoordinate.latitude) < 0.0001 &&
+                abs(osmCenter.longitude - Self.defaultCoordinate.longitude) < 0.0001
         } else {
             // For Apple Maps, always auto-center on first valid location
             // This is simpler and ensures the map centers on user location
@@ -586,7 +580,7 @@ struct MapView: View {
 
     private func cacheCurrentArea() {
         let center = userLocation.latitude == 0.0 && userLocation.longitude == 0.0
-            ? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+            ? Self.defaultCoordinate
             : userLocation
 
         Task {
