@@ -24,7 +24,7 @@ struct WeatherManagerTests {
     }
 
     @Test func testWeatherResponseParsing() throws {
-        let json = """
+        let jsonString = """
         {
             "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
             "main": {"temp": 295.15, "feels_like": 297.0, "temp_min": 293.0, "temp_max": 298.0, "pressure": 1013, "humidity": 65},
@@ -32,7 +32,8 @@ struct WeatherManagerTests {
             "visibility": 10000,
             "name": "San Francisco"
         }
-        """.data(using: .utf8)!
+        """
+        let json = Data(jsonString.utf8)
 
         let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
         let weather = Weather(from: response)
@@ -48,13 +49,14 @@ struct WeatherManagerTests {
     }
 
     @Test func testWeatherResponseParsingMinimalFields() throws {
-        let json = """
+        let jsonString = """
         {
             "weather": [{"id": 500, "main": "Rain", "description": "light rain", "icon": "10d"}],
             "main": {"temp": 280.0, "feels_like": 278.0, "temp_min": 279.0, "temp_max": 281.0, "pressure": 1000, "humidity": 90},
             "name": "London"
         }
-        """.data(using: .utf8)!
+        """
+        let json = Data(jsonString.utf8)
 
         let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
         let weather = Weather(from: response)
@@ -69,13 +71,14 @@ struct WeatherManagerTests {
     }
 
     @Test func testWeatherTemperatureConversions() throws {
-        let json = """
+        let jsonString = """
         {
             "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
             "main": {"temp": 300.0, "feels_like": 300.0, "temp_min": 299.0, "temp_max": 301.0, "pressure": 1013, "humidity": 50},
             "name": "Test"
         }
-        """.data(using: .utf8)!
+        """
+        let json = Data(jsonString.utf8)
 
         let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
         let weather = Weather(from: response)
@@ -95,17 +98,18 @@ struct WeatherManagerTests {
             ("10d", "cloud.rain.fill"),
             ("11d", "cloud.bolt.fill"),
             ("13d", "cloud.snow.fill"),
-            ("50d", "cloud.fog.fill"),
+            ("50d", "cloud.fog.fill")
         ]
 
         for (iconCode, expectedSystemName) in icons {
-            let json = """
+            let jsonString = """
             {
                 "weather": [{"id": 800, "main": "Test", "description": "test", "icon": "\(iconCode)"}],
                 "main": {"temp": 300.0, "feels_like": 300.0, "temp_min": 299.0, "temp_max": 301.0, "pressure": 1013, "humidity": 50},
                 "name": "Test"
             }
-            """.data(using: .utf8)!
+            """
+            let json = Data(jsonString.utf8)
 
             let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
             let weather = Weather(from: response)
