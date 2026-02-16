@@ -57,7 +57,7 @@ struct KeychainHelperTests {
     }
 
     @Test func testStoreAndRetrieveData() {
-        let testData = "binary_test".data(using: .utf8)!
+        let testData = Data("binary_test".utf8)
         let stored = KeychainHelper.shared.store(testData, forKey: testKey)
         #expect(stored == true)
 
