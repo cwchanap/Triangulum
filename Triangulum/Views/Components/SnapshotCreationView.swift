@@ -200,7 +200,7 @@ struct SnapshotCreationView: View {
         .padding(.horizontal)
         .sheet(isPresented: $showingCamera) {
             ImagePicker(sourceType: .camera) { image in
-                if capturedImages.count < 5 {
+                if capturedImages.count + pairedPreviewItems.count < 5 {
                     capturedImages.append(image)
                 }
             }
