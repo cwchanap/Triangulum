@@ -159,10 +159,9 @@ class WeatherManager: ObservableObject {
             }
 
             if httpResponse.statusCode != 200 {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    Logger.weather.error("Error response: \(responseString)")
-                    errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
-                }
+                let responseString = String(data: data, encoding: .utf8) ?? "(no body)"
+                Logger.weather.error("Error response (HTTP \(httpResponse.statusCode)): \(responseString)")
+                errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
                 return
             }
 

@@ -40,6 +40,8 @@ struct WeatherResponse: Codable {
 }
 
 struct Weather {
+    private static let kelvinToCelsius = 273.15
+
     let temperature: Double
     let feelsLike: Double
     let tempMin: Double
@@ -73,15 +75,23 @@ struct Weather {
     }
 
     var temperatureCelsius: Double {
-        return temperature - 273.15
+        return temperature - Self.kelvinToCelsius
     }
 
     var feelsLikeCelsius: Double {
-        return feelsLike - 273.15
+        return feelsLike - Self.kelvinToCelsius
+    }
+
+    var tempMinCelsius: Double {
+        return tempMin - Self.kelvinToCelsius
+    }
+
+    var tempMaxCelsius: Double {
+        return tempMax - Self.kelvinToCelsius
     }
 
     var temperatureFahrenheit: Double {
-        return (temperature - 273.15) * 9/5 + 32
+        return (temperature - Self.kelvinToCelsius) * 9/5 + 32
     }
 
     var systemIconName: String {

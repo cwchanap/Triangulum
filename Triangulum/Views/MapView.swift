@@ -14,6 +14,7 @@ struct MapView: View {
     )
     @State private var isTrackingUser = false
     @State private var hasCenteredAppleOnce = false
+    @State private var hasCenteredOSMOnce = false
     @State private var isCacheMode = false
     // OSM-specific centering and search state
     @State private var osmCenter: CLLocationCoordinate2D = Self.defaultCoordinate
@@ -509,6 +510,7 @@ struct MapView: View {
                 osmCenter = userLocation
                 osmSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                 osmRecenterToken = UUID()
+                hasCenteredOSMOnce = true
             } else {
                 position = .region(
                     MKCoordinateRegion(
@@ -522,12 +524,9 @@ struct MapView: View {
     }
 
     private func isFirstLocationUpdate() -> Bool {
-        // Check if we're still showing the default San Francisco location
         if mapProvider == "osm" {
-            return abs(osmCenter.latitude - Self.defaultCoordinate.latitude) < 0.0001 &&
-                abs(osmCenter.longitude - Self.defaultCoordinate.longitude) < 0.0001
+            return !hasCenteredOSMOnce
         } else {
-            // For Apple Maps, use a flag to only auto-center once
             return !hasCenteredAppleOnce
         }
     }
@@ -544,6 +543,7 @@ struct MapView: View {
             osmCenter = userLocation
             osmSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
             osmRecenterToken = UUID()
+            hasCenteredOSMOnce = true
         } else {
             withAnimation(.easeInOut(duration: 1.0)) {
                 position = .region(
@@ -553,6 +553,7 @@ struct MapView: View {
                     )
                 )
             }
+            hasCenteredAppleOnce = true
         }
     }
 

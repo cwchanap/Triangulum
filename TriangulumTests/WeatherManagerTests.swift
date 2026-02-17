@@ -44,6 +44,9 @@ struct WeatherManagerTests {
         #expect(weather.pressure == 1013)
         #expect(weather.locationName == "San Francisco")
         #expect(abs(weather.temperatureCelsius - (295.15 - 273.15)) < 0.01)
+        #expect(abs(weather.feelsLikeCelsius - (297.0 - 273.15)) < 0.01)
+        #expect(abs(weather.tempMinCelsius - (293.0 - 273.15)) < 0.01)
+        #expect(abs(weather.tempMaxCelsius - (298.0 - 273.15)) < 0.01)
         #expect(weather.windSpeed == 3.5)
         #expect(weather.windDirection == 180)
         #expect(weather.visibility == 10000)
@@ -97,12 +100,20 @@ struct WeatherManagerTests {
             ("02d", "cloud.sun.fill"),
             ("02n", "cloud.moon.fill"),
             ("03d", "cloud.fill"),
+            ("03n", "cloud.fill"),
+            ("04d", "cloud.fill"),
+            ("04n", "cloud.fill"),
             ("09d", "cloud.drizzle.fill"),
+            ("09n", "cloud.drizzle.fill"),
             ("10d", "cloud.sun.rain.fill"),
             ("10n", "cloud.moon.rain.fill"),
             ("11d", "cloud.bolt.fill"),
+            ("11n", "cloud.bolt.fill"),
             ("13d", "cloud.snow.fill"),
-            ("50d", "cloud.fog.fill")
+            ("13n", "cloud.snow.fill"),
+            ("50d", "cloud.fog.fill"),
+            ("50n", "cloud.fog.fill"),
+            ("xx", "questionmark.circle.fill")
         ]
 
         for (iconCode, expectedSystemName) in icons {

@@ -17,6 +17,12 @@ private struct PairedPreviewItem: Identifiable {
     let image: UIImage
 }
 
+/// Wraps a captured camera image with a stable identity for SwiftUI ForEach
+private struct CapturedImageItem: Identifiable {
+    let id: UUID = UUID()
+    let image: UIImage
+}
+
 struct SnapshotCreationView: View {
     @Binding var snapshot: SensorSnapshot?
     let snapshotManager: SnapshotManager
@@ -27,7 +33,7 @@ struct SnapshotCreationView: View {
     @State private var isProcessingPhotos = false
     @State private var showingImagePicker = false
     @State private var showingCamera = false
-    @State private var capturedImages: [UIImage] = []
+    @State private var capturedImages: [CapturedImageItem] = []
     @State private var pairedPreviewItems: [PairedPreviewItem] = []
 
     var body: some View {
@@ -83,6 +89,7 @@ struct SnapshotCreationView: View {
                         tempSelectedPhotos.removeAll()
                     }
                     .foregroundColor(.white)
+                    .disabled(isProcessingPhotos)
                 }
             }
         }
@@ -201,7 +208,7 @@ struct SnapshotCreationView: View {
         .sheet(isPresented: $showingCamera) {
             ImagePicker(sourceType: .camera) { image in
                 if capturedImages.count + pairedPreviewItems.count < 5 {
-                    capturedImages.append(image)
+                    capturedImages.append(CapturedImageItem(image: image))
                 }
             }
         }
@@ -211,9 +218,9 @@ struct SnapshotCreationView: View {
     private var photoPreviewGrid: some View {
         if !capturedImages.isEmpty || !pairedPreviewItems.isEmpty {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                ForEach(Array(capturedImages.enumerated()), id: \.offset) { index, image in
+                ForEach(capturedImages) { item in
                     ZStack(alignment: .topTrailing) {
-                        Image(uiImage: image)
+                        Image(uiImage: item.image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: 80, height: 80)
@@ -221,7 +228,7 @@ struct SnapshotCreationView: View {
                             .cornerRadius(8)
 
                         Button {
-                            capturedImages.remove(at: index)
+                            capturedImages.removeAll { $0.id == item.id }
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.white)
@@ -275,8 +282,8 @@ struct SnapshotCreationView: View {
         snapshotManager.addSnapshot(snapshot)
 
         // Process captured images directly
-        for image in capturedImages {
-            snapshotManager.addPhoto(to: snapshot.id, image: image)
+        for item in capturedImages {
+            snapshotManager.addPhoto(to: snapshot.id, image: item.image)
         }
 
         // Then process photos from library if any

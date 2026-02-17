@@ -330,6 +330,35 @@ class SnapshotManager: ObservableObject {
         }
     }
 
+    /// Pre-loads photos from disk into the in-memory cache off the main actor,
+    /// so that subsequent `getPhotos(for:)` calls return immediately.
+    func prewarmCache(for snapshotID: UUID) async {
+        guard let snapshot = snapshots.first(where: { $0.id == snapshotID }) else { return }
+        let idsToLoad = snapshot.photoIDs.filter { photos[$0] == nil && photoCache[$0] == nil }
+        guard !idsToLoad.isEmpty else { return }
+
+        let dir = photosDirectory
+        let loaded: [(UUID, SnapshotPhoto)] = await Task.detached {
+            idsToLoad.compactMap { id in
+                let fileURL = dir.appendingPathComponent("\(id).jpg")
+                guard let data = try? Data(contentsOf: fileURL) else { return nil }
+                let metaURL = dir.appendingPathComponent("\(id).json")
+                let timestamp: Date
+                if let metaData = try? Data(contentsOf: metaURL),
+                   let meta = try? JSONDecoder().decode(PhotoMetadata.self, from: metaData) {
+                    timestamp = meta.timestamp
+                } else {
+                    timestamp = Date()
+                }
+                return (id, SnapshotPhoto(id: id, imageData: data, timestamp: timestamp))
+            }
+        }.value
+
+        for (id, photo) in loaded {
+            photoCache[id] = photo
+        }
+    }
+
     private func savePhotoToFile(_ photo: SnapshotPhoto) {
         let fileURL = photosDirectory.appendingPathComponent("\(photo.id).jpg")
         let metaURL = photosDirectory.appendingPathComponent("\(photo.id).json")

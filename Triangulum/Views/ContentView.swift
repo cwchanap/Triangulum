@@ -142,6 +142,7 @@ struct ContentView: View {
             barometerManager.stopBarometerUpdates()
             locationManager.stopLocationUpdates()
             satelliteManager.stopUpdates()
+            weatherManager.stopMonitoring()
             // accelerometerManager.stopAccelerometerUpdates()
             // gyroscopeManager.stopGyroscopeUpdates()
             // magnetometerManager.stopMagnetometerUpdates()
