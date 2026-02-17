@@ -39,6 +39,7 @@ struct WeatherManagerTests {
         let weather = Weather(from: response)
 
         #expect(weather.condition == "Clear")
+        #expect(weather.description == "clear sky")
         #expect(weather.humidity == 65)
         #expect(weather.pressure == 1013)
         #expect(weather.locationName == "San Francisco")
@@ -92,10 +93,13 @@ struct WeatherManagerTests {
     @Test func testWeatherSystemIconName() throws {
         let icons: [(String, String)] = [
             ("01d", "sun.max.fill"),
-            ("02n", "cloud.sun.fill"),
+            ("01n", "moon.fill"),
+            ("02d", "cloud.sun.fill"),
+            ("02n", "cloud.moon.fill"),
             ("03d", "cloud.fill"),
             ("09d", "cloud.drizzle.fill"),
-            ("10d", "cloud.rain.fill"),
+            ("10d", "cloud.sun.rain.fill"),
+            ("10n", "cloud.moon.rain.fill"),
             ("11d", "cloud.bolt.fill"),
             ("13d", "cloud.snow.fill"),
             ("50d", "cloud.fog.fill")

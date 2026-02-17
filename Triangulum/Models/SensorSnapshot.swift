@@ -208,26 +208,34 @@ class SnapshotManager: ObservableObject {
     @Published private(set) var saveError: Error?
     private let userDefaults: UserDefaults
     private let snapshotsKey: String
+    private let photosDirectory: URL
 
-    private static var photosDirectory: URL {
+    /// Non-@Published cache for photos loaded from disk, avoiding unintended SwiftUI re-renders
+    private var photoCache: [UUID: SnapshotPhoto] = [:]
+
+    /// Default photos directory, created once at startup
+    static let defaultPhotosDirectory: URL = {
         let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let photosDir = documentsDir.appendingPathComponent("snapshot_photos", isDirectory: true)
         try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
         return photosDir
-    }
+    }()
 
     init() {
         self.userDefaults = UserDefaults.standard
         self.snapshotsKey = "sensor_snapshots"
+        self.photosDirectory = Self.defaultPhotosDirectory
         Task {
             await loadSnapshotsAsync()
         }
     }
 
     /// Internal initializer for testing with isolated storage
-    init(userDefaults: UserDefaults, keyPrefix: String = "") {
+    init(userDefaults: UserDefaults, keyPrefix: String = "", photosDirectory: URL = SnapshotManager.defaultPhotosDirectory) {
         self.userDefaults = userDefaults
         self.snapshotsKey = "\(keyPrefix)sensor_snapshots"
+        self.photosDirectory = photosDirectory
+        try? FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
         // Load synchronously for tests to ensure data is available immediately
         loadSnapshots()
     }
@@ -236,9 +244,10 @@ class SnapshotManager: ObservableObject {
     func resetStorage() {
         snapshots.removeAll()
         photos.removeAll()
+        photoCache.removeAll()
         userDefaults.removeObject(forKey: snapshotsKey)
-        try? FileManager.default.removeItem(at: Self.photosDirectory)
-        try? FileManager.default.createDirectory(at: Self.photosDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: photosDirectory)
+        try? FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
     }
 
     func addSnapshot(_ snapshot: SensorSnapshot) {
@@ -255,10 +264,13 @@ class SnapshotManager: ObservableObject {
     func clearAllSnapshots() {
         let allPhotoIDs = snapshots.flatMap { $0.photoIDs }
         for photoID in allPhotoIDs {
-            let fileURL = Self.photosDirectory.appendingPathComponent("\(photoID).jpg")
+            let fileURL = photosDirectory.appendingPathComponent("\(photoID).jpg")
             try? FileManager.default.removeItem(at: fileURL)
+            let metaURL = photosDirectory.appendingPathComponent("\(photoID).json")
+            try? FileManager.default.removeItem(at: metaURL)
         }
         photos.removeAll()
+        photoCache.removeAll()
         snapshots.removeAll()
         saveSnapshots()
     }
@@ -295,9 +307,12 @@ class SnapshotManager: ObservableObject {
     func removePhoto(_ photoID: UUID, from snapshotID: UUID) {
         guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else { return }
 
-        let fileURL = Self.photosDirectory.appendingPathComponent("\(photoID).jpg")
+        let fileURL = photosDirectory.appendingPathComponent("\(photoID).jpg")
         try? FileManager.default.removeItem(at: fileURL)
+        let metaURL = photosDirectory.appendingPathComponent("\(photoID).json")
+        try? FileManager.default.removeItem(at: metaURL)
         photos.removeValue(forKey: photoID)
+        photoCache.removeValue(forKey: photoID)
         snapshots[snapshotIndex].photoIDs.removeAll { $0 == photoID }
         saveSnapshots()
     }
@@ -306,8 +321,9 @@ class SnapshotManager: ObservableObject {
         guard let snapshot = snapshots.first(where: { $0.id == snapshotID }) else { return [] }
         return snapshot.photoIDs.compactMap { id in
             if let cached = photos[id] { return cached }
+            if let cached = photoCache[id] { return cached }
             if let loaded = loadPhotoFromFile(id: id) {
-                photos[id] = loaded
+                photoCache[id] = loaded
                 return loaded
             }
             return nil
@@ -315,9 +331,14 @@ class SnapshotManager: ObservableObject {
     }
 
     private func savePhotoToFile(_ photo: SnapshotPhoto) {
-        let fileURL = Self.photosDirectory.appendingPathComponent("\(photo.id).jpg")
+        let fileURL = photosDirectory.appendingPathComponent("\(photo.id).jpg")
+        let metaURL = photosDirectory.appendingPathComponent("\(photo.id).json")
         do {
             try photo.imageData.write(to: fileURL, options: .atomic)
+            // Write metadata sidecar to preserve id and timestamp on reload
+            let meta = PhotoMetadata(id: photo.id, timestamp: photo.timestamp)
+            let metaData = try JSONEncoder().encode(meta)
+            try metaData.write(to: metaURL, options: .atomic)
         } catch {
             Logger.snapshot.error("Failed to save photo \(photo.id): \(error.localizedDescription)")
             saveError = error
@@ -325,9 +346,20 @@ class SnapshotManager: ObservableObject {
     }
 
     private func loadPhotoFromFile(id: UUID) -> SnapshotPhoto? {
-        let fileURL = Self.photosDirectory.appendingPathComponent("\(id).jpg")
+        let fileURL = photosDirectory.appendingPathComponent("\(id).jpg")
         guard let data = try? Data(contentsOf: fileURL) else { return nil }
-        return SnapshotPhoto(id: id, imageData: data, timestamp: Date())
+
+        // Try to read timestamp from metadata sidecar; fall back to Date() for legacy photos
+        let metaURL = photosDirectory.appendingPathComponent("\(id).json")
+        let timestamp: Date
+        if let metaData = try? Data(contentsOf: metaURL),
+           let meta = try? JSONDecoder().decode(PhotoMetadata.self, from: metaData) {
+            timestamp = meta.timestamp
+        } else {
+            timestamp = Date()
+        }
+
+        return SnapshotPhoto(id: id, imageData: data, timestamp: timestamp)
     }
 
     private func saveSnapshots() {
@@ -374,11 +406,18 @@ class SnapshotManager: ObservableObject {
     func clearCorruptedData() {
         Logger.snapshot.warning("Clearing corrupted data by user request")
         userDefaults.removeObject(forKey: snapshotsKey)
-        try? FileManager.default.removeItem(at: Self.photosDirectory)
-        try? FileManager.default.createDirectory(at: Self.photosDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: photosDirectory)
+        try? FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
         snapshots.removeAll()
         photos.removeAll()
+        photoCache.removeAll()
         loadError = nil
         saveError = nil
     }
+}
+
+/// Lightweight metadata persisted alongside each photo JPEG for timestamp recovery
+private struct PhotoMetadata: Codable {
+    let id: UUID
+    let timestamp: Date
 }

@@ -24,7 +24,11 @@ class WeatherManager: ObservableObject {
         setupLocationObserver()
     }
 
+    /// Timer is also invalidated here as a safety net.
+    /// Callers can alternatively call stopMonitoring() (e.g., in onDisappear)
+    /// to explicitly stop the timer, especially useful in tests/previews.
     nonisolated deinit {
+        weatherCheckTimer?.invalidate()
     }
 
     private func setupLocationObserver() {
@@ -139,15 +143,27 @@ class WeatherManager: ObservableObject {
             let (data, response) = try await URLSession.shared.data(from: url)
             isLoading = false
 
-            if let httpResponse = response as? HTTPURLResponse {
-                Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
-                if httpResponse.statusCode != 200 {
-                    if let responseString = String(data: data, encoding: .utf8) {
-                        Logger.weather.error("Error response: \(responseString)")
-                        errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
-                    }
-                    return
+            guard let httpResponse = response as? HTTPURLResponse else {
+                Logger.weather.error("Unexpected non-HTTP response")
+                errorMessage = "Unexpected server response"
+                return
+            }
+
+            Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
+
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                Logger.weather.error("Authorization error: HTTP \(httpResponse.statusCode)")
+                errorMessage = "API Error: HTTP \(httpResponse.statusCode) – check your API key"
+                stopFrequentPolling()
+                return
+            }
+
+            if httpResponse.statusCode != 200 {
+                if let responseString = String(data: data, encoding: .utf8) {
+                    Logger.weather.error("Error response: \(responseString)")
+                    errorMessage = "API Error: HTTP \(httpResponse.statusCode)"
                 }
+                return
             }
 
             Logger.weather.debug("Received data of size: \(data.count) bytes")

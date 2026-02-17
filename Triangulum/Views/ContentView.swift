@@ -9,7 +9,6 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 import UIKit
-import os
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
