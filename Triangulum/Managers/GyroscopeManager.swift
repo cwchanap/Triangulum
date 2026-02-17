@@ -26,11 +26,6 @@ class GyroscopeManager: ObservableObject {
             return
         }
 
-        guard motionManager.isGyroAvailable else {
-            errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
-            return
-        }
-
         motionManager.gyroUpdateInterval = 0.1
 
         motionManager.startGyroUpdates(to: .main) { [weak self] data, error in

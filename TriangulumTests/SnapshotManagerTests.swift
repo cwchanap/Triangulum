@@ -389,6 +389,38 @@ struct SnapshotManagerTests {
         #expect(photos.count == 5)
     }
 
+    @Test func testPhotoLimitEnforcement() {
+        let manager = createTestManager()
+        let testManagers = createTestManagers()
+
+        let snapshot = SensorSnapshot.capture(
+            barometerManager: testManagers.barometerManager,
+            locationManager: testManagers.locationManager,
+            accelerometerManager: testManagers.accelerometerManager,
+            gyroscopeManager: testManagers.gyroscopeManager,
+            magnetometerManager: testManagers.magnetometerManager,
+            weatherManager: nil,
+            satelliteManager: nil
+        )
+        manager.addSnapshot(snapshot)
+
+        let testImage = createTestImage()
+
+        // Add 5 photos (the maximum)
+        for _ in 0..<5 {
+            let result = manager.addPhoto(to: snapshot.id, image: testImage)
+            #expect(result == true)
+        }
+
+        // Attempt a 6th photo — should be rejected
+        let rejected = manager.addPhoto(to: snapshot.id, image: testImage)
+        #expect(rejected == false)
+
+        #expect(manager.photos.count == 5)
+        #expect(manager.snapshots.first?.photoIDs.count == 5)
+        #expect(manager.getPhotos(for: snapshot.id).count == 5)
+    }
+
     @Test func testSnapshotDataStructureIntegrity() {
         let testManagers = createTestManagers()
 

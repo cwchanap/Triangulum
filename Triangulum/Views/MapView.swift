@@ -13,6 +13,7 @@ struct MapView: View {
         )
     )
     @State private var isTrackingUser = false
+    @State private var hasCenteredAppleOnce = false
     @State private var isCacheMode = false
     // OSM-specific centering and search state
     @State private var osmCenter: CLLocationCoordinate2D = Self.defaultCoordinate
@@ -515,6 +516,7 @@ struct MapView: View {
                         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                     )
                 )
+                hasCenteredAppleOnce = true
             }
         }
     }
@@ -525,9 +527,8 @@ struct MapView: View {
             return abs(osmCenter.latitude - Self.defaultCoordinate.latitude) < 0.0001 &&
                 abs(osmCenter.longitude - Self.defaultCoordinate.longitude) < 0.0001
         } else {
-            // For Apple Maps, always auto-center on first valid location
-            // This is simpler and ensures the map centers on user location
-            return true
+            // For Apple Maps, use a flag to only auto-center once
+            return !hasCenteredAppleOnce
         }
     }
 

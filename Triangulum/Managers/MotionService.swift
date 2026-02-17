@@ -1,6 +1,5 @@
 import CoreMotion
 
-final class MotionService {
+enum MotionService {
     static let shared = CMMotionManager()
-    private init() {}
 }

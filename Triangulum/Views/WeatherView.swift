@@ -108,7 +108,7 @@ struct WeatherView: View {
                                 .font(.title)
                                 .fontWeight(.bold)
                                 .foregroundColor(.prussianBlueDark)
-                            Text("Feels like \(weather.feelsLike - 273.15, specifier: "%.1f")°C")
+                            Text("Feels like \(weather.feelsLikeCelsius, specifier: "%.1f")°C")
                                 .font(.caption)
                                 .foregroundColor(.prussianBlueLight)
                             Text(weather.description.capitalized)
@@ -207,19 +207,6 @@ struct WeatherView: View {
                             .font(.caption2)
                             .foregroundColor(.prussianBlueLight)
                     }
-                }
-            } else {
-                VStack(spacing: 8) {
-                    Text("No weather data")
-                        .foregroundColor(.prussianBlueLight)
-                        .font(.caption)
-                    Button("Fetch Weather") {
-                        Task {
-                            await weatherManager.fetchWeather()
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundColor(.prussianAccent)
                 }
             }
         }

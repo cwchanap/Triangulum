@@ -18,6 +18,7 @@ class BarometerManager: ObservableObject {
     @Published var historyRecordingError: Error?
 
     private var cancellables = Set<AnyCancellable>()
+    private var didStartDeviceMotion = false
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -122,13 +123,17 @@ class BarometerManager: ObservableObject {
 
     func stopBarometerUpdates() {
         altimeter.stopRelativeAltitudeUpdates()
-        motionManager.stopDeviceMotionUpdates()
+        if didStartDeviceMotion {
+            motionManager.stopDeviceMotionUpdates()
+            didStartDeviceMotion = false
+        }
     }
 
     private func startAttitudeUpdates() {
         guard isAttitudeAvailable else { return }
 
         motionManager.deviceMotionUpdateInterval = 0.1
+        didStartDeviceMotion = true
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
             guard let self = self else { return }
 
