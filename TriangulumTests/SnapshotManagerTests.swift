@@ -29,7 +29,9 @@ struct SnapshotManagerTests {
     // Helper to create an isolated SnapshotManager for testing
     private func createTestManager() -> SnapshotManager {
         let testDefaults = UserDefaults(suiteName: "SnapshotManagerTests_\(UUID().uuidString)")!
-        return SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_")
+        let testPhotosDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_\(UUID().uuidString)")
+        return SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_", photosDirectory: testPhotosDir)
     }
 
     // Helper struct to hold test sensor managers
