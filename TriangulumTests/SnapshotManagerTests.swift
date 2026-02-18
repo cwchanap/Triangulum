@@ -168,14 +168,23 @@ struct SnapshotManagerTests {
         #expect(manager.photos.count == 2)
         #expect(manager.snapshots.first?.photoIDs.count == 2)
 
+        // Capture photo IDs and directory before deletion
+        let photoIDsBeforeDeletion = manager.snapshots.first?.photoIDs ?? []
+        let photosDir = manager.photosDirectory
+        #expect(photoIDsBeforeDeletion.count == 2)
+
         // Delete the snapshot — photos should also be cleaned up
         manager.deleteSnapshot(at: 0)
 
         #expect(manager.snapshots.isEmpty)
         #expect(manager.photos.isEmpty)
         // Verify photo files are removed from disk
-        let firstPhotoID = manager.snapshots.first?.photoIDs.first
-        #expect(firstPhotoID == nil)
+        for photoID in photoIDsBeforeDeletion {
+            let jpgURL = photosDir.appendingPathComponent("\(photoID).jpg")
+            let jsonURL = photosDir.appendingPathComponent("\(photoID).json")
+            #expect(!FileManager.default.fileExists(atPath: jpgURL.path), "JPG file should be deleted for photo \(photoID)")
+            #expect(!FileManager.default.fileExists(atPath: jsonURL.path), "JSON sidecar should be deleted for photo \(photoID)")
+        }
     }
 
     @Test func testDeleteSnapshotInvalidIndex() {

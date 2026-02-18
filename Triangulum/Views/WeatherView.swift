@@ -215,7 +215,7 @@ struct WeatherView: View {
             WeatherSearchView()
         }
         .onAppear {
-            if weatherManager.currentWeather == nil && weatherManager.isAvailable {
+            if weatherManager.currentWeather == nil && weatherManager.isAvailable && !weatherManager.isLoading {
                 Task {
                     await weatherManager.fetchWeather()
                 }

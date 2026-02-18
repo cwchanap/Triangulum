@@ -30,7 +30,6 @@ struct SnapshotCreationView: View {
 
     @State private var tempSelectedPhotos: [PhotosPickerItem] = []
     @State private var isProcessingPhotos = false
-    @State private var showingImagePicker = false
     @State private var showingCamera = false
     @State private var capturedImages: [CapturedImageItem] = []
     @State private var pairedPreviewItems: [PairedPreviewItem] = []
