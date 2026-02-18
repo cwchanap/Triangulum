@@ -28,11 +28,10 @@ class WeatherManager: ObservableObject {
         setupLocationObserver()
     }
 
-    /// Timer is also invalidated here as a safety net.
-    /// Callers can alternatively call stopMonitoring() (e.g., in onDisappear)
-    /// to explicitly stop the timer, especially useful in tests/previews.
     deinit {
-        weatherCheckTimer?.invalidate()
+        // Timer is explicitly stopped via stopMonitoring() called from onDisappear.
+        // Do not invalidate here: deinit can run off the main thread while Timer
+        // must be invalidated on the run loop it was scheduled on.
     }
 
     private func setupLocationObserver() {
@@ -168,9 +167,9 @@ class WeatherManager: ObservableObject {
             Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
 
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                Logger.weather.error("Authorization error: HTTP \(httpResponse.statusCode)")
+                Logger.weather.error("Authorization error: HTTP \(httpResponse.statusCode) — stopping polling")
                 errorMessage = "API Error: HTTP \(httpResponse.statusCode) – check your API key"
-                stopFrequentPolling()
+                stopMonitoring()
                 return
             }
 
