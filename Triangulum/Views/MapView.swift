@@ -615,22 +615,31 @@ extension MapView {
         if mapProvider == "osm" {
             // Use OSM Nominatim for OSM map provider
             Task {
-                let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
-                let results = try await OSMGeocoder.search(query: query, limit: 1, region: region, bounded: limitToView)
-                await MainActor.run {
-                    isSearching = false
-                    guard let first = results.first else {
-                        searchMessage = "No results for ‘\(query)’"
+                do {
+                    let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
+                    let results = try await OSMGeocoder.search(query: query, limit: 1, region: region, bounded: limitToView)
+                    await MainActor.run {
+                        isSearching = false
+                        guard let first = results.first else {
+                            searchMessage = "No results for '\(query)'"
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                            return
+                        }
+                        osmCenter = first.coordinate
+                        osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                        osmRecenterToken = UUID()
+                        searchMessage = first.displayName
+                        selectedResultCoordinate = first.coordinate
+                        selectedResultTitle = first.displayName
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
-                        return
                     }
-                    osmCenter = first.coordinate
-                    osmSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-                    osmRecenterToken = UUID()
-                    searchMessage = first.displayName
-                    selectedResultCoordinate = first.coordinate
-                    selectedResultTitle = first.displayName
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                } catch {
+                    await MainActor.run {
+                        isSearching = false
+                        searchMessage = "Search failed: \(error.localizedDescription)"
+                        Logger.app.error("OSM search error for '\(query)': \(error.localizedDescription)")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { searchMessage = nil }
+                    }
                 }
             }
         } else {
