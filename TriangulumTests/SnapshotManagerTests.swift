@@ -26,12 +26,16 @@ struct SnapshotManagerTests {
         return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
     }
 
-    // Helper to create an isolated SnapshotManager for testing
+    // Helper to create an isolated SnapshotManager for testing.
+    // Each call creates a unique temporary directory; call manager.resetStorage()
+    // at the end of a test (or let the unique UUID path be collected by the OS)
+    // to avoid accumulating stale tmp directories between test runs.
     private func createTestManager() -> SnapshotManager {
         let testDefaults = UserDefaults(suiteName: "SnapshotManagerTests_\(UUID().uuidString)")!
         let testPhotosDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("SnapshotManagerTests_\(UUID().uuidString)")
-        return SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_", photosDirectory: testPhotosDir)
+        let manager = SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_", photosDirectory: testPhotosDir)
+        return manager
     }
 
     // Helper struct to hold test sensor managers
@@ -148,6 +152,7 @@ struct SnapshotManagerTests {
 
     @Test func testDeleteSnapshotCleansUpPhotos() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -213,6 +218,7 @@ struct SnapshotManagerTests {
 
     @Test func testClearAllSnapshots() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testManagers = createTestManagers()
 
         let snapshot1 = SensorSnapshot.capture(
@@ -253,6 +259,7 @@ struct SnapshotManagerTests {
 
     @Test func testAddPhoto() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -279,6 +286,7 @@ struct SnapshotManagerTests {
 
     @Test func testAddPhotoToNonExistentSnapshot() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testImage = createTestImage()
         let nonExistentID = UUID()
 
@@ -289,6 +297,7 @@ struct SnapshotManagerTests {
 
     @Test func testRemovePhoto() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -311,7 +320,11 @@ struct SnapshotManagerTests {
         let photoID = manager.snapshots.first?.photoIDs.first
         #expect(photoID != nil)
 
-        manager.removePhoto(photoID!, from: snapshot.id)
+        guard let safePhotoID = photoID else {
+            Issue.record("Expected photoID to be non-nil before removal")
+            return
+        }
+        manager.removePhoto(safePhotoID, from: snapshot.id)
 
         #expect(manager.photos.isEmpty)
         #expect(manager.snapshots.first?.photoIDs.isEmpty == true)
@@ -405,6 +418,7 @@ struct SnapshotManagerTests {
 
     @Test func testMultiplePhotosPerSnapshot() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -434,6 +448,7 @@ struct SnapshotManagerTests {
 
     @Test func testPhotoLimitEnforcement() {
         let manager = createTestManager()
+        defer { manager.resetStorage() }
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(

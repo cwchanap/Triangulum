@@ -132,6 +132,7 @@ struct ContentView: View {
             barometerManager.startBarometerUpdates()
             locationManager.startLocationUpdates()
             satelliteManager.startUpdates()
+            weatherManager.startMonitoring()
             // TODO: Temporarily disabled until privacy permissions are properly configured
             // accelerometerManager.startAccelerometerUpdates()
             // gyroscopeManager.startGyroscopeUpdates()

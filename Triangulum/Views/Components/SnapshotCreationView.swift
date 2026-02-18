@@ -84,10 +84,11 @@ struct SnapshotCreationView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         isPresented = false
-                        tempSelectedPhotos.removeAll()
+                        if !isProcessingPhotos {
+                            tempSelectedPhotos.removeAll()
+                        }
                     }
                     .foregroundColor(.white)
-                    .disabled(isProcessingPhotos)
                 }
             }
         }
@@ -311,15 +312,21 @@ struct SnapshotCreationView: View {
     }
 
     private func processSelectedPhotos(for snapshotID: UUID) async {
-        for (index, photoItem) in tempSelectedPhotos.enumerated() {
-            // Reuse the already-decoded UIImage from the preview pass when available
-            if index < pairedPreviewItems.count {
-                let image = pairedPreviewItems[index].image
+        // Build an identity map from PhotosPickerItem to its already-decoded preview image
+        // so we don't re-decode images that were loaded during the preview pass.
+        var previewMap: [PhotosPickerItem: UIImage] = [:]
+        for pair in pairedPreviewItems {
+            previewMap[pair.pickerItem] = pair.image
+        }
+
+        for photoItem in tempSelectedPhotos {
+            if let image = previewMap[photoItem] {
+                // Reuse the preview-pass decode
                 await MainActor.run {
                     _ = snapshotManager.addPhoto(to: snapshotID, image: image)
                 }
             } else {
-                // Fallback: decode from the picker item (should not normally be reached)
+                // Fallback: decode from the picker item (failed preview or new item)
                 do {
                     if let data = try await photoItem.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {

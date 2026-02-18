@@ -216,9 +216,17 @@ class SnapshotManager: ObservableObject {
 
     /// Default photos directory, created once at startup
     static let defaultPhotosDirectory: URL = {
-        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            // Fall back to a safe writable location rather than crashing
+            Logger.snapshot.error("Documents directory unavailable — falling back to temporary directory")
+            return FileManager.default.temporaryDirectory.appendingPathComponent("snapshot_photos", isDirectory: true)
+        }
         let photosDir = documentsDir.appendingPathComponent("snapshot_photos", isDirectory: true)
-        try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
+        } catch {
+            Logger.snapshot.error("Failed to create default photos directory: \(error.localizedDescription)")
+        }
         return photosDir
     }()
 
@@ -235,7 +243,11 @@ class SnapshotManager: ObservableObject {
         self.snapshotsKey = "\(keyPrefix)sensor_snapshots"
         let resolvedPhotosDirectory = photosDirectory ?? Self.defaultPhotosDirectory
         self.photosDirectory = resolvedPhotosDirectory
-        try? FileManager.default.createDirectory(at: resolvedPhotosDirectory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: resolvedPhotosDirectory, withIntermediateDirectories: true)
+        } catch {
+            Logger.snapshot.error("Failed to create photos directory at \(resolvedPhotosDirectory.path): \(error.localizedDescription)")
+        }
         // Load synchronously for tests to ensure data is available immediately
         loadSnapshots()
     }

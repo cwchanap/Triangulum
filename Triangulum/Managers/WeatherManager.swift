@@ -112,6 +112,11 @@ class WeatherManager: ObservableObject {
     func fetchWeather() async {
         Logger.weather.debug("fetchWeather called")
 
+        guard !isLoading else {
+            Logger.weather.debug("fetchWeather skipped — already in progress")
+            return
+        }
+
         guard Config.hasValidAPIKey else {
             errorMessage = "API key required"
             return
@@ -188,9 +193,20 @@ class WeatherManager: ObservableObject {
 
     func refreshWeather() {
         Logger.weather.debug("Manual refresh requested")
+        guard !isLoading else {
+            Logger.weather.debug("refreshWeather skipped — fetch already in progress")
+            return
+        }
         Task {
             await fetchWeather()
         }
+    }
+
+    /// Restart monitoring after stopMonitoring() has been called.
+    /// Safe to call even if monitoring is already active — won't duplicate timers.
+    func startMonitoring() {
+        guard weatherCheckTimer == nil else { return }
+        setupLocationObserver()
     }
 
     /// Call this when API key is updated to recheck availability
