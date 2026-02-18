@@ -26,7 +26,6 @@ private struct CapturedImageItem: Identifiable {
 struct SnapshotCreationView: View {
     @Binding var snapshot: SensorSnapshot?
     let snapshotManager: SnapshotManager
-    @Binding var selectedPhotos: [PhotosPickerItem]
     @Binding var isPresented: Bool
 
     @State private var tempSelectedPhotos: [PhotosPickerItem] = []
@@ -313,16 +312,25 @@ struct SnapshotCreationView: View {
     }
 
     private func processSelectedPhotos(for snapshotID: UUID) async {
-        for photoItem in tempSelectedPhotos {
-            do {
-                if let data = try await photoItem.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    await MainActor.run {
-                        _ = snapshotManager.addPhoto(to: snapshotID, image: image)
-                    }
+        for (index, photoItem) in tempSelectedPhotos.enumerated() {
+            // Reuse the already-decoded UIImage from the preview pass when available
+            if index < pairedPreviewItems.count {
+                let image = pairedPreviewItems[index].image
+                await MainActor.run {
+                    _ = snapshotManager.addPhoto(to: snapshotID, image: image)
                 }
-            } catch {
-                Logger.snapshot.error("Failed to process photo: \(error.localizedDescription)")
+            } else {
+                // Fallback: decode from the picker item (should not normally be reached)
+                do {
+                    if let data = try await photoItem.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run {
+                            _ = snapshotManager.addPhoto(to: snapshotID, image: image)
+                        }
+                    }
+                } catch {
+                    Logger.snapshot.error("Failed to process photo: \(error.localizedDescription)")
+                }
             }
         }
     }

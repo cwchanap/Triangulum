@@ -27,7 +27,7 @@ class WeatherManager: ObservableObject {
     /// Timer is also invalidated here as a safety net.
     /// Callers can alternatively call stopMonitoring() (e.g., in onDisappear)
     /// to explicitly stop the timer, especially useful in tests/previews.
-    nonisolated deinit {
+    deinit {
         weatherCheckTimer?.invalidate()
     }
 
@@ -38,7 +38,9 @@ class WeatherManager: ObservableObject {
             self?.checkAndFetchWeather()
         }
 
-        // Then check periodically
+        // Poll every 3 seconds until the first successful weather fetch.
+        // On success, stopFrequentPolling() invalidates this timer and replaces it
+        // with a 15-minute (900 s) repeating timer to prevent battery drain.
         weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkAndFetchWeather()

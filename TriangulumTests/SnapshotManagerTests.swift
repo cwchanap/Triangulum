@@ -146,6 +146,38 @@ struct SnapshotManagerTests {
         #expect(manager.snapshots.count == 1)
     }
 
+    @Test func testDeleteSnapshotCleansUpPhotos() {
+        let manager = createTestManager()
+        let testManagers = createTestManagers()
+
+        let snapshot = SensorSnapshot.capture(
+            barometerManager: testManagers.barometerManager,
+            locationManager: testManagers.locationManager,
+            accelerometerManager: testManagers.accelerometerManager,
+            gyroscopeManager: testManagers.gyroscopeManager,
+            magnetometerManager: testManagers.magnetometerManager,
+            weatherManager: nil,
+            satelliteManager: nil
+        )
+        manager.addSnapshot(snapshot)
+
+        // Add two photos to the snapshot
+        let testImage = createTestImage()
+        manager.addPhoto(to: snapshot.id, image: testImage)
+        manager.addPhoto(to: snapshot.id, image: testImage)
+        #expect(manager.photos.count == 2)
+        #expect(manager.snapshots.first?.photoIDs.count == 2)
+
+        // Delete the snapshot — photos should also be cleaned up
+        manager.deleteSnapshot(at: 0)
+
+        #expect(manager.snapshots.isEmpty)
+        #expect(manager.photos.isEmpty)
+        // Verify photo files are removed from disk
+        let firstPhotoID = manager.snapshots.first?.photoIDs.first
+        #expect(firstPhotoID == nil)
+    }
+
     @Test func testDeleteSnapshotInvalidIndex() {
         let manager = createTestManager()
         let testManagers = createTestManagers()
