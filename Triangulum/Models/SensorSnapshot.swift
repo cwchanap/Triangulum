@@ -231,11 +231,12 @@ class SnapshotManager: ObservableObject {
     }
 
     /// Internal initializer for testing with isolated storage
-    init(userDefaults: UserDefaults, keyPrefix: String = "", photosDirectory: URL = SnapshotManager.defaultPhotosDirectory) {
+    init(userDefaults: UserDefaults, keyPrefix: String = "", photosDirectory: URL? = nil) {
         self.userDefaults = userDefaults
         self.snapshotsKey = "\(keyPrefix)sensor_snapshots"
-        self.photosDirectory = photosDirectory
-        try? FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
+        let resolvedPhotosDirectory = photosDirectory ?? Self.defaultPhotosDirectory
+        self.photosDirectory = resolvedPhotosDirectory
+        try? FileManager.default.createDirectory(at: resolvedPhotosDirectory, withIntermediateDirectories: true)
         // Load synchronously for tests to ensure data is available immediately
         loadSnapshots()
     }
