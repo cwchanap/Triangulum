@@ -7,6 +7,9 @@ class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
     var locationManager: LocationManager
     private var weatherCheckTimer: Timer?
+    /// Tracks whether monitoring is active. Set false by stopMonitoring() to prevent
+    /// in-flight fetch completions from re-enabling the timer after an explicit stop.
+    private var isMonitoringEnabled: Bool = false
 
     @Published var currentWeather: Weather?
     @Published var isLoading: Bool = false
@@ -21,6 +24,7 @@ class WeatherManager: ObservableObject {
         isInitializing = true
 
         // Check availability and start monitoring
+        isMonitoringEnabled = true
         setupLocationObserver()
     }
 
@@ -49,6 +53,7 @@ class WeatherManager: ObservableObject {
     }
 
     func stopMonitoring() {
+        isMonitoringEnabled = false
         weatherCheckTimer?.invalidate()
         weatherCheckTimer = nil
     }
@@ -56,6 +61,10 @@ class WeatherManager: ObservableObject {
     private func stopFrequentPolling() {
         weatherCheckTimer?.invalidate()
         weatherCheckTimer = nil
+        guard isMonitoringEnabled else {
+            Logger.weather.debug("Monitoring stopped — skipping 15-minute timer setup")
+            return
+        }
         Logger.weather.debug("Stopped frequent polling, switching to 15-minute refresh")
         weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -206,6 +215,7 @@ class WeatherManager: ObservableObject {
     /// Safe to call even if monitoring is already active — won't duplicate timers.
     func startMonitoring() {
         guard weatherCheckTimer == nil else { return }
+        isMonitoringEnabled = true
         setupLocationObserver()
     }
 

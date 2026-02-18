@@ -209,6 +209,7 @@ class SnapshotManager: ObservableObject {
     @Published private(set) var saveError: Error?
     private let userDefaults: UserDefaults
     private let snapshotsKey: String
+    private var legacyPhotosKey: String { snapshotsKey.replacingOccurrences(of: "sensor_snapshots", with: "snapshot_photos") }
     let photosDirectory: URL
 
     /// Non-@Published cache for photos loaded from disk, avoiding unintended SwiftUI re-renders
@@ -434,12 +435,49 @@ class SnapshotManager: ObservableObject {
         do {
             snapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
             loadError = nil  // Clear error on successful load
+            migrateLegacyPhotosIfNeeded()
         } catch {
             Logger.snapshot.error("SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
             Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
             loadError = error
             // DO NOT auto-delete user data - preserve it for potential recovery
         }
+    }
+
+    /// One-time migration: reads the legacy `snapshot_photos` UserDefaults blob
+    /// (a `[UUID: SnapshotPhoto]` payload written before the file-system storage move)
+    /// and writes each photo that is still referenced by a loaded snapshot to disk.
+    /// Clears the legacy key on success so this only runs once per install.
+    private func migrateLegacyPhotosIfNeeded() {
+        guard let legacyData = userDefaults.data(forKey: legacyPhotosKey) else { return }
+        Logger.snapshot.info("Migrating legacy UserDefaults photos to file system")
+
+        let legacyPhotos: [UUID: SnapshotPhoto]
+        do {
+            legacyPhotos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: legacyData)
+        } catch {
+            Logger.snapshot.error("Failed to decode legacy photos during migration: \(error.localizedDescription)")
+            return
+        }
+
+        let referencedIDs = Set(snapshots.flatMap { $0.photoIDs })
+        var migratedCount = 0
+        for (id, photo) in legacyPhotos where referencedIDs.contains(id) {
+            // Only write if file doesn't already exist (idempotent)
+            let fileURL = photosDirectory.appendingPathComponent("\(id).jpg")
+            guard !FileManager.default.fileExists(atPath: fileURL.path) else {
+                migratedCount += 1
+                continue
+            }
+            if savePhotoToFile(photo) {
+                photos[id] = photo
+                migratedCount += 1
+            }
+        }
+
+        Logger.snapshot.info("Migrated \(migratedCount) legacy photos to file system")
+        // Clear legacy payload so migration doesn't run again
+        userDefaults.removeObject(forKey: legacyPhotosKey)
     }
 
     /// Manually clears corrupted data from storage
