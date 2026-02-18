@@ -268,14 +268,26 @@ class SnapshotManager: ObservableObject {
         saveSnapshots()
     }
 
+    /// Removes a file at the given URL, logging a warning if deletion fails.
+    /// Failing to delete a file that should be gone is non-fatal but noteworthy.
+    private func removeFileLoggingError(at url: URL) {
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch CocoaError.fileNoSuchFile {
+            // Already gone — acceptable, no action needed
+        } catch {
+            Logger.snapshot.warning("Failed to delete file at \(url.lastPathComponent): \(error.localizedDescription)")
+        }
+    }
+
     func deleteSnapshot(at index: Int) {
         guard index >= 0 && index < snapshots.count else { return }
         let snapshot = snapshots[index]
         for photoID in snapshot.photoIDs {
             let fileURL = photosDirectory.appendingPathComponent("\(photoID).jpg")
-            try? FileManager.default.removeItem(at: fileURL)
+            removeFileLoggingError(at: fileURL)
             let metaURL = photosDirectory.appendingPathComponent("\(photoID).json")
-            try? FileManager.default.removeItem(at: metaURL)
+            removeFileLoggingError(at: metaURL)
             photos.removeValue(forKey: photoID)
             photoCache.removeValue(forKey: photoID)
         }
@@ -287,9 +299,9 @@ class SnapshotManager: ObservableObject {
         let allPhotoIDs = snapshots.flatMap { $0.photoIDs }
         for photoID in allPhotoIDs {
             let fileURL = photosDirectory.appendingPathComponent("\(photoID).jpg")
-            try? FileManager.default.removeItem(at: fileURL)
+            removeFileLoggingError(at: fileURL)
             let metaURL = photosDirectory.appendingPathComponent("\(photoID).json")
-            try? FileManager.default.removeItem(at: metaURL)
+            removeFileLoggingError(at: metaURL)
         }
         photos.removeAll()
         photoCache.removeAll()
@@ -333,9 +345,9 @@ class SnapshotManager: ObservableObject {
         guard let snapshotIndex = snapshots.firstIndex(where: { $0.id == snapshotID }) else { return }
 
         let fileURL = photosDirectory.appendingPathComponent("\(photoID).jpg")
-        try? FileManager.default.removeItem(at: fileURL)
+        removeFileLoggingError(at: fileURL)
         let metaURL = photosDirectory.appendingPathComponent("\(photoID).json")
-        try? FileManager.default.removeItem(at: metaURL)
+        removeFileLoggingError(at: metaURL)
         photos.removeValue(forKey: photoID)
         photoCache.removeValue(forKey: photoID)
         snapshots[snapshotIndex].photoIDs.removeAll { $0 == photoID }
@@ -366,13 +378,21 @@ class SnapshotManager: ObservableObject {
         let loaded: [(UUID, SnapshotPhoto)] = await Task.detached {
             idsToLoad.compactMap { id in
                 let fileURL = dir.appendingPathComponent("\(id).jpg")
-                guard let data = try? Data(contentsOf: fileURL) else { return nil }
+                let data: Data
+                do {
+                    data = try Data(contentsOf: fileURL)
+                } catch {
+                    print("[snapshot] prewarmCache: failed to load photo \(id): \(error.localizedDescription)")
+                    return nil
+                }
                 let metaURL = dir.appendingPathComponent("\(id).json")
                 let timestamp: Date
-                if let metaData = try? Data(contentsOf: metaURL),
-                   let meta = try? JSONDecoder().decode(PhotoMetadata.self, from: metaData) {
+                do {
+                    let metaData = try Data(contentsOf: metaURL)
+                    let meta = try JSONDecoder().decode(PhotoMetadata.self, from: metaData)
                     timestamp = meta.timestamp
-                } else {
+                } catch {
+                    print("[snapshot] prewarmCache: missing/corrupt metadata for \(id), using current time: \(error.localizedDescription)")
                     timestamp = Date()
                 }
                 return (id, SnapshotPhoto(id: id, imageData: data, timestamp: timestamp))
@@ -404,15 +424,23 @@ class SnapshotManager: ObservableObject {
 
     private func loadPhotoFromFile(id: UUID) -> SnapshotPhoto? {
         let fileURL = photosDirectory.appendingPathComponent("\(id).jpg")
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch {
+            Logger.snapshot.error("Failed to load photo \(id) from disk: \(error.localizedDescription)")
+            return nil
+        }
 
         // Try to read timestamp from metadata sidecar; fall back to Date() for legacy photos
         let metaURL = photosDirectory.appendingPathComponent("\(id).json")
         let timestamp: Date
-        if let metaData = try? Data(contentsOf: metaURL),
-           let meta = try? JSONDecoder().decode(PhotoMetadata.self, from: metaData) {
+        do {
+            let metaData = try Data(contentsOf: metaURL)
+            let meta = try JSONDecoder().decode(PhotoMetadata.self, from: metaData)
             timestamp = meta.timestamp
-        } else {
+        } catch {
+            Logger.snapshot.warning("Missing or corrupt metadata for photo \(id), using current time: \(error.localizedDescription)")
             timestamp = Date()
         }
 
