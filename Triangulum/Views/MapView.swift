@@ -32,7 +32,7 @@ struct MapView: View {
     @StateObject private var cacheManager = TileCacheManager.shared
     @StateObject private var appleCompleter = AppleSearchCompleter()
     @State private var osmSuggestions: [OSMGeocoder.Result] = []
-    @State private var osmAutocompleteTask: Task<Void, Error>?
+    @State private var osmAutocompleteTask: Task<Void, Never>?
     @State private var osmVisibleRegion: MKCoordinateRegion?
     @State private var limitToView: Bool = false
 
@@ -584,9 +584,14 @@ struct MapView: View {
     }
 
     private func cacheCurrentArea() {
-        let center = userLocation.latitude == 0.0 && userLocation.longitude == 0.0
-            ? Self.defaultCoordinate
-            : userLocation
+        let center: CLLocationCoordinate2D
+        if let visibleCenter = osmVisibleRegion?.center {
+            center = visibleCenter
+        } else if userLocation.latitude == 0.0 && userLocation.longitude == 0.0 {
+            center = Self.defaultCoordinate
+        } else {
+            center = userLocation
+        }
 
         Task {
             await cacheManager.downloadTilesForRegion(
