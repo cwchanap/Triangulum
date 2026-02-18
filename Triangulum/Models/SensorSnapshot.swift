@@ -209,7 +209,7 @@ class SnapshotManager: ObservableObject {
     @Published private(set) var saveError: Error?
     private let userDefaults: UserDefaults
     private let snapshotsKey: String
-    private let photosDirectory: URL
+    let photosDirectory: URL
 
     /// Non-@Published cache for photos loaded from disk, avoiding unintended SwiftUI re-renders
     private var photoCache: [UUID: SnapshotPhoto] = [:]
@@ -306,7 +306,10 @@ class SnapshotManager: ObservableObject {
             return false
         }
 
-        savePhotoToFile(photo)
+        guard savePhotoToFile(photo) else {
+            Logger.snapshot.error("Aborting addPhoto — file write failed for photo \(photo.id)")
+            return false
+        }
         photos[photo.id] = photo
         snapshots[snapshotIndex].photoIDs.append(photo.id)
         saveSnapshots()
@@ -368,7 +371,8 @@ class SnapshotManager: ObservableObject {
         }
     }
 
-    private func savePhotoToFile(_ photo: SnapshotPhoto) {
+    @discardableResult
+    private func savePhotoToFile(_ photo: SnapshotPhoto) -> Bool {
         let fileURL = photosDirectory.appendingPathComponent("\(photo.id).jpg")
         let metaURL = photosDirectory.appendingPathComponent("\(photo.id).json")
         do {
@@ -377,9 +381,11 @@ class SnapshotManager: ObservableObject {
             let meta = PhotoMetadata(id: photo.id, timestamp: photo.timestamp)
             let metaData = try JSONEncoder().encode(meta)
             try metaData.write(to: metaURL, options: .atomic)
+            return true
         } catch {
             Logger.snapshot.error("Failed to save photo \(photo.id): \(error.localizedDescription)")
             saveError = error
+            return false
         }
     }
 
