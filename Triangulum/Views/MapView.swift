@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import os
 
 struct MapView: View {
     private static let defaultCoordinate = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
@@ -540,11 +541,13 @@ struct MapView: View {
 
         // Center on user location without enabling tracking mode
         if mapProvider == "osm" {
+            guard !hasCenteredOSMOnce else { return }
             osmCenter = userLocation
             osmSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
             osmRecenterToken = UUID()
             hasCenteredOSMOnce = true
         } else {
+            guard !hasCenteredAppleOnce else { return }
             withAnimation(.easeInOut(duration: 1.0)) {
                 position = .region(
                     MKCoordinateRegion(
@@ -682,10 +685,16 @@ extension MapView {
             // Debounce OSM calls
             osmAutocompleteTask?.cancel()
             osmAutocompleteTask = Task {
-                try? await Task.sleep(nanoseconds: 350_000_000)
-                let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
-                let results = try await OSMGeocoder.search(query: trimmed, limit: 6, region: region, bounded: limitToView)
-                await MainActor.run { osmSuggestions = results }
+                do {
+                    try await Task.sleep(nanoseconds: 350_000_000)
+                    let region = osmVisibleRegion ?? MKCoordinateRegion(center: osmCenter, span: osmSpan)
+                    let results = try await OSMGeocoder.search(query: trimmed, limit: 6, region: region, bounded: limitToView)
+                    await MainActor.run { osmSuggestions = results }
+                } catch is CancellationError {
+                    // Task was cancelled by a newer keystroke — nothing to do
+                } catch {
+                    Logger.app.error("OSM autocomplete error: \(error.localizedDescription)")
+                }
             }
         } else {
             if locationManager.latitude != 0.0 || locationManager.longitude != 0.0 {

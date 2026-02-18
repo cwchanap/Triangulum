@@ -24,7 +24,6 @@ struct ContentView: View {
     @State private var showSnapshotDialog = false
     @State private var showEnhancedSnapshotDialog = false
     @State private var currentSnapshot: SensorSnapshot?
-    @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isEditMode = false
 
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
@@ -151,7 +150,6 @@ struct ContentView: View {
             SnapshotCreationView(
                 snapshot: $currentSnapshot,
                 snapshotManager: snapshotManager,
-                selectedPhotos: $selectedPhotos,
                 isPresented: $showEnhancedSnapshotDialog
             )
         }

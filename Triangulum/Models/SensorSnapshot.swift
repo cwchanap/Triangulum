@@ -203,7 +203,8 @@ struct SnapshotPhoto: Codable, Identifiable {
 @MainActor
 class SnapshotManager: ObservableObject {
     @Published private(set) var snapshots: [SensorSnapshot] = []
-    @Published private(set) var photos: [UUID: SnapshotPhoto] = [:]
+    /// Not @Published - use getPhotos(for:) to access photos; populated via addPhoto() only.
+    private(set) var photos: [UUID: SnapshotPhoto] = [:]
     @Published private(set) var loadError: Error?
     @Published private(set) var saveError: Error?
     private let userDefaults: UserDefaults
@@ -225,9 +226,7 @@ class SnapshotManager: ObservableObject {
         self.userDefaults = UserDefaults.standard
         self.snapshotsKey = "sensor_snapshots"
         self.photosDirectory = Self.defaultPhotosDirectory
-        Task {
-            await loadSnapshotsAsync()
-        }
+        loadSnapshots()
     }
 
     /// Internal initializer for testing with isolated storage
@@ -258,6 +257,15 @@ class SnapshotManager: ObservableObject {
 
     func deleteSnapshot(at index: Int) {
         guard index >= 0 && index < snapshots.count else { return }
+        let snapshot = snapshots[index]
+        for photoID in snapshot.photoIDs {
+            let fileURL = photosDirectory.appendingPathComponent("\(photoID).jpg")
+            try? FileManager.default.removeItem(at: fileURL)
+            let metaURL = photosDirectory.appendingPathComponent("\(photoID).json")
+            try? FileManager.default.removeItem(at: metaURL)
+            photos.removeValue(forKey: photoID)
+            photoCache.removeValue(forKey: photoID)
+        }
         snapshots.remove(at: index)
         saveSnapshots()
     }
@@ -400,21 +408,6 @@ class SnapshotManager: ObservableObject {
         } catch {
             Logger.snapshot.error("SnapshotManager: Failed to save snapshots: \(error.localizedDescription)")
             saveError = error
-        }
-    }
-
-    private func loadSnapshotsAsync() async {
-        guard let data = userDefaults.data(forKey: snapshotsKey) else { return }
-
-        do {
-            let loadedSnapshots = try JSONDecoder().decode([SensorSnapshot].self, from: data)
-            self.snapshots = loadedSnapshots
-            self.loadError = nil  // Clear error on successful load
-        } catch {
-            Logger.snapshot.error("SnapshotManager: Failed to load snapshots: \(error.localizedDescription)")
-            Logger.snapshot.warning("Corrupted data preserved - use clearCorruptedData() to remove if needed")
-            self.loadError = error
-            // DO NOT auto-delete user data - preserve it for potential recovery
         }
     }
 
