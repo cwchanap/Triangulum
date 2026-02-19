@@ -245,9 +245,12 @@ class SatelliteManager: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
 
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                Logger.satellite.error("HTTP error for NORAD \(noradId)")
+            guard let httpResponse = response as? HTTPURLResponse else {
+                Logger.satellite.error("Non-HTTP response fetching TLE for NORAD \(noradId)")
+                return nil
+            }
+            guard httpResponse.statusCode == 200 else {
+                Logger.satellite.error("HTTP \(httpResponse.statusCode) fetching TLE for NORAD \(noradId)")
                 return nil
             }
 
