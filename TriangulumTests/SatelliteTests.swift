@@ -756,6 +756,37 @@ struct TLECacheTests {
         #expect(cache.cacheAgeHours != nil)
         #expect(cache.cacheAgeHours! < 1.0)
     }
+
+    @Test func testCacheExpiration() throws {
+        // Build an isolated UserDefaults suite and cache instance
+        let suiteName = "TLECacheTests_Expiration_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        let cacheKey = "test_tle_cache_expiration"
+        let cache = TLECache(userDefaults: testDefaults, cacheKey: cacheKey)
+
+        // Construct a valid TLE to embed in the stale cache entry
+        let line1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
+        let line2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
+        guard let tle = TLE(name: "ISS", line1: line1, line2: line2) else {
+            Issue.record("TLE parsing failed for testCacheExpiration")
+            return
+        }
+
+        // Manually encode a CachedTLEData with a timestamp 25 hours in the past
+        let staleTimestamp = Date().addingTimeInterval(-(25 * 60 * 60))
+        let staleData = CachedTLEData(tles: [tle], timestamp: staleTimestamp)
+        let encoded = try JSONEncoder().encode(staleData)
+        testDefaults.set(encoded, forKey: cacheKey)
+
+        // hasFreshCache must be false — the cache is older than the 24-hour threshold
+        #expect(cache.hasFreshCache == false)
+
+        // hasCache must be true — the data is still present for offline fallback
+        #expect(cache.hasCache == true)
+
+        // load() must return nil — expired cache is treated as a miss
+        #expect(cache.load() == nil)
+    }
 }
 
 // MARK: - Satellite Snapshot Data Tests
