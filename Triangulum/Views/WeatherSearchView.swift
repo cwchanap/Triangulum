@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreLocation
+import os
 
 struct WeatherSearchView: View {
     @State private var searchText = ""
@@ -237,15 +238,20 @@ struct WeatherSearchView: View {
     }
 
     private func loadSearchHistory() {
-        if let data = UserDefaults.standard.data(forKey: "weatherSearchHistory"),
-           let decoded = try? JSONDecoder().decode([SearchedCity].self, from: data) {
-            searchHistory = decoded
+        guard let data = UserDefaults.standard.data(forKey: "weatherSearchHistory") else { return }
+        do {
+            searchHistory = try JSONDecoder().decode([SearchedCity].self, from: data)
+        } catch {
+            Logger.weather.error("Failed to decode weather search history: \(error.localizedDescription)")
         }
     }
 
     private func saveSearchHistory() {
-        if let encoded = try? JSONEncoder().encode(searchHistory) {
+        do {
+            let encoded = try JSONEncoder().encode(searchHistory)
             UserDefaults.standard.set(encoded, forKey: "weatherSearchHistory")
+        } catch {
+            Logger.weather.error("Failed to encode weather search history: \(error.localizedDescription)")
         }
     }
 }
