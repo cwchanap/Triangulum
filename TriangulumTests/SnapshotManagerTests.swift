@@ -520,4 +520,64 @@ struct SnapshotManagerTests {
         #expect(snapshot.photoIDs.isEmpty)
         #expect(snapshot.timestamp.timeIntervalSinceNow < 1.0)
     }
+
+    // Verifies that snapshots and their associated photo files survive a manager
+    // restart pointing at the same UserDefaults suite and photos directory — the
+    // exact scenario that occurs every time the app is relaunched.
+    @Test func testSnapshotSurvivesManagerRecreation() throws {
+        let suiteName = "test_roundtrip_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: dir)
+        }
+
+        // Manager 1: create a snapshot and attach a photo.
+        let manager1 = SnapshotManager(userDefaults: defaults, keyPrefix: "rt_", photosDirectory: dir)
+
+        let testManagers = createTestManagers()
+        let snapshot = SensorSnapshot.capture(
+            barometerManager: testManagers.barometerManager,
+            locationManager: testManagers.locationManager,
+            accelerometerManager: testManagers.accelerometerManager,
+            gyroscopeManager: testManagers.gyroscopeManager,
+            magnetometerManager: testManagers.magnetometerManager,
+            weatherManager: nil,
+            satelliteManager: nil
+        )
+        manager1.addSnapshot(snapshot)
+
+        // Create a minimal 1x1 white image so photo storage code exercises the
+        // JPEG-compression and on-disk write paths without depending on test
+        // fixture files.
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        let added = manager1.addPhoto(to: snapshot.id, image: image)
+        #expect(added == true)
+        #expect(manager1.snapshots.count == 1)
+        #expect(manager1.snapshots.first?.photoIDs.count == 1)
+        let originalPhotoID = try #require(manager1.snapshots.first?.photoIDs.first)
+
+        // Manager 2: simulate an app restart — a fresh instance backed by the
+        // same UserDefaults suite and photos directory as manager1.
+        let manager2 = SnapshotManager(userDefaults: defaults, keyPrefix: "rt_", photosDirectory: dir)
+
+        // The snapshot must be reloaded from UserDefaults with its identity and
+        // photo reference intact.
+        #expect(manager2.snapshots.count == 1)
+        #expect(manager2.snapshots.first?.id == snapshot.id)
+        #expect(manager2.snapshots.first?.photoIDs.count == 1)
+        #expect(manager2.snapshots.first?.photoIDs.first == originalPhotoID)
+
+        // The photo file written by manager1 must still be readable via manager2.
+        let photos = manager2.getPhotos(for: snapshot.id)
+        #expect(photos.count == 1)
+        #expect(photos.first?.id == originalPhotoID)
+        #expect(photos.first?.image != nil)
+    }
 }
