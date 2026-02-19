@@ -475,7 +475,7 @@ class SnapshotManager: ObservableObject {
     /// One-time migration: reads the legacy `snapshot_photos` UserDefaults blob
     /// (a `[UUID: SnapshotPhoto]` payload written before the file-system storage move)
     /// and writes each photo that is still referenced by a loaded snapshot to disk.
-    /// Clears the legacy key on success so this only runs once per install.
+    /// Clears the legacy key only when all referenced photos are successfully migrated.
     private func migrateLegacyPhotosIfNeeded() {
         guard let legacyData = userDefaults.data(forKey: legacyPhotosKey) else { return }
         Logger.snapshot.info("Migrating legacy UserDefaults photos to file system")
@@ -489,23 +489,45 @@ class SnapshotManager: ObservableObject {
         }
 
         let referencedIDs = Set(snapshots.flatMap { $0.photoIDs })
-        var migratedCount = 0
+        var migratedIDs = Set<UUID>()
         for (id, photo) in legacyPhotos where referencedIDs.contains(id) {
             // Only write if file doesn't already exist (idempotent)
             let fileURL = photosDirectory.appendingPathComponent("\(id).jpg")
             guard !FileManager.default.fileExists(atPath: fileURL.path) else {
-                migratedCount += 1
+                migratedIDs.insert(id)
                 continue
             }
             if savePhotoToFile(photo) {
                 photos[id] = photo
-                migratedCount += 1
+                migratedIDs.insert(id)
             }
         }
 
-        Logger.snapshot.info("Migrated \(migratedCount) legacy photos to file system")
-        // Clear legacy payload so migration doesn't run again
-        userDefaults.removeObject(forKey: legacyPhotosKey)
+        Logger.snapshot.info("Migrated \(migratedIDs.count) legacy photos to file system")
+
+        // Determine which referenced IDs exist in legacyPhotos
+        let referencedLegacyIDs = Set(legacyPhotos.keys).intersection(referencedIDs)
+
+        // Only clear legacy key if all referenced photos that exist in legacy were migrated
+        if migratedIDs == referencedLegacyIDs {
+            userDefaults.removeObject(forKey: legacyPhotosKey)
+        } else {
+            // Persist remaining un-migrated photos back to UserDefaults for future retry
+            let unmigratedIDs = referencedLegacyIDs.subtracting(migratedIDs)
+            var unmigratedPhotos: [UUID: SnapshotPhoto] = [:]
+            for id in unmigratedIDs {
+                if let photo = legacyPhotos[id] {
+                    unmigratedPhotos[id] = photo
+                }
+            }
+            do {
+                let data = try JSONEncoder().encode(unmigratedPhotos)
+                userDefaults.set(data, forKey: legacyPhotosKey)
+                Logger.snapshot.warning("Partial migration: \(unmigratedIDs.count) photos remain in UserDefaults for retry")
+            } catch {
+                Logger.snapshot.error("Failed to persist unmigrated photos: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Manually clears corrupted data from storage

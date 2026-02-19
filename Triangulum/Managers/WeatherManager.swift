@@ -186,6 +186,8 @@ class WeatherManager: ObservableObject {
             currentWeather = Weather(from: weatherResponse)
             errorMessage = ""
             Logger.weather.info("Weather data parsed successfully")
+            // Restore monitoring state after successful fetch - indicates auth issues are resolved
+            isMonitoringEnabled = true
             stopFrequentPolling()
         } catch let decodingError as DecodingError {
             isLoading = false
@@ -220,6 +222,19 @@ class WeatherManager: ObservableObject {
 
     /// Call this when API key is updated to recheck availability
     func refreshAvailability() {
+        // Re-enable monitoring if it was stopped, so that successful fetches
+        // can restart the 15-minute timer
+        isMonitoringEnabled = true
         checkAndFetchWeather()
+        // If we have valid conditions but no timer, start the 15-minute timer
+        // (handles case where fetchWeather wasn't called because we already have data)
+        if isAvailable && weatherCheckTimer == nil {
+            Logger.weather.debug("Starting 15-minute timer from refreshAvailability")
+            weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.checkAndFetchWeather()
+                }
+            }
+        }
     }
 }
