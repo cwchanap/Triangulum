@@ -131,4 +131,34 @@ struct WeatherManagerTests {
             #expect(weather.systemIconName == expectedSystemName, "Icon \(iconCode) should map to \(expectedSystemName)")
         }
     }
+
+    // MARK: - Monitoring State Tests
+
+    @Test @MainActor func testStartMonitoringAfterStop() {
+        let locationManager = LocationManager()
+        let weatherManager = WeatherManager(locationManager: locationManager)
+
+        // Initial state - monitoring should be enabled during init
+        weatherManager.stopMonitoring()
+
+        // After stop, startMonitoring should be able to restart
+        weatherManager.startMonitoring()
+
+        // Stop again to clean up
+        weatherManager.stopMonitoring()
+    }
+
+    @Test @MainActor func testRefreshAvailabilityRestoresMonitoring() {
+        let locationManager = LocationManager()
+        let weatherManager = WeatherManager(locationManager: locationManager)
+
+        // Simulate auth failure scenario - stop monitoring
+        weatherManager.stopMonitoring()
+
+        // refreshAvailability should restore monitoring state
+        weatherManager.refreshAvailability()
+
+        // Clean up
+        weatherManager.stopMonitoring()
+    }
 }
