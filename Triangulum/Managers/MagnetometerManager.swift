@@ -1,5 +1,6 @@
 import Foundation
 import CoreMotion
+import os
 
 class MagnetometerManager: ObservableObject {
     private let motionManager: CMMotionManager
@@ -47,7 +48,10 @@ class MagnetometerManager: ObservableObject {
                 return
             }
 
-            guard let data = data else { return }
+            guard let data = data else {
+                Logger.sensor.warning("MagnetometerManager: received nil data without error — reading frozen at last value")
+                return
+            }
 
             self.magneticFieldX = data.magneticField.x
             self.magneticFieldY = data.magneticField.y

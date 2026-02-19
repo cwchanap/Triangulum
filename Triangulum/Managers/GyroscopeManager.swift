@@ -1,5 +1,6 @@
 import Foundation
 import CoreMotion
+import os
 
 class GyroscopeManager: ObservableObject {
     private let motionManager: CMMotionManager
@@ -41,7 +42,10 @@ class GyroscopeManager: ObservableObject {
                 return
             }
 
-            guard let data = data else { return }
+            guard let data = data else {
+                Logger.sensor.warning("GyroscopeManager: received nil data without error — reading frozen at last value")
+                return
+            }
 
             self.rotationX = data.rotationRate.x
             self.rotationY = data.rotationRate.y

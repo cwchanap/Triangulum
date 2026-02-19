@@ -1,5 +1,6 @@
 import Foundation
 import CoreMotion
+import os
 
 class AccelerometerManager: ObservableObject {
     private let motionManager: CMMotionManager
@@ -48,7 +49,10 @@ class AccelerometerManager: ObservableObject {
                 return
             }
 
-            guard let data = data else { return }
+            guard let data = data else {
+                Logger.sensor.warning("AccelerometerManager: received nil data without error — reading frozen at last value")
+                return
+            }
 
             self.accelerationX = data.acceleration.x
             self.accelerationY = data.acceleration.y
