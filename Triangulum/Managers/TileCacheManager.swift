@@ -109,8 +109,12 @@ class TileCacheManager: ObservableObject {
         do {
             let (data, response) = try await urlSession.data(from: url)
 
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                Logger.map.error("TileCacheManager: Non-HTTP response for tile \(tileZ)/\(tileX)/\(tileY)")
+                return nil
+            }
+            guard httpResponse.statusCode == 200 else {
+                Logger.map.warning("TileCacheManager: HTTP \(httpResponse.statusCode) for tile \(tileZ)/\(tileX)/\(tileY)")
                 return nil
             }
 
