@@ -72,49 +72,49 @@ struct MapView: View {
 
             // Search bar: OSM uses Nominatim, Apple uses MKLocalSearch
             HStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass").foregroundColor(.prussianBlueLight)
-                        TextField("Search places", text: $searchText)
-                            .textInputAutocapitalization(.words)
-                            .disableAutocorrection(true)
-                            .onSubmit { performSearch() }
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                                searchMessage = nil
-                                osmSuggestions = []
-                                appleCompleter.results = []
-                            } label: {
-                                Image(systemName: "xmark.circle.fill").foregroundColor(.prussianBlueLight)
-                            }
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundColor(.prussianBlueLight)
+                    TextField("Search places", text: $searchText)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+                        .onSubmit { performSearch() }
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                            searchMessage = nil
+                            osmSuggestions = []
+                            appleCompleter.results = []
+                        } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(.prussianBlueLight)
                         }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Color.prussianSoft.opacity(0.4))
-                    .cornerRadius(10)
-
-                    Button(action: performSearch) {
-                        if isSearching {
-                            ProgressView().scaleEffect(0.7).tint(.prussianAccent)
-                        } else {
-                            Text("Search").font(.subheadline).foregroundColor(.white)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(isSearching ? Color.prussianSoft : Color.prussianAccent)
-                    .cornerRadius(10)
-                    .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    // Limit to visible region toggle (applies to OSM strictly; Apple is a bias)
-                    HStack(spacing: 6) {
-                        Toggle("", isOn: $limitToView).labelsHidden()
-                        Text("Limit to View").font(.caption2).foregroundColor(.prussianBlueDark)
                     }
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.prussianSoft.opacity(0.4))
+                .cornerRadius(10)
+
+                Button(action: performSearch) {
+                    if isSearching {
+                        ProgressView().scaleEffect(0.7).tint(.prussianAccent)
+                    } else {
+                        Text("Search").font(.subheadline).foregroundColor(.white)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(isSearching ? Color.prussianSoft : Color.prussianAccent)
+                .cornerRadius(10)
+                .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                // Limit to visible region toggle (applies to OSM strictly; Apple is a bias)
+                HStack(spacing: 6) {
+                    Toggle("", isOn: $limitToView).labelsHidden()
+                    Text("Limit to View").font(.caption2).foregroundColor(.prussianBlueDark)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 6)
 
             // Autocomplete suggestions (provider-specific)
             if mapProvider == "osm" && !osmSuggestions.isEmpty {
