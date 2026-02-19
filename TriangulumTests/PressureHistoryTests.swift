@@ -125,6 +125,36 @@ struct PressureStatisticsTests {
         #expect(stats.avgAltitude == 100.0)
         #expect(stats.dataPointCount == 10)
     }
+
+    @Test func testStatisticsFailsWhenMinPressureExceedsMax() {
+        // minPressure > maxPressure violates the invariant guarded by the failable initializer
+        let stats = PressureStatistics(
+            minPressure: 110.0,
+            maxPressure: 100.0,
+            avgPressure: 105.0,
+            minAltitude: 50.0,
+            maxAltitude: 150.0,
+            avgAltitude: 100.0,
+            dataPointCount: 5
+        )
+
+        #expect(stats == nil)
+    }
+
+    @Test func testStatisticsFailsWhenAvgPressureBelowMin() {
+        // avgPressure < minPressure violates the invariant guarded by the failable initializer
+        let stats = PressureStatistics(
+            minPressure: 100.0,
+            maxPressure: 105.0,
+            avgPressure: 95.0,
+            minAltitude: 50.0,
+            maxAltitude: 150.0,
+            avgAltitude: 100.0,
+            dataPointCount: 5
+        )
+
+        #expect(stats == nil)
+    }
 }
 
 // MARK: - PressureReading Model Tests
