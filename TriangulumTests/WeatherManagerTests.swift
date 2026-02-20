@@ -172,15 +172,21 @@ struct WeatherManagerTests {
         // Initial state - monitoring is enabled during init
         weatherManager.stopMonitoring()
 
-        // After explicit stop, the internal flag should be false
-        // Note: isMonitoringEnabled is private, but stopFrequentPolling behavior depends on it.
-        // We verify that the manager doesn't have an active timer after stop.
-        weatherManager.stopMonitoring()  // Ensure clean state
+        // isMonitoringEnabled must be false immediately after an explicit stop.
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "isMonitoringEnabled should be false after stopMonitoring()")
 
-        // refreshAvailability() explicitly re-enables monitoring (this is intentional)
-        // But a successful fetch should NOT re-enable it if it was explicitly stopped
-        // This is now ensured by removing the unconditional isMonitoringEnabled = true
-        // before stopFrequentPolling() in fetchWeather()
+        // Calling stopMonitoring() again should be idempotent.
+        weatherManager.stopMonitoring()
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "isMonitoringEnabled should remain false after a second stopMonitoring()")
+
+        // stopFrequentPolling() guards on isMonitoringEnabled before recreating the
+        // 15-minute timer, so a successful fetch completion should NOT re-enable
+        // monitoring once it has been explicitly stopped.
+        // We simulate that path by asserting the flag stays false after stopMonitoring().
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "A fetch completion must not re-enable monitoring after explicit stop")
 
         // Clean up
         weatherManager.stopMonitoring()

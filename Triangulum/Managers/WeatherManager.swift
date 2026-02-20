@@ -9,7 +9,8 @@ class WeatherManager: ObservableObject {
     private var weatherCheckTimer: Timer?
     /// Tracks whether monitoring is active. Set false by stopMonitoring() to prevent
     /// in-flight fetch completions from re-enabling the timer after an explicit stop.
-    private var isMonitoringEnabled: Bool = false
+    /// Internal (not private) so unit tests can verify the flag via @testable import.
+    var isMonitoringEnabled: Bool = false
 
     @Published var currentWeather: Weather?
     @Published var isLoading: Bool = false
@@ -29,9 +30,14 @@ class WeatherManager: ObservableObject {
     }
 
     deinit {
-        // Timer is explicitly stopped via stopMonitoring() called from onDisappear.
-        // Do not invalidate here: deinit can run off the main thread while Timer
-        // must be invalidated on the run loop it was scheduled on.
+        // stopMonitoring() is the preferred cleanup path and should be called from
+        // onDisappear. As a defensive fallback, dispatch invalidation back to the
+        // main run loop — the same thread the Timer was scheduled on — so a missed
+        // stopMonitoring() call never leaks a firing Timer.
+        let timer = weatherCheckTimer
+        DispatchQueue.main.async {
+            timer?.invalidate()
+        }
     }
 
     private func setupLocationObserver() {
