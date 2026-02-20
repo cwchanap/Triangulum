@@ -92,12 +92,23 @@ struct SnapshotCreationView: View {
                 }
             }
         }
-        .onChange(of: tempSelectedPhotos) { _, newPhotos in
-            if !newPhotos.isEmpty {
+        .onChange(of: tempSelectedPhotos) { oldPhotos, newPhotos in
+            // Diff to handle additions vs removals incrementally
+            let addedPhotos = newPhotos.filter { !oldPhotos.contains($0) }
+            let removedPhotos = oldPhotos.filter { !newPhotos.contains($0) }
+            
+            // Remove corresponding entries for deselected photos (no async needed)
+            if !removedPhotos.isEmpty {
+                pairedPreviewItems.removeAll { pair in
+                    removedPhotos.contains(pair.pickerItem)
+                }
+            }
+            
+            // Load previews only for newly added photos
+            if !addedPhotos.isEmpty {
                 isProcessingPhotos = true
-                // Process selected photos and create preview images
                 Task {
-                    await loadPhotoPreviewImages(from: newPhotos)
+                    await loadPhotoPreviewImagesForNewItems(addedPhotos)
                     await MainActor.run {
                         isProcessingPhotos = false
                     }
@@ -357,6 +368,27 @@ struct SnapshotCreationView: View {
 
         await MainActor.run {
             pairedPreviewItems = newPairs
+        }
+    }
+
+    /// Loads preview images only for newly added photos and appends them to pairedPreviewItems.
+    /// Used by onChange to incrementally update without reloading existing items.
+    private func loadPhotoPreviewImagesForNewItems(_ newPhotoItems: [PhotosPickerItem]) async {
+        var newPairs: [PairedPreviewItem] = []
+
+        for photoItem in newPhotoItems {
+            do {
+                if let data = try await photoItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    newPairs.append(PairedPreviewItem(pickerItem: photoItem, image: image))
+                }
+            } catch {
+                Logger.snapshot.error("Failed to load preview image: \(error.localizedDescription)")
+            }
+        }
+
+        await MainActor.run {
+            pairedPreviewItems.append(contentsOf: newPairs)
         }
     }
 }
