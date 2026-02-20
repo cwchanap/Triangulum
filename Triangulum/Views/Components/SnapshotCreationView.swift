@@ -33,6 +33,9 @@ struct SnapshotCreationView: View {
     @State private var showingCamera = false
     @State private var capturedImages: [CapturedImageItem] = []
     @State private var pairedPreviewItems: [PairedPreviewItem] = []
+    /// Tracks the in-flight Task that loads photo previews so it can be cancelled
+    /// when the selection changes or the view is dismissed.
+    @State private var previewLoadingTask: Task<Void, Never>?
 
     var body: some View {
         NavigationView {
@@ -83,10 +86,12 @@ struct SnapshotCreationView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
+                        // Cancel any in-flight preview loading, reset state, and dismiss.
+                        previewLoadingTask?.cancel()
+                        previewLoadingTask = nil
+                        isProcessingPhotos = false
+                        tempSelectedPhotos.removeAll()
                         isPresented = false
-                        if !isProcessingPhotos {
-                            tempSelectedPhotos.removeAll()
-                        }
                     }
                     .foregroundColor(.white)
                 }
@@ -107,7 +112,8 @@ struct SnapshotCreationView: View {
             // Load previews only for newly added photos
             if !addedPhotos.isEmpty {
                 isProcessingPhotos = true
-                Task {
+                previewLoadingTask?.cancel()
+                previewLoadingTask = Task {
                     await loadPhotoPreviewImagesForNewItems(addedPhotos)
                     await MainActor.run {
                         isProcessingPhotos = false
@@ -175,11 +181,11 @@ struct SnapshotCreationView: View {
                     .background(Color.prussianBlueLight.opacity(0.1))
                     .cornerRadius(8)
                 }
-                .disabled(capturedImages.count + pairedPreviewItems.count >= 5)
+                .disabled(capturedImages.count + tempSelectedPhotos.count >= 5)
 
                 PhotosPicker(
                     selection: $tempSelectedPhotos,
-                    maxSelectionCount: max(0, 5 - capturedImages.count - pairedPreviewItems.count),
+                    maxSelectionCount: max(0, 5 - capturedImages.count - tempSelectedPhotos.count),
                     matching: .images
                 ) {
                     HStack {
@@ -193,7 +199,7 @@ struct SnapshotCreationView: View {
                     .background(Color.prussianBlueLight.opacity(0.1))
                     .cornerRadius(8)
                 }
-                .disabled(capturedImages.count + pairedPreviewItems.count >= 5)
+                .disabled(capturedImages.count + tempSelectedPhotos.count >= 5)
 
                 Spacer()
             }
@@ -217,7 +223,7 @@ struct SnapshotCreationView: View {
         .padding(.horizontal)
         .sheet(isPresented: $showingCamera) {
             ImagePicker(sourceType: .camera) { image in
-                if capturedImages.count + pairedPreviewItems.count < 5 {
+                if capturedImages.count + tempSelectedPhotos.count < 5 {
                     capturedImages.append(CapturedImageItem(image: image))
                 }
             }
@@ -287,6 +293,10 @@ struct SnapshotCreationView: View {
 
     private func saveSnapshot() {
         guard let snapshot = snapshot else { return }
+        // Prevent re-entry on rapid taps; isProcessingPhotos is also reflected in
+        // the button's .disabled modifier but we guard here for safety.
+        guard !isProcessingPhotos else { return }
+        isProcessingPhotos = true
 
         // Add the snapshot first
         snapshotManager.addSnapshot(snapshot)
@@ -298,7 +308,6 @@ struct SnapshotCreationView: View {
 
         // Then process photos from library if any
         if !tempSelectedPhotos.isEmpty {
-            isProcessingPhotos = true
             Task {
                 await processSelectedPhotos(for: snapshot.id)
                 await MainActor.run {
