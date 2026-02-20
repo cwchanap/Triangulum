@@ -186,8 +186,6 @@ class WeatherManager: ObservableObject {
             currentWeather = Weather(from: weatherResponse)
             errorMessage = ""
             Logger.weather.info("Weather data parsed successfully")
-            // Restore monitoring state after successful fetch - indicates auth issues are resolved
-            isMonitoringEnabled = true
             stopFrequentPolling()
         } catch let decodingError as DecodingError {
             isLoading = false
