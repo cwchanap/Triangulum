@@ -107,6 +107,10 @@ struct SnapshotCreationView: View {
                 pairedPreviewItems.removeAll { pair in
                     removedPhotos.contains(pair.pickerItem)
                 }
+                // Cancel any in-flight decode that may still append previews for
+                // the removed photos, which would re-introduce stale thumbnails.
+                previewLoadingTask?.cancel()
+                previewLoadingTask = nil
             }
             
             // Load previews only for newly added photos
@@ -185,7 +189,7 @@ struct SnapshotCreationView: View {
 
                 PhotosPicker(
                     selection: $tempSelectedPhotos,
-                    maxSelectionCount: max(0, 5 - capturedImages.count - tempSelectedPhotos.count),
+                    maxSelectionCount: max(0, 5 - capturedImages.count),
                     matching: .images
                 ) {
                     HStack {
