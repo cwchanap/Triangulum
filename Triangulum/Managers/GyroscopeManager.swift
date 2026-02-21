@@ -33,12 +33,7 @@ class GyroscopeManager: ObservableObject {
             guard let self = self else { return }
 
             if let error = error {
-                let nsError = error as NSError
-                if nsError.domain == CMErrorDomain && nsError.code == Int(CMErrorMotionActivityNotAuthorized.rawValue) {
-                    self.errorMessage = "Motion sensor access denied. Please enable Motion & Fitness in Settings > Privacy & Security > Motion & Fitness"
-                } else {
-                    self.errorMessage = "Error reading gyroscope: \(error.localizedDescription)"
-                }
+                self.errorMessage = "Error reading gyroscope: \(error.localizedDescription)"
                 return
             }
 
