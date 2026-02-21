@@ -173,9 +173,15 @@ class WeatherManager: ObservableObject {
             Logger.weather.debug("HTTP Status Code: \(httpResponse.statusCode)")
 
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                Logger.weather.error("Authorization error: HTTP \(httpResponse.statusCode) — stopping polling")
+                Logger.weather.error("Authorization error: HTTP \(httpResponse.statusCode, privacy: .public) — pausing polls until key is updated")
                 errorMessage = "API Error: HTTP \(httpResponse.statusCode) – check your API key"
-                stopMonitoring()
+                // Stop the timer to avoid hammering the API with a bad key, but keep
+                // isMonitoringEnabled = true.  That way a subsequent manual refresh
+                // (refreshWeather/refreshAvailability) can call fetchWeather(), succeed
+                // once the key is corrected, and have stopFrequentPolling() re-arm the
+                // 15-minute timer without needing a full lifecycle restart.
+                weatherCheckTimer?.invalidate()
+                weatherCheckTimer = nil
                 return
             }
 

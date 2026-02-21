@@ -285,7 +285,7 @@ struct SnapshotRowView: View {
     var isSelected: Bool = false
 
     private var photoCount: Int {
-        snapshotManager.getPhotos(for: snapshot.id).count
+        snapshot.photoIDs.count
     }
 
     var body: some View {
@@ -384,6 +384,9 @@ struct SnapshotDetailView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var showingDeletePhotoAlert = false
     @State private var photoToDelete: UUID?
+    /// In-memory snapshot of photos for this view; populated asynchronously
+    /// via prewarmCache so disk I/O never blocks the main thread.
+    @State private var loadedPhotos: [SnapshotPhoto] = []
 
     private var seaLevelPressureText: String {
         guard let seaLevelPressure = snapshot.barometer.seaLevelPressure else {
@@ -396,111 +399,10 @@ struct SnapshotDetailView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Photos")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.prussianBlueDark)
-
-                            Spacer()
-
-                            PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.prussianBlue)
-                            }
-                        }
-
-                        let photos = snapshotManager.getPhotos(for: snapshot.id)
-                        if photos.isEmpty {
-                            Text("No photos added yet")
-                                .font(.body)
-                                .foregroundColor(.prussianBlueLight)
-                                .italic()
-                        } else {
-                            LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
-                                spacing: 8
-                            ) {
-                                ForEach(photos) { photo in
-                                    if let image = photo.image {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 80, height: 80)
-                                            .clipped()
-                                            .cornerRadius(8)
-                                            .onLongPressGesture {
-                                                photoToDelete = photo.id
-                                                showingDeletePhotoAlert = true
-                                            }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(12)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Barometer Data")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.prussianBlueDark)
-
-                        DetailRowView(label: "Pressure", value: String(format: "%.2f kPa", snapshot.barometer.pressure))
-                        DetailRowView(
-                            label: "Sea Level Pressure",
-                            value: seaLevelPressureText
-                        )
-
-                        if let attitude = snapshot.barometer.attitude {
-                            DetailRowView(label: "Roll", value: String(format: "%.1f°", attitude.roll * 180 / .pi))
-                            DetailRowView(label: "Pitch", value: String(format: "%.1f°", attitude.pitch * 180 / .pi))
-                            DetailRowView(label: "Yaw", value: String(format: "%.1f°", attitude.yaw * 180 / .pi))
-                        }
-                    }
-                    .padding()
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(12)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Location Data")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.prussianBlueDark)
-
-                        DetailRowView(label: "Latitude", value: String(format: "%.6f°", snapshot.location.latitude))
-                        DetailRowView(label: "Longitude", value: String(format: "%.6f°", snapshot.location.longitude))
-                        DetailRowView(
-                            label: "GPS Altitude",
-                            value: String(format: "%.2f m", snapshot.location.altitude)
-                        )
-                        DetailRowView(label: "Accuracy", value: String(format: "±%.2f m", snapshot.location.accuracy))
-                    }
-                    .padding()
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(12)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Timestamp")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.prussianBlueDark)
-
-                        Text(
-                            snapshot.timestamp,
-                            format: .dateTime.weekday().month().day().year().hour().minute().second()
-                        )
-                            .font(.body)
-                            .foregroundColor(.prussianBlueDark)
-                    }
-                    .padding()
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(12)
+                    photoSection
+                    barometerSection
+                    locationSection
+                    timestampSection
                 }
                 .padding()
             }
@@ -512,10 +414,8 @@ struct SnapshotDetailView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
+                    Button("Done") { dismiss() }
+                        .foregroundColor(.white)
                 }
             }
         }
@@ -524,20 +424,14 @@ struct SnapshotDetailView: View {
                 for photoItem in newPhotos {
                     if let data = try? await photoItem.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
-                        await MainActor.run {
-                            _ = snapshotManager.addPhoto(to: snapshot.id, image: image)
-                        }
+                        await MainActor.run { _ = snapshotManager.addPhoto(to: snapshot.id, image: image) }
                     }
                 }
-                await MainActor.run {
-                    selectedPhotos.removeAll()
-                }
+                await MainActor.run { selectedPhotos.removeAll() }
             }
         }
         .alert("Delete Photo", isPresented: $showingDeletePhotoAlert) {
-            Button("Cancel", role: .cancel) {
-                photoToDelete = nil
-            }
+            Button("Cancel", role: .cancel) { photoToDelete = nil }
             Button("Delete", role: .destructive) {
                 if let photoID = photoToDelete {
                     snapshotManager.removePhoto(photoID, from: snapshot.id)
@@ -547,6 +441,110 @@ struct SnapshotDetailView: View {
         } message: {
             Text("This will permanently delete this photo from the snapshot.")
         }
+        .task(id: snapshot.id) {
+            await snapshotManager.prewarmCache(for: snapshot.id)
+            loadedPhotos = snapshotManager.getPhotos(for: snapshot.id)
+        }
+        .onChange(of: snapshotManager.snapshots.first(where: { $0.id == snapshot.id })?.photoIDs.count ?? 0) { _, _ in
+            loadedPhotos = snapshotManager.getPhotos(for: snapshot.id)
+        }
+    }
+
+    @ViewBuilder private var photoSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Photos")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.prussianBlueDark)
+                Spacer()
+                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.prussianBlue)
+                }
+            }
+            if loadedPhotos.isEmpty {
+                Text("No photos added yet")
+                    .font(.body)
+                    .foregroundColor(.prussianBlueLight)
+                    .italic()
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                    spacing: 8
+                ) {
+                    ForEach(loadedPhotos) { photo in
+                        if let image = photo.image {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 80, height: 80)
+                                .clipped()
+                                .cornerRadius(8)
+                                .onLongPressGesture {
+                                    photoToDelete = photo.id
+                                    showingDeletePhotoAlert = true
+                                }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.8))
+        .cornerRadius(12)
+    }
+
+    @ViewBuilder private var barometerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Barometer Data")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.prussianBlueDark)
+            DetailRowView(label: "Pressure", value: String(format: "%.2f kPa", snapshot.barometer.pressure))
+            DetailRowView(label: "Sea Level Pressure", value: seaLevelPressureText)
+            if let attitude = snapshot.barometer.attitude {
+                DetailRowView(label: "Roll", value: String(format: "%.1f°", attitude.roll * 180 / .pi))
+                DetailRowView(label: "Pitch", value: String(format: "%.1f°", attitude.pitch * 180 / .pi))
+                DetailRowView(label: "Yaw", value: String(format: "%.1f°", attitude.yaw * 180 / .pi))
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.8))
+        .cornerRadius(12)
+    }
+
+    @ViewBuilder private var locationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Location Data")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.prussianBlueDark)
+            DetailRowView(label: "Latitude", value: String(format: "%.6f°", snapshot.location.latitude))
+            DetailRowView(label: "Longitude", value: String(format: "%.6f°", snapshot.location.longitude))
+            DetailRowView(label: "GPS Altitude", value: String(format: "%.2f m", snapshot.location.altitude))
+            DetailRowView(label: "Accuracy", value: String(format: "±%.2f m", snapshot.location.accuracy))
+        }
+        .padding()
+        .background(Color.white.opacity(0.8))
+        .cornerRadius(12)
+    }
+
+    @ViewBuilder private var timestampSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Timestamp")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.prussianBlueDark)
+            Text(snapshot.timestamp,
+                 format: .dateTime.weekday().month().day().year().hour().minute().second())
+                .font(.body)
+                .foregroundColor(.prussianBlueDark)
+        }
+        .padding()
+        .background(Color.white.opacity(0.8))
+        .cornerRadius(12)
     }
 }
 
