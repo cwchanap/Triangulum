@@ -36,6 +36,8 @@ struct SnapshotCreationView: View {
     /// Tracks the in-flight Task that loads photo previews so it can be cancelled
     /// when the selection changes or the view is dismissed.
     @State private var previewLoadingTask: Task<Void, Never>?
+    /// Tracks the in-flight Task that saves photos so it can be cancelled via Cancel.
+    @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
         NavigationView {
@@ -86,9 +88,11 @@ struct SnapshotCreationView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
-                        // Cancel any in-flight preview loading, reset state, and dismiss.
+                        // Cancel any in-flight preview loading or photo saving, reset state, and dismiss.
                         previewLoadingTask?.cancel()
                         previewLoadingTask = nil
+                        saveTask?.cancel()
+                        saveTask = nil
                         isProcessingPhotos = false
                         tempSelectedPhotos.removeAll()
                         isPresented = false
@@ -312,9 +316,10 @@ struct SnapshotCreationView: View {
 
         // Then process photos from library if any
         if !tempSelectedPhotos.isEmpty {
-            Task {
+            saveTask = Task {
                 await processSelectedPhotos(for: snapshot.id)
                 await MainActor.run {
+                    saveTask = nil
                     finishSaving()
                 }
             }
@@ -344,6 +349,7 @@ struct SnapshotCreationView: View {
         }
 
         for photoItem in tempSelectedPhotos {
+            guard !Task.isCancelled else { return }
             if let image = previewMap[photoItem] {
                 // Reuse the preview-pass decode
                 await MainActor.run {
@@ -362,25 +368,6 @@ struct SnapshotCreationView: View {
                     Logger.snapshot.error("Failed to process photo: \(error.localizedDescription)")
                 }
             }
-        }
-    }
-
-    private func loadPhotoPreviewImages(from photoItems: [PhotosPickerItem]) async {
-        var newPairs: [PairedPreviewItem] = []
-
-        for photoItem in photoItems {
-            do {
-                if let data = try await photoItem.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    newPairs.append(PairedPreviewItem(pickerItem: photoItem, image: image))
-                }
-            } catch {
-                Logger.snapshot.error("Failed to load preview image: \(error.localizedDescription)")
-            }
-        }
-
-        await MainActor.run {
-            pairedPreviewItems = newPairs
         }
     }
 

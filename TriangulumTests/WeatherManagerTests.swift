@@ -140,12 +140,18 @@ struct WeatherManagerTests {
 
         // Initial state - monitoring should be enabled during init
         weatherManager.stopMonitoring()
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "isMonitoringEnabled should be false after stopMonitoring()")
 
         // After stop, startMonitoring should be able to restart
         weatherManager.startMonitoring()
+        #expect(weatherManager.isMonitoringEnabled == true,
+                "isMonitoringEnabled should be true after startMonitoring()")
 
         // Stop again to clean up
         weatherManager.stopMonitoring()
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "isMonitoringEnabled should be false after final stopMonitoring()")
     }
 
     @Test @MainActor func testRefreshAvailabilityRestoresMonitoring() {
@@ -154,9 +160,13 @@ struct WeatherManagerTests {
 
         // Simulate auth failure scenario - stop monitoring
         weatherManager.stopMonitoring()
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "isMonitoringEnabled should be false after stopMonitoring()")
 
         // refreshAvailability should restore monitoring state
         weatherManager.refreshAvailability()
+        #expect(weatherManager.isMonitoringEnabled == true,
+                "refreshAvailability() should set isMonitoringEnabled back to true")
 
         // Clean up
         weatherManager.stopMonitoring()
@@ -165,7 +175,7 @@ struct WeatherManagerTests {
     /// Verify that explicit stopMonitoring() is not overridden by fetch completion.
     /// This test ensures the fix for the issue where successful fetch would unconditionally
     /// re-enable monitoring even after an explicit stop.
-    @Test @MainActor func testExplicitStopMonitoringNotOverriddenByFetchCompletion() {
+    @Test @MainActor func testExplicitStopMonitoringNotOverriddenByFetchCompletion() async {
         let locationManager = LocationManager()
         let weatherManager = WeatherManager(locationManager: locationManager)
 
@@ -181,10 +191,11 @@ struct WeatherManagerTests {
         #expect(weatherManager.isMonitoringEnabled == false,
                 "isMonitoringEnabled should remain false after a second stopMonitoring()")
 
-        // stopFrequentPolling() guards on isMonitoringEnabled before recreating the
-        // 15-minute timer, so a successful fetch completion should NOT re-enable
-        // monitoring once it has been explicitly stopped.
-        // We simulate that path by asserting the flag stays false after stopMonitoring().
+        // Simulate a fetch completion path: invoke fetchWeather() after an explicit stop
+        // to exercise that stopFrequentPolling() guards on isMonitoringEnabled before
+        // recreating the 15-minute timer. fetchWeather() will return early (no valid API
+        // key in tests) but must not re-enable monitoring.
+        await weatherManager.fetchWeather()
         #expect(weatherManager.isMonitoringEnabled == false,
                 "A fetch completion must not re-enable monitoring after explicit stop")
 

@@ -26,16 +26,36 @@ struct SnapshotManagerTests {
         return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
     }
 
+    // Container that bundles a SnapshotManager with its cleanup resources.
+    private struct TestManagerContainer {
+        let manager: SnapshotManager
+        let suiteName: String
+        let photosDirectory: URL
+
+        /// Removes the UserDefaults persistent domain and deletes the temporary photos directory.
+        @MainActor func cleanup() {
+            manager.resetStorage()
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: photosDirectory)
+        }
+    }
+
+    // Helper function to create a test manager with full cleanup support.
+    private func createTestManagerContainer() -> TestManagerContainer {
+        let suiteName = "SnapshotManagerTests_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        let testPhotosDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_\(UUID().uuidString)")
+        let manager = SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_", photosDirectory: testPhotosDir)
+        return TestManagerContainer(manager: manager, suiteName: suiteName, photosDirectory: testPhotosDir)
+    }
+
     // Helper to create an isolated SnapshotManager for testing.
     // Each call creates a unique temporary directory; call manager.resetStorage()
     // at the end of a test (or let the unique UUID path be collected by the OS)
     // to avoid accumulating stale tmp directories between test runs.
     private func createTestManager() -> SnapshotManager {
-        let testDefaults = UserDefaults(suiteName: "SnapshotManagerTests_\(UUID().uuidString)")!
-        let testPhotosDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SnapshotManagerTests_\(UUID().uuidString)")
-        let manager = SnapshotManager(userDefaults: testDefaults, keyPrefix: "test_", photosDirectory: testPhotosDir)
-        return manager
+        createTestManagerContainer().manager
     }
 
     // Helper struct to hold test sensor managers
@@ -97,7 +117,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testAddSnapshot() {
-        let manager = createTestManager()
+        let container = createTestManagerContainer()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -151,8 +173,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testDeleteSnapshotCleansUpPhotos() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManagerContainer()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -417,8 +440,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testMultiplePhotosPerSnapshot() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManagerContainer()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -447,8 +471,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testPhotoLimitEnforcement() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManagerContainer()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(

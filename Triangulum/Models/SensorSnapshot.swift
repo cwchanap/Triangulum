@@ -382,7 +382,7 @@ class SnapshotManager: ObservableObject {
                 do {
                     data = try Data(contentsOf: fileURL)
                 } catch {
-                    print("[snapshot] prewarmCache: failed to load photo \(id): \(error.localizedDescription)")
+                    Logger.snapshot.error("[snapshot] prewarmCache: failed to load photo \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     return nil
                 }
                 let metaURL = dir.appendingPathComponent("\(id).json")
@@ -392,7 +392,7 @@ class SnapshotManager: ObservableObject {
                     let meta = try JSONDecoder().decode(PhotoMetadata.self, from: metaData)
                     timestamp = meta.timestamp
                 } catch {
-                    print("[snapshot] prewarmCache: missing/corrupt metadata for \(id), using current time: \(error.localizedDescription)")
+                    Logger.snapshot.warning("[snapshot] prewarmCache: missing/corrupt metadata for \(id, privacy: .public), using current time: \(error.localizedDescription, privacy: .public)")
                     timestamp = Date()
                 }
                 return (id, SnapshotPhoto(id: id, imageData: data, timestamp: timestamp))

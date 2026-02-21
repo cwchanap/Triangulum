@@ -221,7 +221,18 @@ class WeatherManager: ObservableObject {
     func startMonitoring() {
         guard weatherCheckTimer == nil else { return }
         isMonitoringEnabled = true
-        setupLocationObserver()
+        if currentWeather != nil {
+            // Weather already fetched — skip the frequent 3-second poll and go
+            // straight to the 15-minute schedule to avoid unnecessary requests.
+            Logger.weather.debug("startMonitoring: existing weather data found, starting 15-minute timer directly")
+            weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.checkAndFetchWeather()
+                }
+            }
+        } else {
+            setupLocationObserver()
+        }
     }
 
     /// Call this when API key is updated to recheck availability

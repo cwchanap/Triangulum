@@ -27,12 +27,6 @@ class AccelerometerManager: ObservableObject {
             return
         }
 
-        // Check if motion permissions are likely denied by testing availability
-        guard motionManager.isAccelerometerAvailable else {
-            errorMessage = "Motion & Fitness permission required. Enable in Settings > Privacy & Security."
-            return
-        }
-
         motionManager.accelerometerUpdateInterval = 0.1
 
         motionManager.startAccelerometerUpdates(to: .main) { [weak self] data, error in
