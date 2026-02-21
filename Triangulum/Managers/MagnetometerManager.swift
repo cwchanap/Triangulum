@@ -28,11 +28,6 @@ class MagnetometerManager: ObservableObject {
             return
         }
 
-        guard motionManager.isMagnetometerAvailable else {
-            errorMessage = "Motion sensors require privacy permissions. Please enable Motion & Fitness access in Settings."
-            return
-        }
-
         motionManager.magnetometerUpdateInterval = 0.1
 
         motionManager.startMagnetometerUpdates(to: .main) { [weak self] data, error in

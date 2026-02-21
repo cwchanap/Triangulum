@@ -479,6 +479,7 @@ struct MapView: View {
             // Clear suggestions when switching providers
             osmSuggestions = []
             appleCompleter.results = []
+            centerOnUserLocationIfAvailable()
         }
         .onAppear {
             // Auto-center on user location when view appears if location is available
@@ -622,7 +623,7 @@ extension MapView {
                         isSearching = false
                         guard let first = results.first else {
                             searchMessage = "No results for '\(query)'"
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                            Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
                             return
                         }
                         osmCenter = first.coordinate
@@ -631,14 +632,14 @@ extension MapView {
                         searchMessage = first.displayName
                         selectedResultCoordinate = first.coordinate
                         selectedResultTitle = first.displayName
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                        Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
                     }
                 } catch {
                     await MainActor.run {
                         isSearching = false
                         searchMessage = "Search failed: \(error.localizedDescription)"
-                        Logger.app.error("OSM search error for '\(query)': \(error.localizedDescription)")
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { searchMessage = nil }
+                        Logger.map.error("OSM search error for '\(query, privacy: .public)': \(error.localizedDescription, privacy: .public)")
+                        Task { @MainActor in try? await Task.sleep(for: .seconds(3)); searchMessage = nil }
                     }
                 }
             }
@@ -659,13 +660,13 @@ extension MapView {
                 isSearching = false
                 if let error = error {
                     searchMessage = "Search error: \(error.localizedDescription)"
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { searchMessage = nil }
+                    Task { @MainActor in try? await Task.sleep(for: .seconds(2.5)); searchMessage = nil }
                     return
                 }
 
                 guard let response = response, !response.mapItems.isEmpty else {
                     searchMessage = "No results for ‘\(query)’"
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                    Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
                     return
                 }
 
@@ -682,7 +683,7 @@ extension MapView {
                 searchMessage = item.name ?? "Found location"
                 selectedResultCoordinate = coord
                 selectedResultTitle = item.name ?? "Result"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
             }
         }
     }
@@ -707,7 +708,7 @@ extension MapView {
                 } catch is CancellationError {
                     // Task was cancelled by a newer keystroke — nothing to do
                 } catch {
-                    Logger.app.error("OSM autocomplete error: \(error.localizedDescription)")
+                    Logger.map.error("OSM autocomplete error: \(error.localizedDescription, privacy: .public)")
                 }
             }
         } else {
@@ -729,26 +730,36 @@ extension MapView {
         osmSuggestions = []
         selectedResultCoordinate = result.coordinate
         selectedResultTitle = result.displayName
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+        Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
     }
 
     private func selectAppleCompletion(_ completion: MKLocalSearchCompletion) {
         let req = MKLocalSearch.Request(completion: completion)
         let search = MKLocalSearch(request: req)
         isSearching = true
-        search.start { response, _ in
+        search.start { response, error in
             isSearching = false
-            if let item = response?.mapItems.first {
-                let coord = item.placemark.coordinate
-                withAnimation(.easeInOut(duration: 0.8)) {
-                    position = .region(MKCoordinateRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)))
-                }
-                searchMessage = item.name ?? completion.title
-                selectedResultCoordinate = coord
-                selectedResultTitle = item.name ?? completion.title
+            if let error = error {
+                searchMessage = error.localizedDescription
                 appleCompleter.results = []
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { searchMessage = nil }
+                Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
+                return
             }
+            guard let item = response?.mapItems.first else {
+                searchMessage = "No results found"
+                appleCompleter.results = []
+                Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
+                return
+            }
+            let coord = item.placemark.coordinate
+            withAnimation(.easeInOut(duration: 0.8)) {
+                position = .region(MKCoordinateRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)))
+            }
+            searchMessage = item.name ?? completion.title
+            selectedResultCoordinate = coord
+            selectedResultTitle = item.name ?? completion.title
+            appleCompleter.results = []
+            Task { @MainActor in try? await Task.sleep(for: .seconds(2)); searchMessage = nil }
         }
     }
 }

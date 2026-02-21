@@ -60,7 +60,7 @@ class TileCacheManager: ObservableObject {
             modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
             let errorMessage = "Failed to create TileCacheManager ModelContainer: \(error.localizedDescription)"
-            Logger.map.error("\(errorMessage)")
+            Logger.map.error("\(errorMessage, privacy: .public)")
             initializationError = errorMessage
         }
     }
@@ -95,7 +95,7 @@ class TileCacheManager: ObservableObject {
                 }
             }
         } catch {
-            Logger.map.error("TileCacheManager: Error fetching cached tile: \(error.localizedDescription)")
+            Logger.map.error("TileCacheManager: Error fetching cached tile: \(error.localizedDescription, privacy: .public)")
         }
 
         // Download tile if not in cache or expired
@@ -127,12 +127,12 @@ class TileCacheManager: ObservableObject {
                 updateCacheStats()
                 await cleanupCacheIfNeeded()
             } catch {
-                Logger.map.error("TileCacheManager: Error saving tile to cache: \(error.localizedDescription)")
+                Logger.map.error("TileCacheManager: Error saving tile to cache: \(error.localizedDescription, privacy: .public)")
             }
 
             return data
         } catch {
-            Logger.map.error("TileCacheManager: Error downloading tile: \(error.localizedDescription)")
+            Logger.map.error("TileCacheManager: Error downloading tile: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -156,7 +156,7 @@ class TileCacheManager: ObservableObject {
 
         guard let modelContainer = modelContainer else {
             let errorMessage = "Cannot download tiles: cache not available"
-            Logger.map.error("TileCacheManager: \(errorMessage)")
+            Logger.map.error("TileCacheManager: \(errorMessage, privacy: .public)")
             lastOperationError = errorMessage
             isDownloading = false
             return
@@ -236,7 +236,7 @@ class TileCacheManager: ObservableObject {
                     self.cacheSize = tiles.reduce(0) { $0 + $1.data.count }
                 }
             } catch {
-                Logger.map.error("TileCacheManager: Error updating cache stats: \(error.localizedDescription)")
+                Logger.map.error("TileCacheManager: Error updating cache stats: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -280,7 +280,7 @@ class TileCacheManager: ObservableObject {
             try context.save()
             updateCacheStats()
         } catch {
-            Logger.map.error("TileCacheManager: Error cleaning up cache: \(error.localizedDescription)")
+            Logger.map.error("TileCacheManager: Error cleaning up cache: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -290,7 +290,7 @@ class TileCacheManager: ObservableObject {
     func clearCache() async -> Bool {
         guard let modelContainer = modelContainer else {
             let errorMessage = "Cannot clear cache: cache not available"
-            Logger.map.error("TileCacheManager: \(errorMessage)")
+            Logger.map.error("TileCacheManager: \(errorMessage, privacy: .public)")
             lastOperationError = errorMessage
             return false
         }
@@ -311,7 +311,7 @@ class TileCacheManager: ObservableObject {
             return true
         } catch {
             let errorMessage = "Error clearing cache: \(error.localizedDescription)"
-            Logger.map.error("TileCacheManager: \(errorMessage)")
+            Logger.map.error("TileCacheManager: \(errorMessage, privacy: .public)")
             lastOperationError = errorMessage
             return false
         }
