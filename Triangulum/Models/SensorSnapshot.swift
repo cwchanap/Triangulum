@@ -354,15 +354,17 @@ class SnapshotManager: ObservableObject {
         saveSnapshots()
     }
 
+    /// Returns the photos for a snapshot from the in-memory cache only.
+    ///
+    /// Photos added this session (via `addPhoto`) are immediately available.
+    /// For photos belonging to a snapshot loaded from a previous session, call
+    /// `prewarmCache(for:)` first (off the main thread) so disk reads don't
+    /// block the main actor during rendering.
     func getPhotos(for snapshotID: UUID) -> [SnapshotPhoto] {
         guard let snapshot = snapshots.first(where: { $0.id == snapshotID }) else { return [] }
         return snapshot.photoIDs.compactMap { id in
             if let cached = photos[id] { return cached }
             if let cached = photoCache[id] { return cached }
-            if let loaded = loadPhotoFromFile(id: id) {
-                photoCache[id] = loaded
-                return loaded
-            }
             return nil
         }
     }

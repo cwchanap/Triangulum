@@ -549,7 +549,7 @@ struct SnapshotManagerTests {
     // Verifies that snapshots and their associated photo files survive a manager
     // restart pointing at the same UserDefaults suite and photos directory — the
     // exact scenario that occurs every time the app is relaunched.
-    @Test func testSnapshotSurvivesManagerRecreation() throws {
+    @Test func testSnapshotSurvivesManagerRecreation() async throws {
         let suiteName = "test_roundtrip_\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         let dir = FileManager.default.temporaryDirectory
@@ -600,6 +600,8 @@ struct SnapshotManagerTests {
         #expect(manager2.snapshots.first?.photoIDs.first == originalPhotoID)
 
         // The photo file written by manager1 must still be readable via manager2.
+        // prewarmCache loads disk files off the main actor; getPhotos then reads from cache.
+        await manager2.prewarmCache(for: snapshot.id)
         let photos = manager2.getPhotos(for: snapshot.id)
         #expect(photos.count == 1)
         #expect(photos.first?.id == originalPhotoID)
