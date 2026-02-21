@@ -13,6 +13,7 @@ import os
 struct TriangulumApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
+            Item.self,          // legacy placeholder — kept for store compatibility
             SensorReading.self,
             MapTile.self,
             PressureReading.self
