@@ -445,7 +445,7 @@ struct SnapshotDetailView: View {
             await snapshotManager.prewarmCache(for: snapshot.id)
             loadedPhotos = snapshotManager.getPhotos(for: snapshot.id)
         }
-        .onChange(of: snapshotManager.snapshots.first(where: { $0.id == snapshot.id })?.photoIDs.count ?? 0) { _, _ in
+        .onChange(of: snapshotManager.snapshots.first(where: { $0.id == snapshot.id })?.photoIDs ?? []) { _, _ in
             loadedPhotos = snapshotManager.getPhotos(for: snapshot.id)
         }
     }
