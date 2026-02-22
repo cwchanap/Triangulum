@@ -403,17 +403,8 @@ class SatelliteManager: ObservableObject {
         let observerLon = locationManager.longitude
         let now = Date()
 
-        if let lastUpdate = lastNextPassUpdate,
-           let lastLocation = lastNextPassLocation,
-           let nextPass = nextISSPass,
-           nextPass.setTime > now,
-           now.timeIntervalSince(lastUpdate) < nextPassRefreshInterval {
-            let currentLocation = CLLocation(latitude: observerLat, longitude: observerLon)
-            let previousLocation = CLLocation(latitude: lastLocation.latitude, longitude: lastLocation.longitude)
-            let distance = currentLocation.distance(from: previousLocation)
-            if distance < nextPassLocationThresholdMeters {
-                return
-            }
+        guard shouldUpdateNextPass(observerLat: observerLat, observerLon: observerLon, now: now) else {
+            return
         }
 
         // Find ISS TLE
@@ -422,48 +413,76 @@ class SatelliteManager: ObservableObject {
             return
         }
 
-        // Calculate next pass (this is somewhat expensive, so we do it less frequently)
+        startNextPassCalculation(tle: issTLE, observerLat: observerLat, observerLon: observerLon)
+    }
+
+    private func shouldUpdateNextPass(observerLat: Double, observerLon: Double, now: Date) -> Bool {
+        guard let lastUpdate = lastNextPassUpdate,
+              let lastLocation = lastNextPassLocation,
+              let nextPass = nextISSPass,
+              nextPass.setTime > now,
+              now.timeIntervalSince(lastUpdate) < nextPassRefreshInterval else {
+            return true
+        }
+
+        let currentLocation = CLLocation(latitude: observerLat, longitude: observerLon)
+        let previousLocation = CLLocation(latitude: lastLocation.latitude, longitude: lastLocation.longitude)
+        let distance = currentLocation.distance(from: previousLocation)
+        return distance >= nextPassLocationThresholdMeters
+    }
+
+    private func startNextPassCalculation(tle: TLE, observerLat: Double, observerLon: Double) {
         nextPassWorkItem?.cancel()
 
         let token = UUID()
         nextPassToken = token
-        lastNextPassUpdate = now
+        lastNextPassUpdate = Date()
         lastNextPassLocation = CLLocationCoordinate2D(latitude: observerLat, longitude: observerLon)
 
         var workItem: DispatchWorkItem?
-        workItem = DispatchWorkItem { [weak self] in
-            guard let self = self, let workItem = workItem else { return }
-            guard self.nextPassToken == token else { return }
-
-            let pass = SGP4Propagator.findNextPass(
-                tle: issTLE,
-                observerLat: observerLat,
-                observerLon: observerLon,
-                minElevation: 10.0,
-                maxHours: 48.0,
-                shouldCancel: { [weak self, weak workItem] in
-                    workItem?.isCancelled == true || self?.nextPassToken != token
-                }
-            )
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                guard self.nextPassToken == token else { return }
-                self.nextISSPass = pass
-                // Update ISS satellite with pass info
-                if let index = self.satellites.firstIndex(where: { $0.id == "ISS" }) {
-                    var updatedSatellites = self.satellites
-                    var updated = updatedSatellites[index]
-                    updated.nextPass = pass
-                    updatedSatellites[index] = updated
-                    self.satellites = updatedSatellites
-                }
-            }
+        workItem = DispatchWorkItem { [weak self, weak workItem] in
+            self?.calculateNextPass(token: token, tle: tle, observerLat: observerLat,
+                                    observerLon: observerLon, workItem: workItem)
         }
 
         nextPassWorkItem = workItem
         if let workItem = workItem {
             DispatchQueue.global(qos: .userInitiated).async(execute: workItem)
         }
+    }
+
+    private func calculateNextPass(token: UUID, tle: TLE, observerLat: Double, observerLon: Double,
+                                   workItem: DispatchWorkItem?) {
+        guard nextPassToken == token else { return }
+
+        let pass = SGP4Propagator.findNextPass(
+            tle: tle,
+            observerLat: observerLat,
+            observerLon: observerLon,
+            minElevation: 10.0,
+            maxHours: 48.0,
+            shouldCancel: { [weak self, weak workItem] in
+                workItem?.isCancelled == true || self?.nextPassToken != token
+            }
+        )
+
+        DispatchQueue.main.async { [weak self] in
+            self?.applyNextPassResult(pass: pass, token: token)
+        }
+    }
+
+    private func applyNextPassResult(pass: SatellitePass?, token: UUID) {
+        guard nextPassToken == token else { return }
+        nextISSPass = pass
+        updateISSSatelliteWithPass(pass: pass)
+    }
+
+    private func updateISSSatelliteWithPass(pass: SatellitePass?) {
+        guard let index = satellites.firstIndex(where: { $0.id == "ISS" }) else { return }
+        var updatedSatellites = satellites
+        var updated = updatedSatellites[index]
+        updated.nextPass = pass
+        updatedSatellites[index] = updated
+        satellites = updatedSatellites
     }
 }

@@ -310,30 +310,99 @@ enum SGP4Propagator {
     ///   - minElevation: Minimum peak elevation to consider (default 10°)
     ///   - maxHours: Maximum hours to search ahead (default 48)
     /// - Returns: Next visible pass, or nil if none found
-    static func findNextPass(tle: TLE, observerLat: Double, observerLon: Double,
-                             startDate: Date = Date(), minElevation: Double = 10.0,
+    static func findNextPass(tle: TLE,
+                             observerLat: Double,
+                             observerLon: Double,
+                             startDate: Date = Date(),
+                             minElevation: Double = 10.0,
                              maxHours: Double = 48.0,
                              shouldCancel: (() -> Bool)? = nil) -> SatellitePass? {
-        let stepMinutes: Double = 1.0  // 1-minute steps
+        let stepMinutes: Double = 1.0
         let maxSteps = Int(maxHours * 60 / stepMinutes)
+        let sample = createSampleFunction(tle: tle, observerLat: observerLat, observerLon: observerLon)
 
-        func sample(at date: Date) -> (elevation: Double, azimuth: Double)? {
-            let position = propagate(tle: tle, to: date,
-                                     observerLat: observerLat, observerLon: observerLon)
+        let searchStart = findSearchStartTime(startDate: startDate, sample: sample, maxSteps: maxSteps, stepMinutes: stepMinutes)
+
+        return searchForPass(searchStart: searchStart, tle: tle, minElevation: minElevation,
+                            maxSteps: maxSteps, stepMinutes: stepMinutes, sample: sample,
+                            shouldCancel: shouldCancel)
+    }
+
+    private static func createSampleFunction(tle: TLE, observerLat: Double, observerLon: Double)
+        -> (Date) -> (elevation: Double, azimuth: Double)? {
+        return { date in
+            let position = propagate(tle: tle, to: date, observerLat: observerLat, observerLon: observerLon)
             guard let elevation = position.altitudeDeg,
                   let azimuth = position.azimuthDeg else { return nil }
             return (elevation, azimuth)
         }
+    }
 
-        func refineCrossing(from start: Date, to end: Date, startElevation: Double,
-                            endElevation: Double) -> (Date, Double, Double)? {
+    private static func findSearchStartTime(startDate: Date,
+                                            sample: (Date) -> (elevation: Double, azimuth: Double)?,
+                                            maxSteps: Int,
+                                            stepMinutes: Double) -> Date {
+        guard let initial = sample(startDate), initial.elevation > 0 else {
+            return startDate
+        }
+
+        var backSteps = 0
+        var backDate = startDate
+        while backSteps < maxSteps {
+            let candidateDate = backDate.addingTimeInterval(-stepMinutes * 60)
+            guard let candidateSample = sample(candidateDate) else { return backDate }
+            if candidateSample.elevation <= 0 {
+                return candidateDate
+            }
+            backDate = candidateDate
+            backSteps += 1
+        }
+
+        return backDate
+    }
+
+    private static func searchForPass(searchStart: Date,
+                                      tle: TLE,
+                                      minElevation: Double,
+                                      maxSteps: Int,
+                                      stepMinutes: Double,
+                                      sample: (Date) -> (elevation: Double, azimuth: Double)?,
+                                      shouldCancel: (() -> Bool)?) -> SatellitePass? {
+        var state = PassSearchState()
+        let refineCrossing = createCrossingRefiner(sample: sample)
+        let refinePeak = createPeakRefiner(sample: sample)
+
+        for step in 0..<maxSteps {
+            if shouldCancel?() == true {
+                return nil
+            }
+
+            let currentDate = searchStart.addingTimeInterval(Double(step) * stepMinutes * 60)
+            guard let sampleResult = sample(currentDate) else {
+                state.reset()
+                continue
+            }
+
+            if let pass = state.processSample(sampleResult, currentDate: currentDate, tle: tle,
+                                               minElevation: minElevation, refineCrossing: refineCrossing,
+                                               refinePeak: refinePeak) {
+                return pass
+            }
+        }
+
+        return nil
+    }
+
+    private static func createCrossingRefiner(sample: (Date) -> (elevation: Double, azimuth: Double)?)
+        -> (Date, Date, Double, Double) -> (Date, Double, Double)? {
+        return { start, end, startElevation, _ in
             var lower = start
             var upper = end
             var lowerElev = startElevation
 
             for _ in 0..<20 {
                 let mid = Date(timeIntervalSince1970: (lower.timeIntervalSince1970 + upper.timeIntervalSince1970) / 2)
-                guard let midSample = sample(at: mid) else { return nil }
+                guard let midSample = sample(mid) else { return nil }
 
                 if (lowerElev <= 0 && midSample.elevation > 0) || (lowerElev > 0 && midSample.elevation <= 0) {
                     upper = mid
@@ -343,11 +412,14 @@ enum SGP4Propagator {
                 }
             }
 
-            guard let refined = sample(at: upper) else { return nil }
+            guard let refined = sample(upper) else { return nil }
             return (upper, refined.azimuth, refined.elevation)
         }
+    }
 
-        func refinePeak(from start: Date, to end: Date) -> (Date, Double)? {
+    private static func createPeakRefiner(sample: (Date) -> (elevation: Double, azimuth: Double)?)
+        -> (Date, Date) -> (Date, Double)? {
+        return { start, end in
             var left = start
             var right = end
 
@@ -355,8 +427,8 @@ enum SGP4Propagator {
                 let leftMid = Date(timeIntervalSince1970: (2 * left.timeIntervalSince1970 + right.timeIntervalSince1970) / 3)
                 let rightMid = Date(timeIntervalSince1970: (left.timeIntervalSince1970 + 2 * right.timeIntervalSince1970) / 3)
 
-                guard let leftSample = sample(at: leftMid),
-                      let rightSample = sample(at: rightMid) else { return nil }
+                guard let leftSample = sample(leftMid),
+                      let rightSample = sample(rightMid) else { return nil }
 
                 if leftSample.elevation < rightSample.elevation {
                     left = leftMid
@@ -366,113 +438,100 @@ enum SGP4Propagator {
             }
 
             let peakTime = Date(timeIntervalSince1970: (left.timeIntervalSince1970 + right.timeIntervalSince1970) / 2)
-            guard let peakSample = sample(at: peakTime) else { return nil }
+            guard let peakSample = sample(peakTime) else { return nil }
             return (peakTime, peakSample.elevation)
         }
+    }
 
-        var searchStart = startDate
-        if let initial = sample(at: startDate), initial.elevation > 0 {
-            var backSteps = 0
-            var backDate = startDate
-
-            while backSteps < maxSteps {
-                let candidateDate = backDate.addingTimeInterval(-stepMinutes * 60)
-                guard let candidateSample = sample(at: candidateDate) else { break }
-                if candidateSample.elevation <= 0 {
-                    searchStart = candidateDate
-                    break
-                }
-                backDate = candidateDate
-                backSteps += 1
-            }
-
-            if backSteps == maxSteps {
-                searchStart = backDate
-            }
-        }
-
+    private class PassSearchState {
         var isAboveHorizon = false
         var riseTime: Date?
         var riseAzimuth: Double = 0
         var peakTime: Date?
         var peakElevation: Double = 0
-        var lastDate: Date?
-        var lastElevation: Double?
 
-        for step in 0..<maxSteps {
-            if shouldCancel?() == true {
-                return nil
-            }
-            let currentDate = searchStart.addingTimeInterval(Double(step) * stepMinutes * 60)
-            guard let sampleResult = sample(at: currentDate) else {
-                lastDate = nil
-                lastElevation = nil
-                continue
-            }
+        func reset() {
+            riseTime = nil
+            peakTime = nil
+            peakElevation = 0
+        }
+
+        func processSample(_ sampleResult: (elevation: Double, azimuth: Double), currentDate: Date,
+                           tle: TLE, minElevation: Double,
+                           refineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)?,
+                           refinePeak: (Date, Date) -> (Date, Double)?) -> SatellitePass? {
             let elevation = sampleResult.elevation
             let azimuth = sampleResult.azimuth
 
             if elevation > 0 && !isAboveHorizon {
-                // Satellite just rose
-                isAboveHorizon = true
-                let prevDate = lastDate ?? currentDate
-                let prevElevation = lastElevation ?? elevation
-                if let refined = refineCrossing(from: prevDate, to: currentDate,
-                                                startElevation: prevElevation,
-                                                endElevation: elevation) {
-                    riseTime = refined.0
-                    riseAzimuth = refined.1
-                } else {
-                    riseTime = currentDate
-                    riseAzimuth = azimuth
-                }
-                peakElevation = elevation
-                peakTime = currentDate
+                return handleRise(sampleResult: sampleResult, currentDate: currentDate,
+                                 refineCrossing: refineCrossing)
             } else if elevation > 0 && isAboveHorizon {
-                // Satellite still visible - track peak
-                if elevation > peakElevation {
-                    peakElevation = elevation
-                    peakTime = currentDate
-                }
+                handleAboveHorizon(sampleResult: sampleResult, currentDate: currentDate)
             } else if elevation <= 0 && isAboveHorizon {
-                // Satellite just set
-                if peakElevation >= minElevation, let rise = riseTime, let peak = peakTime {
-                    let prevDate = lastDate ?? currentDate
-                    let prevElevation = lastElevation ?? elevation
-                    let refinedSet = refineCrossing(from: prevDate, to: currentDate,
-                                                    startElevation: prevElevation,
-                                                    endElevation: elevation)
-
-                    let setTime = refinedSet?.0 ?? currentDate
-                    let setAzimuth = refinedSet?.1 ?? azimuth
-
-                    let refinedPeak = refinePeak(from: rise, to: setTime)
-                    let finalPeakTime = refinedPeak?.0 ?? peak
-                    let finalPeakElevation = refinedPeak?.1 ?? peakElevation
-
-                    return SatellitePass(
-                        satelliteId: String(tle.noradId),
-                        satelliteName: tle.name,
-                        riseTime: rise,
-                        peakTime: finalPeakTime,
-                        setTime: setTime,
-                        maxAltitudeDeg: finalPeakElevation,
-                        riseAzimuthDeg: riseAzimuth,
-                        setAzimuthDeg: setAzimuth
-                    )
-                }
-
-                // Reset for next pass
-                isAboveHorizon = false
-                riseTime = nil
-                peakTime = nil
-                peakElevation = 0
+                return handleSet(sampleResult: sampleResult, currentDate: currentDate,
+                               tle: tle, minElevation: minElevation,
+                               refineCrossing: refineCrossing, refinePeak: refinePeak)
             }
 
-            lastDate = currentDate
-            lastElevation = elevation
+            return nil
         }
 
-        return nil
+        private func handleRise(sampleResult: (elevation: Double, azimuth: Double),
+                                currentDate: Date,
+                                refineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)?) {
+            isAboveHorizon = true
+            let prevDate = riseTime ?? currentDate
+            let prevElevation = peakElevation > 0 ? peakElevation : sampleResult.elevation
+            if let refined = refineCrossing(prevDate, currentDate, prevElevation, sampleResult.elevation) {
+                riseTime = refined.0
+                riseAzimuth = refined.1
+            } else {
+                riseTime = currentDate
+                riseAzimuth = sampleResult.azimuth
+            }
+            peakElevation = sampleResult.elevation
+            peakTime = currentDate
+        }
+
+        private func handleAboveHorizon(sampleResult: (elevation: Double, azimuth: Double), currentDate: Date) {
+            if sampleResult.elevation > peakElevation {
+                peakElevation = sampleResult.elevation
+                peakTime = currentDate
+            }
+        }
+
+        private func handleSet(sampleResult: (elevation: Double, azimuth: Double),
+                               currentDate: Date,
+                               tle: TLE,
+                               minElevation: Double,
+                               refineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)?,
+                               refinePeak: (Date, Date) -> (Date, Double)?) -> SatellitePass? {
+            guard peakElevation >= minElevation, let rise = riseTime, let peak = peakTime else {
+                reset()
+                return nil
+            }
+
+            let prevDate = peakTime ?? currentDate
+            let prevElevation = peakElevation > 0 ? peakElevation : sampleResult.elevation
+            let refinedSet = refineCrossing(prevDate, currentDate, prevElevation, sampleResult.elevation)
+            let setTime = refinedSet?.0 ?? currentDate
+            let setAzimuth = refinedSet?.1 ?? sampleResult.azimuth
+
+            let refinedPeak = refinePeak(rise, setTime)
+            let finalPeakTime = refinedPeak?.0 ?? peak
+            let finalPeakElevation = refinedPeak?.1 ?? peakElevation
+
+            return SatellitePass(
+                satelliteId: String(tle.noradId),
+                satelliteName: tle.name,
+                riseTime: rise,
+                peakTime: finalPeakTime,
+                setTime: setTime,
+                maxAltitudeDeg: finalPeakElevation,
+                riseAzimuthDeg: riseAzimuth,
+                setAzimuthDeg: setAzimuth
+            )
+        }
     }
 }
