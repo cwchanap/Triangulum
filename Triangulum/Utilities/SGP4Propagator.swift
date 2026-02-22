@@ -366,9 +366,9 @@ enum SGP4Propagator {
                                       minElevation: Double,
                                       maxSteps: Int,
                                       stepMinutes: Double,
-                                      sample: (Date) -> (elevation: Double, azimuth: Double)?,
+                                      sample: @escaping (Date) -> (elevation: Double, azimuth: Double)?,
                                       shouldCancel: (() -> Bool)?) -> SatellitePass? {
-        var state = PassSearchState()
+        let state = PassSearchState()
         let refineCrossing = createCrossingRefiner(sample: sample)
         let refinePeak = createPeakRefiner(sample: sample)
 
@@ -393,7 +393,7 @@ enum SGP4Propagator {
         return nil
     }
 
-    private static func createCrossingRefiner(sample: (Date) -> (elevation: Double, azimuth: Double)?)
+    private static func createCrossingRefiner(sample: @escaping (Date) -> (elevation: Double, azimuth: Double)?)
         -> (Date, Date, Double, Double) -> (Date, Double, Double)? {
         return { start, end, startElevation, _ in
             var lower = start
@@ -417,7 +417,7 @@ enum SGP4Propagator {
         }
     }
 
-    private static func createPeakRefiner(sample: (Date) -> (elevation: Double, azimuth: Double)?)
+    private static func createPeakRefiner(sample: @escaping (Date) -> (elevation: Double, azimuth: Double)?)
         -> (Date, Date) -> (Date, Double)? {
         return { start, end in
             var left = start
@@ -461,11 +461,10 @@ enum SGP4Propagator {
                            refineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)?,
                            refinePeak: (Date, Date) -> (Date, Double)?) -> SatellitePass? {
             let elevation = sampleResult.elevation
-            let azimuth = sampleResult.azimuth
 
             if elevation > 0 && !isAboveHorizon {
-                return handleRise(sampleResult: sampleResult, currentDate: currentDate,
-                                 refineCrossing: refineCrossing)
+                handleRise(sampleResult: sampleResult, currentDate: currentDate,
+                           refineCrossing: refineCrossing)
             } else if elevation > 0 && isAboveHorizon {
                 handleAboveHorizon(sampleResult: sampleResult, currentDate: currentDate)
             } else if elevation <= 0 && isAboveHorizon {
