@@ -28,6 +28,7 @@ struct TrendCalculationIntegrationTests {
         // Test that actual PressureHistoryManager calculates rising fast trend correctly
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         // Insert readings spanning 31 minutes with rising seaLevelPressure
         // Note: calculateTrend() only fetches from last 35 min (30 + 5 buffer)
@@ -35,7 +36,7 @@ struct TrendCalculationIntegrationTests {
         let now = Date()
         let reading1 = PressureReading(timestamp: now.addingTimeInterval(-31 * 60), pressure: 101.0, altitude: 100.0, seaLevelPressure: 101.0)
         let reading2 = PressureReading(timestamp: now.addingTimeInterval(-30 * 60), pressure: 101.0, altitude: 100.0, seaLevelPressure: 101.0)
-        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-10 * 60), pressure: 102.0, altitude: 100.0, seaLevelPressure: 102.5)
+        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-1 * 60), pressure: 102.0, altitude: 100.0, seaLevelPressure: 102.5)
 
         context.insert(reading1)
         context.insert(reading2)
@@ -51,12 +52,13 @@ struct TrendCalculationIntegrationTests {
     @Test func testTrendCalculationRising() throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         let now = Date()
-        // Just over 2 mb rise in 30 minutes - should be "rising", not "rising fast"
+        // Small rise (~0.8 hPa/hour) should be "rising"
         let reading1 = PressureReading(timestamp: now.addingTimeInterval(-31 * 60), pressure: 101.0, altitude: 100.0, seaLevelPressure: 101.0)
         let reading2 = PressureReading(timestamp: now.addingTimeInterval(-30 * 60), pressure: 101.0, altitude: 100.0, seaLevelPressure: 101.0)
-        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-5 * 60), pressure: 101.5, altitude: 100.0, seaLevelPressure: 102.0)
+        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-1 * 60), pressure: 101.02, altitude: 100.0, seaLevelPressure: 101.04)
 
         context.insert(reading1)
         context.insert(reading2)
@@ -72,12 +74,13 @@ struct TrendCalculationIntegrationTests {
     @Test func testTrendCalculationSteady() throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         let now = Date()
-        // Only 0.5 mb change in 30 minutes - should be "steady"
+        // Tiny change (~0.2 hPa/hour) should be "steady"
         let reading1 = PressureReading(timestamp: now.addingTimeInterval(-31 * 60), pressure: 101.0, altitude: 100.0, seaLevelPressure: 101.0)
         let reading2 = PressureReading(timestamp: now.addingTimeInterval(-30 * 60), pressure: 101.0, altitude: 100.0, seaLevelPressure: 101.0)
-        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-5 * 60), pressure: 101.3, altitude: 100.0, seaLevelPressure: 101.5)
+        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-1 * 60), pressure: 101.01, altitude: 100.0, seaLevelPressure: 101.01)
 
         context.insert(reading1)
         context.insert(reading2)
@@ -93,12 +96,13 @@ struct TrendCalculationIntegrationTests {
     @Test func testTrendCalculationFalling() throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         let now = Date()
-        // Just over 2 mb drop in 30 minutes - should be "falling", not "falling fast"
+        // Small drop (~-0.8 hPa/hour) should be "falling"
         let reading1 = PressureReading(timestamp: now.addingTimeInterval(-31 * 60), pressure: 102.0, altitude: 100.0, seaLevelPressure: 102.0)
         let reading2 = PressureReading(timestamp: now.addingTimeInterval(-30 * 60), pressure: 102.0, altitude: 100.0, seaLevelPressure: 102.0)
-        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-5 * 60), pressure: 101.5, altitude: 100.0, seaLevelPressure: 101.0)
+        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-1 * 60), pressure: 101.98, altitude: 100.0, seaLevelPressure: 101.96)
 
         context.insert(reading1)
         context.insert(reading2)
@@ -114,12 +118,13 @@ struct TrendCalculationIntegrationTests {
     @Test func testTrendCalculationFallingFast() throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         let now = Date()
         // Over 3 mb drop in 30 minutes - should be "falling fast"
         let reading1 = PressureReading(timestamp: now.addingTimeInterval(-31 * 60), pressure: 103.0, altitude: 100.0, seaLevelPressure: 103.0)
         let reading2 = PressureReading(timestamp: now.addingTimeInterval(-30 * 60), pressure: 103.0, altitude: 100.0, seaLevelPressure: 103.0)
-        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-5 * 60), pressure: 102.0, altitude: 100.0, seaLevelPressure: 101.5)
+        let reading3 = PressureReading(timestamp: now.addingTimeInterval(-1 * 60), pressure: 102.0, altitude: 100.0, seaLevelPressure: 101.5)
 
         context.insert(reading1)
         context.insert(reading2)
@@ -135,6 +140,7 @@ struct TrendCalculationIntegrationTests {
     @Test func testTrendCalculationNotEnoughData() throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         // Only one reading - not enough for trend calculation
         let now = Date()
@@ -152,6 +158,7 @@ struct TrendCalculationIntegrationTests {
     @Test func testTrendCalculationDataOutsideWindow() throws {
         let manager = PressureHistoryManager()
         let context = try createTestModelContext()
+        manager.configure(with: context)
 
         let now = Date()
         // Readings from more than 35 minutes ago should be ignored

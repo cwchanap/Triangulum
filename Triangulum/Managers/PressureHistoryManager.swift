@@ -255,11 +255,12 @@ class PressureHistoryManager: ObservableObject {
     // MARK: - Trend Analysis
 
     /// Calculates the current pressure trend based on recent data
-    private func calculateTrend() {
+    @discardableResult
+    func calculateTrend() -> PressureTrend {
         guard let modelContext = modelContext else {
             trend = .unknown
             changeRate = 0
-            return
+            return trend
         }
 
         // Add a buffer to ensure we capture enough data points spanning the minimum period
@@ -278,14 +279,14 @@ class PressureHistoryManager: ObservableObject {
             guard readings.count >= 3 else {
                 trend = .unknown
                 changeRate = 0
-                return
+                return trend
             }
 
             // Calculate rate of change in hPa per hour
             guard let first = readings.first, let last = readings.last else {
                 trend = .unknown
                 changeRate = 0
-                return
+                return trend
             }
 
             let timeDiff = last.timestamp.timeIntervalSince(first.timestamp)
@@ -293,7 +294,7 @@ class PressureHistoryManager: ObservableObject {
             guard timeDiff >= minimumTrendDataSeconds else {
                 trend = .unknown
                 changeRate = 0
-                return
+                return trend
             }
 
             // Use seaLevelPressure for weather trends (altitude-normalized)
@@ -317,11 +318,13 @@ class PressureHistoryManager: ObservableObject {
             } else {
                 trend = .steady
             }
+            return trend
 
         } catch {
             Logger.sensor.error("PressureHistoryManager: Failed to calculate trend: \(error.localizedDescription)")
             trend = .unknown
             changeRate = 0
+            return trend
         }
     }
 
