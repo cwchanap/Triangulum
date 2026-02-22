@@ -33,6 +33,10 @@ final class TriangulumUITests: XCTestCase {
 
     @MainActor
     func testLaunchPerformance() throws {
+        guard ProcessInfo.processInfo.environment["RUN_LAUNCH_PERF_TESTS"] == "1" else {
+            throw XCTSkip("Launch performance test is opt-in; set RUN_LAUNCH_PERF_TESTS=1 to run.")
+        }
+
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
