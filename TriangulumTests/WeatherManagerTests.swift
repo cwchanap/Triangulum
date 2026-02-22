@@ -203,6 +203,49 @@ struct WeatherManagerTests {
         weatherManager.stopMonitoring()
     }
 
+    /// Verify that startMonitoring() revalidates availability immediately when
+    /// pre-existing weather data is present (P2 fix). Without the fix the manager
+    /// would skip checkAndFetchWeather() and go straight to a 15-minute timer,
+    /// leaving stale state (e.g. revoked API key, lost location permission) visible
+    /// until the next timer firing.
+    @Test @MainActor func testStartMonitoringWithExistingWeatherRevalidatesImmediately() throws {
+        let locationManager = LocationManager()
+        let weatherManager = WeatherManager(locationManager: locationManager)
+        weatherManager.stopMonitoring()
+
+        // Inject pre-existing weather data to simulate a restart scenario.
+        let json = Data("""
+        {
+            "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
+            "main": {"temp": 295.15, "feels_like": 297.0, "temp_min": 293.0,
+                     "temp_max": 298.0, "pressure": 1013, "humidity": 65},
+            "name": "Test City"
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
+        weatherManager.currentWeather = Weather(from: response)
+
+        // Reset observable state so we can detect the synchronous revalidation call.
+        weatherManager.errorMessage = ""
+
+        // startMonitoring() must call checkAndFetchWeather() synchronously. With no
+        // valid API key present in the test environment, checkAndFetchWeather() will
+        // set errorMessage and isAvailable=false immediately — proving the check ran.
+        weatherManager.startMonitoring()
+
+        #expect(
+            weatherManager.errorMessage == "API key required. Set in Preferences.",
+            "startMonitoring() must revalidate immediately even when currentWeather != nil"
+        )
+        #expect(
+            weatherManager.isAvailable == false,
+            "isAvailable should be updated by the immediate revalidation"
+        )
+        #expect(weatherManager.isMonitoringEnabled == true)
+
+        weatherManager.stopMonitoring()
+    }
+
     /// Verify that monitoring stays enabled after the 401/403 timer-pause path
     /// so a subsequent manual/timer-triggered fetch can re-arm the 15-minute
     /// poll once the key is corrected.

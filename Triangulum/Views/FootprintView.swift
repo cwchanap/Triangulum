@@ -458,11 +458,16 @@ struct SnapshotDetailView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.prussianBlueDark)
                 Spacer()
-                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
+                PhotosPicker(
+                    selection: $selectedPhotos,
+                    maxSelectionCount: max(1, 5 - loadedPhotos.count),
+                    matching: .images
+                ) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundColor(.prussianBlue)
+                        .foregroundColor(loadedPhotos.count >= 5 ? .prussianBlueLight : .prussianBlue)
                 }
+                .disabled(loadedPhotos.count >= 5)
             }
             if loadedPhotos.isEmpty {
                 Text("No photos added yet")

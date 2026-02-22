@@ -228,9 +228,11 @@ class WeatherManager: ObservableObject {
         guard weatherCheckTimer == nil else { return }
         isMonitoringEnabled = true
         if currentWeather != nil {
-            // Weather already fetched — skip the frequent 3-second poll and go
-            // straight to the 15-minute schedule to avoid unnecessary requests.
-            Logger.weather.debug("startMonitoring: existing weather data found, starting 15-minute timer directly")
+            // Weather already fetched — revalidate immediately to catch any setting
+            // changes (API key removal/update, location permission revocation) that
+            // occurred while monitoring was stopped, then resume the 15-minute schedule.
+            Logger.weather.debug("startMonitoring: existing weather data found, revalidating before starting 15-minute timer")
+            checkAndFetchWeather()
             weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     self?.checkAndFetchWeather()
