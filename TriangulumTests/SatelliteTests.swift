@@ -4,6 +4,7 @@
 //
 //  Unit tests for satellite tracking functionality
 //
+// swiftlint:disable file_length
 
 import Testing
 import Foundation
@@ -961,8 +962,7 @@ struct PassSearchStateTests {
         var capturedStart: Date?
         var capturedStartElevation: Double?
 
-        let capturingRefine: (Date, Date, Double, Double) -> (Date, Double, Double)? = {
-            start, _, startElev, _ in
+        let capturingRefine: (Date, Date, Double, Double) -> (Date, Double, Double)? = { start, _, startElev, _ in
             capturedStart = start
             capturedStartElevation = startElev
             return nil  // fall back; we only care about the arguments
