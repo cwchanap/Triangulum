@@ -33,6 +33,7 @@ struct ContentView: View {
     @AppStorage("showAccelerometerWidget") private var showAccelerometerWidget = true
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
+    private let isRunningUITests = ProcessInfo.processInfo.arguments.contains("-ui-testing")
 
     init() {
         let locationManager = LocationManager()
@@ -126,6 +127,8 @@ struct ContentView: View {
             Color.prussianSoft.ignoresSafeArea()
         }
         .onAppear {
+            guard !isRunningUITests else { return }
+
             // Configure pressure history manager with SwiftData context
             barometerManager.configureHistory(with: modelContext)
 
@@ -139,6 +142,8 @@ struct ContentView: View {
             // magnetometerManager.startMagnetometerUpdates()
         }
         .onDisappear {
+            guard !isRunningUITests else { return }
+
             barometerManager.stopBarometerUpdates()
             locationManager.stopLocationUpdates()
             satelliteManager.stopUpdates()
