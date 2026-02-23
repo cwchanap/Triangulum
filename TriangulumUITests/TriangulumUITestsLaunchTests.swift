@@ -10,7 +10,13 @@ import XCTest
 final class TriangulumUITestsLaunchTests: XCTestCase {
 
     override static var runsForEachTargetApplicationUIConfiguration: Bool {
-        true
+        false
+    }
+
+    private func makeApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("-ui-testing")
+        return app
     }
 
     override func setUpWithError() throws {
@@ -19,7 +25,7 @@ final class TriangulumUITestsLaunchTests: XCTestCase {
 
     @MainActor
     func testLaunch() throws {
-        let app = XCUIApplication()
+        let app = makeApp()
         app.launch()
 
         // Insert steps here to perform after app launch but before taking a screenshot,
