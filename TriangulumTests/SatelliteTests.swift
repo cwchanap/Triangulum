@@ -848,3 +848,159 @@ struct SatelliteSnapshotDataTests {
         #expect(decoded.nextISSPass?.maxAltitudeDeg == 45.0)
     }
 }
+
+// MARK: - PassSearchState Regression Tests
+
+struct PassSearchStateTests {
+
+    // Shared ISS TLE used across state-machine tests.
+    let issLine1 = "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993"
+    let issLine2 = "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001"
+
+    private func makeTLE() -> TLE? {
+        TLE(name: "ISS", line1: issLine1, line2: issLine2)
+    }
+
+    // Helpers – no-op closures so we can isolate state-machine logic.
+    private let noRefineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)? = { _, _, _, _ in nil }
+    private let noRefinePeak: (Date, Date) -> (Date, Double)? = { _, _ in nil }
+
+    // -------------------------------------------------------------------------
+    // P1 – reset() must clear isAboveHorizon
+    // -------------------------------------------------------------------------
+
+    /// After a pass is discarded (peak below minElevation), `isAboveHorizon`
+    /// must be `false` so the state machine can detect the next rise.
+    @Test func testResetClearsAboveHorizonFlag() {
+        guard let tle = makeTLE() else {
+            Issue.record("TLE parsing failed")
+            return
+        }
+
+        let state = SGP4Propagator.PassSearchState()
+        let base = Date(timeIntervalSinceReferenceDate: 0)
+
+        // below → above (rise, peak only 5° → below minElevation 10°)
+        _ = state.processSample((-5.0, 90.0), currentDate: base,
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+        _ = state.processSample((5.0, 90.0), currentDate: base.addingTimeInterval(60),
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+        // above → below  (set; peak < minElevation → pass discarded, reset() called)
+        _ = state.processSample((-5.0, 90.0), currentDate: base.addingTimeInterval(120),
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+
+        // Bug: reset() previously left isAboveHorizon = true
+        #expect(!state.isAboveHorizon, "isAboveHorizon must be false after a discarded pass")
+        #expect(state.riseTime == nil)
+        #expect(state.peakTime == nil)
+        #expect(state.peakElevation == 0)
+    }
+
+    /// A qualifying pass that follows a discarded (below-threshold) pass must
+    /// still be returned.  Before the fix, `isAboveHorizon` was never cleared,
+    /// so `handleRise` was bypassed on the second arc and nil was returned.
+    @Test func testDiscardedPassDoesNotBlockSubsequentPass() {
+        guard let tle = makeTLE() else {
+            Issue.record("TLE parsing failed")
+            return
+        }
+
+        let state = SGP4Propagator.PassSearchState()
+        let base = Date(timeIntervalSinceReferenceDate: 0)
+
+        // Pass 1: peak = 5° → discarded by minElevation 10°
+        _ = state.processSample((-5.0, 90.0), currentDate: base,
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+        _ = state.processSample((5.0, 90.0), currentDate: base.addingTimeInterval(60),
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+        _ = state.processSample((-5.0, 90.0), currentDate: base.addingTimeInterval(120),
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+
+        // Pass 2: peak = 20° → should produce a valid SatellitePass
+        let pass2Base = base.addingTimeInterval(3600)
+        _ = state.processSample((-5.0, 180.0), currentDate: pass2Base,
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+        _ = state.processSample((20.0, 180.0), currentDate: pass2Base.addingTimeInterval(60),
+                                tle: tle, minElevation: 10.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+        let result = state.processSample((-5.0, 270.0), currentDate: pass2Base.addingTimeInterval(120),
+                                         tle: tle, minElevation: 10.0,
+                                         refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+
+        #expect(result != nil, "Pass with qualifying peak must be returned after a discarded pass")
+        if let pass = result {
+            #expect(pass.maxAltitudeDeg >= 10.0)
+            #expect(pass.riseTime < pass.setTime)
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // P2 – handleRise must supply actual below-horizon bracket to refineCrossing
+    // -------------------------------------------------------------------------
+
+    /// `refineCrossing` must be called with the previous *below-horizon* sample
+    /// as the lower bracket.  Before the fix, the fallback used `currentDate`
+    /// (positive elevation) for both bracket points, making bisection impossible.
+    @Test func testRiseCrossingUsesPreviousBelowHorizonBracket() {
+        guard let tle = makeTLE() else {
+            Issue.record("TLE parsing failed")
+            return
+        }
+
+        let state = SGP4Propagator.PassSearchState()
+        let belowDate = Date(timeIntervalSinceReferenceDate: 1_000)
+        let riseDate  = belowDate.addingTimeInterval(60)
+
+        var capturedStart: Date?
+        var capturedStartElevation: Double?
+
+        let capturingRefine: (Date, Date, Double, Double) -> (Date, Double, Double)? = {
+            start, _, startElev, _ in
+            capturedStart = start
+            capturedStartElevation = startElev
+            return nil  // fall back; we only care about the arguments
+        }
+
+        // Step 1: below-horizon sample – seeds lastSampleDate / lastSampleElevation
+        _ = state.processSample((-3.0, 90.0), currentDate: belowDate,
+                                tle: tle, minElevation: 5.0,
+                                refineCrossing: capturingRefine, refinePeak: noRefinePeak)
+
+        // Step 2: first above-horizon sample – triggers handleRise
+        _ = state.processSample((5.0, 90.0), currentDate: riseDate,
+                                tle: tle, minElevation: 5.0,
+                                refineCrossing: capturingRefine, refinePeak: noRefinePeak)
+
+        // refineCrossing should have received the genuine below-horizon bracket.
+        #expect(capturedStart == belowDate,
+                "refineCrossing must be called with the previous below-horizon date as its start")
+        #expect(capturedStartElevation == -3.0,
+                "refineCrossing start elevation must be the previous negative elevation")
+    }
+
+    /// When there is no prior sample at all, `handleRise` must still set
+    /// `riseTime` (falling back to `currentDate`) without crashing.
+    @Test func testRiseWithNoPreviousSampleDoesNotCrash() {
+        guard let tle = makeTLE() else {
+            Issue.record("TLE parsing failed")
+            return
+        }
+
+        let state = SGP4Propagator.PassSearchState()
+        let riseDate = Date(timeIntervalSinceReferenceDate: 5_000)
+
+        _ = state.processSample((8.0, 45.0), currentDate: riseDate,
+                                tle: tle, minElevation: 5.0,
+                                refineCrossing: noRefineCrossing, refinePeak: noRefinePeak)
+
+        #expect(state.isAboveHorizon)
+        #expect(state.riseTime == riseDate, "Falls back to currentDate when no prior sample exists")
+    }
+}
