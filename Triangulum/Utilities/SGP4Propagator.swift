@@ -443,17 +443,24 @@ enum SGP4Propagator {
         }
     }
 
-    private class PassSearchState {
+    class PassSearchState {
         var isAboveHorizon = false
         var riseTime: Date?
         var riseAzimuth: Double = 0
         var peakTime: Date?
         var peakElevation: Double = 0
+        // Tracks the most-recently processed sample so handleRise can supply
+        // a genuine below-horizon bracket point to refineCrossing.
+        var lastSampleDate: Date?
+        var lastSampleElevation: Double = 0
 
         func reset() {
+            isAboveHorizon = false
             riseTime = nil
             peakTime = nil
             peakElevation = 0
+            // lastSampleDate / lastSampleElevation are intentionally preserved
+            // so the next rise crossing still has a valid previous bracket point.
         }
 
         func processSample(_ sampleResult: (elevation: Double, azimuth: Double), currentDate: Date,
@@ -461,6 +468,13 @@ enum SGP4Propagator {
                            refineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)?,
                            refinePeak: (Date, Date) -> (Date, Double)?) -> SatellitePass? {
             let elevation = sampleResult.elevation
+
+            // Record the sample AFTER processing so handleRise sees the previous
+            // below-horizon values in lastSampleDate / lastSampleElevation.
+            defer {
+                lastSampleDate = currentDate
+                lastSampleElevation = elevation
+            }
 
             if elevation > 0 && !isAboveHorizon {
                 handleRise(sampleResult: sampleResult, currentDate: currentDate,
@@ -480,8 +494,10 @@ enum SGP4Propagator {
                                 currentDate: Date,
                                 refineCrossing: (Date, Date, Double, Double) -> (Date, Double, Double)?) {
             isAboveHorizon = true
-            let prevDate = riseTime ?? currentDate
-            let prevElevation = peakElevation > 0 ? peakElevation : sampleResult.elevation
+            // Use the actual previous (below-horizon) sample as the lower bracket
+            // for bisection so the crossing can be refined to sub-sample precision.
+            let prevDate = lastSampleDate ?? currentDate
+            let prevElevation = lastSampleElevation  // ≤ 0 from the last below-horizon step
             if let refined = refineCrossing(prevDate, currentDate, prevElevation, sampleResult.elevation) {
                 riseTime = refined.0
                 riseAzimuth = refined.1
