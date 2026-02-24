@@ -121,12 +121,18 @@ class WeatherManager: ObservableObject {
         isInitializing = false
         errorMessage = ""
 
-        // Fetch weather if we don't have any data yet
+        // Fetch weather if we don't have any data yet.
         if currentWeather == nil && !isLoading {
             Logger.weather.debug("Auto-fetching weather data")
             Task {
                 await fetchWeather()
             }
+        } else if currentWeather != nil {
+            // We already have weather data, but the timer may be the 3-second
+            // availability-polling loop started by the setupLocationObserver()
+            // fallback in startMonitoring(). Now that all conditions are confirmed,
+            // switch to the 15-minute schedule to avoid continuous polling.
+            stopFrequentPolling()
         }
     }
 

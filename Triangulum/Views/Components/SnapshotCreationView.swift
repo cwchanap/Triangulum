@@ -387,17 +387,22 @@ struct SnapshotCreationView: View {
         var newPairs: [PairedPreviewItem] = []
 
         for photoItem in newPhotoItems {
-            // Return early at each iteration so a cancelled task stops loading
-            // immediately; the caller's cleanup (`isProcessingPhotos = false`)
-            // still runs because this function returns normally (not via throw).
-            guard !Task.isCancelled else { return }
+            // Check cancellation at each iteration boundary. Flush any pairs
+            // already decoded in this task run so they are not lost — a follow-up
+            // onChange only processes the diff (newly added items), so discarding
+            // mid-task work would leave those photos permanently without previews.
+            if Task.isCancelled {
+                await MainActor.run { pairedPreviewItems.append(contentsOf: newPairs) }
+                return
+            }
             do {
                 if let data = try await photoItem.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     newPairs.append(PairedPreviewItem(pickerItem: photoItem, image: image))
                 }
             } catch is CancellationError {
-                // Task was cancelled mid-transfer — stop without logging an error.
+                // Task was cancelled mid-transfer — flush decoded pairs and stop.
+                await MainActor.run { pairedPreviewItems.append(contentsOf: newPairs) }
                 return
             } catch {
                 Logger.snapshot.error("Failed to load preview image: \(error.localizedDescription)")
