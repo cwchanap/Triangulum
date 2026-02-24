@@ -13,12 +13,6 @@ final class TriangulumUITestsLaunchTests: XCTestCase {
         false
     }
 
-    private func makeApp() -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments.append("-ui-testing")
-        return app
-    }
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }

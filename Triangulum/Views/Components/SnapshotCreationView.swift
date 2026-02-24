@@ -115,12 +115,20 @@ struct SnapshotCreationView: View {
                 // the removed photos, which would re-introduce stale thumbnails.
                 previewLoadingTask?.cancel()
                 previewLoadingTask = nil
+                // Immediately clear the spinner; the cancelled task can no longer
+                // run its own cleanup because Task.cancel() only sets the flag —
+                // it does not guarantee the cleanup closure executes promptly.
+                isProcessingPhotos = false
             }
             
             // Load previews only for newly added photos
             if !addedPhotos.isEmpty {
-                isProcessingPhotos = true
+                // Cancel any in-flight task and reset its flag before starting a
+                // new one so the spinner state stays consistent.
                 previewLoadingTask?.cancel()
+                previewLoadingTask = nil
+                isProcessingPhotos = false
+                isProcessingPhotos = true
                 previewLoadingTask = Task {
                     await loadPhotoPreviewImagesForNewItems(addedPhotos)
                     await MainActor.run {
@@ -372,11 +380,18 @@ struct SnapshotCreationView: View {
         var newPairs: [PairedPreviewItem] = []
 
         for photoItem in newPhotoItems {
+            // Return early at each iteration so a cancelled task stops loading
+            // immediately; the caller's cleanup (`isProcessingPhotos = false`)
+            // still runs because this function returns normally (not via throw).
+            guard !Task.isCancelled else { return }
             do {
                 if let data = try await photoItem.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     newPairs.append(PairedPreviewItem(pickerItem: photoItem, image: image))
                 }
+            } catch is CancellationError {
+                // Task was cancelled mid-transfer — stop without logging an error.
+                return
             } catch {
                 Logger.snapshot.error("Failed to load preview image: \(error.localizedDescription)")
             }

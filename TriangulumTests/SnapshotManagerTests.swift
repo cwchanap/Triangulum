@@ -51,11 +51,10 @@ struct SnapshotManagerTests {
     }
 
     // Helper to create an isolated SnapshotManager for testing.
-    // Each call creates a unique temporary directory; call manager.resetStorage()
-    // at the end of a test (or let the unique UUID path be collected by the OS)
-    // to avoid accumulating stale tmp directories between test runs.
-    private func createTestManager() -> SnapshotManager {
-        createTestManagerContainer().manager
+    // Returns the full TestManagerContainer so callers can use defer { container.cleanup() }
+    // to remove the temporary UserDefaults suite and photos directory after the test.
+    private func createTestManager() -> TestManagerContainer {
+        createTestManagerContainer()
     }
 
     // Helper struct to hold test sensor managers
@@ -110,7 +109,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testSnapshotManagerInitialization() {
-        let manager = createTestManager()
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
 
         #expect(manager.snapshots.isEmpty)
         #expect(manager.photos.isEmpty)
@@ -140,7 +141,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testDeleteSnapshot() {
-        let manager = createTestManager()
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot1 = SensorSnapshot.capture(
@@ -216,7 +219,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testDeleteSnapshotInvalidIndex() {
-        let manager = createTestManager()
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -240,8 +245,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testClearAllSnapshots() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot1 = SensorSnapshot.capture(
@@ -281,8 +287,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testAddPhoto() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -308,8 +315,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testAddPhotoToNonExistentSnapshot() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testImage = createTestImage()
         let nonExistentID = UUID()
 
@@ -319,8 +327,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testRemovePhoto() {
-        let manager = createTestManager()
-        defer { manager.resetStorage() }
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -354,7 +363,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testRemovePhotoFromNonExistentSnapshot() {
-        let manager = createTestManager()
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testPhotoID = UUID()
         let nonExistentSnapshotID = UUID()
 
@@ -366,7 +377,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testGetPhotosForSnapshot() {
-        let manager = createTestManager()
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let testManagers = createTestManagers()
 
         let snapshot = SensorSnapshot.capture(
@@ -393,7 +406,9 @@ struct SnapshotManagerTests {
     }
 
     @Test func testGetPhotosForNonExistentSnapshot() {
-        let manager = createTestManager()
+        let container = createTestManager()
+        defer { container.cleanup() }
+        let manager = container.manager
         let nonExistentID = UUID()
 
         let photos = manager.getPhotos(for: nonExistentID)

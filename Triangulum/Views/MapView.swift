@@ -691,6 +691,10 @@ extension MapView {
     private func handleAutocomplete(for text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.count < 2 {
+            // Cancel any in-flight OSM task so it cannot repopulate suggestions
+            // after the query was cleared.
+            osmAutocompleteTask?.cancel()
+            osmAutocompleteTask = nil
             osmSuggestions = []
             appleCompleter.results = []
             return
