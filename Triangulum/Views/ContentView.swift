@@ -36,10 +36,11 @@ struct ContentView: View {
     private let isRunningUITests = ProcessInfo.processInfo.arguments.contains("-ui-testing")
 
     init() {
-        let locationManager = LocationManager()
+        let isUITesting = ProcessInfo.processInfo.arguments.contains("-ui-testing")
+        let locationManager = LocationManager(skipAvailabilityCheck: isUITesting)
         _locationManager = StateObject(wrappedValue: locationManager)
         _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: locationManager))
-        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: locationManager))
+        _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: locationManager, skipMonitoring: isUITesting))
         _satelliteManager = StateObject(wrappedValue: SatelliteManager(locationManager: locationManager))
     }
 

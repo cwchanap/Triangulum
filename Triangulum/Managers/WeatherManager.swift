@@ -18,15 +18,22 @@ class WeatherManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var isInitializing: Bool = true
 
-    init(locationManager: LocationManager) {
+    /// Designated initializer.
+    /// - Parameters:
+    ///   - locationManager: The shared `LocationManager` instance.
+    ///   - skipMonitoring: When `true` the polling timer and initial fetch
+    ///     task are not created, preventing background work in UI-test runs.
+    init(locationManager: LocationManager, skipMonitoring: Bool = false) {
         self.locationManager = locationManager
 
         // Start with loading state
         isInitializing = true
 
-        // Check availability and start monitoring
-        isMonitoringEnabled = true
-        setupLocationObserver()
+        if !skipMonitoring {
+            // Check availability and start monitoring
+            isMonitoringEnabled = true
+            setupLocationObserver()
+        }
     }
 
     deinit {
