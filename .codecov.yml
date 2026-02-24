@@ -1,0 +1,8 @@
+coverage:
+  # Exclude SwiftUI view files — declarative UI code is not amenable to unit testing
+  # and can only be exercised via UI/integration tests which run in a separate CI job.
+  # Exclude UI test helper files — these are covered when the UI test scheme runs,
+  # not the unit test scheme that generates the coverage report.
+  ignore:
+    - "Triangulum/Views/**"
+    - "TriangulumUITests/**"

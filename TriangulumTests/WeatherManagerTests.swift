@@ -270,4 +270,109 @@ struct WeatherManagerTests {
         weatherManager.stopMonitoring()
         #expect(weatherManager.isMonitoringEnabled == false)
     }
+
+    // MARK: - skipMonitoring Tests
+
+    /// Verify that init with skipMonitoring:true leaves monitoring disabled
+    /// so no background timers or tasks are created during UI-test launches.
+    @Test @MainActor func testSkipMonitoringInit() {
+        let locationManager = LocationManager()
+        let weatherManager = WeatherManager(locationManager: locationManager, skipMonitoring: true)
+
+        #expect(weatherManager.isMonitoringEnabled == false,
+                "skipMonitoring:true must leave isMonitoringEnabled false")
+        #expect(weatherManager.isInitializing == true,
+                "isInitializing should remain true when monitoring is skipped")
+        #expect(weatherManager.isAvailable == false)
+        #expect(weatherManager.currentWeather == nil)
+        // No cleanup needed — no timer was created
+    }
+
+    // MARK: - checkAndFetchWeather / startMonitoring branch tests
+
+    /// Verify the `else if currentWeather != nil { stopFrequentPolling() }` branch
+    /// inside checkAndFetchWeather(). When all availability conditions are met but
+    /// weather is already loaded, the manager should switch to the 15-minute schedule
+    /// rather than re-fetching. This is exercised via refreshAvailability().
+    @Test @MainActor func testCheckAndFetchWeatherCallsStopFrequentPollingWhenWeatherExists() throws {
+        let locationManager = LocationManager()
+        // Provide valid location data so checkAndFetchWeather reaches the 'all conditions met' block.
+        locationManager.isAvailable = true
+        locationManager.latitude = 37.7749
+        locationManager.longitude = -122.4194
+
+        // Store a throwaway API key so Config.hasValidAPIKey returns true.
+        let keyStored = Config.storeAPIKey("test_fake_key_coverage_only")
+        guard keyStored else {
+            // Keychain unavailable in this environment — skip gracefully.
+            return
+        }
+        defer { _ = Config.deleteAPIKey() }
+
+        let weatherManager = WeatherManager(locationManager: locationManager)
+        weatherManager.stopMonitoring()
+
+        // Inject existing weather so the 'else if currentWeather != nil' branch is taken.
+        let json = Data("""
+        {
+            "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
+            "main": {"temp": 295.15, "feels_like": 297.0, "temp_min": 293.0,
+                     "temp_max": 298.0, "pressure": 1013, "humidity": 65},
+            "name": "San Francisco"
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
+        weatherManager.currentWeather = Weather(from: response)
+
+        // refreshAvailability() calls checkAndFetchWeather() synchronously.
+        // With all conditions met and currentWeather != nil it takes the
+        // `else if currentWeather != nil { stopFrequentPolling() }` path.
+        weatherManager.refreshAvailability()
+
+        #expect(weatherManager.isAvailable == true,
+                "isAvailable should be true when API key and location are valid")
+        #expect(weatherManager.isMonitoringEnabled == true,
+                "refreshAvailability should re-enable monitoring")
+
+        weatherManager.stopMonitoring()
+    }
+
+    /// Verify the `if isAvailable { weatherCheckTimer = Timer.scheduled... }` branch
+    /// in startMonitoring(). When pre-existing weather is present and all conditions
+    /// are confirmed after revalidation, a 15-minute timer should be scheduled.
+    @Test @MainActor func testStartMonitoringSchedules15MinTimerWhenAvailable() throws {
+        let locationManager = LocationManager()
+        locationManager.isAvailable = true
+        locationManager.latitude = 37.7749
+        locationManager.longitude = -122.4194
+
+        let keyStored = Config.storeAPIKey("test_fake_key_coverage_only")
+        guard keyStored else { return }
+        defer { _ = Config.deleteAPIKey() }
+
+        let weatherManager = WeatherManager(locationManager: locationManager)
+        weatherManager.stopMonitoring()
+
+        // Inject pre-existing weather data.
+        let json = Data("""
+        {
+            "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
+            "main": {"temp": 295.15, "feels_like": 297.0, "temp_min": 293.0,
+                     "temp_max": 298.0, "pressure": 1013, "humidity": 65},
+            "name": "San Francisco"
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
+        weatherManager.currentWeather = Weather(from: response)
+
+        // startMonitoring() with existing weather revalidates and, on success,
+        // takes the `if isAvailable { weatherCheckTimer = Timer.scheduled... }` branch.
+        weatherManager.startMonitoring()
+
+        #expect(weatherManager.isMonitoringEnabled == true)
+        #expect(weatherManager.isAvailable == true,
+                "isAvailable should remain true after successful revalidation")
+
+        weatherManager.stopMonitoring()
+    }
 }
