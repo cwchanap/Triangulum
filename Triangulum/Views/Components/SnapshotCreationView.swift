@@ -306,25 +306,51 @@ struct SnapshotCreationView: View {
         guard !isProcessingPhotos else { return }
         isProcessingPhotos = true
 
-        // Add the snapshot first
-        snapshotManager.addSnapshot(snapshot)
+        // Capture mutable state before entering the async context so that
+        // a Cancel tap (which clears these arrays on the main actor) does
+        // not race with the in-flight task.
+        let cameraImages = capturedImages.map { $0.image }
+        let selectedPhotosSnapshot = tempSelectedPhotos
+        // Reuse already-decoded preview images to avoid a second decode pass.
+        let previewMap: [PhotosPickerItem: UIImage] = Dictionary(
+            uniqueKeysWithValues: pairedPreviewItems.map { ($0.pickerItem, $0.image) }
+        )
 
-        // Process captured images directly
-        for item in capturedImages {
-            snapshotManager.addPhoto(to: snapshot.id, image: item.image)
-        }
-
-        // Then process photos from library if any
-        if !tempSelectedPhotos.isEmpty {
-            saveTask = Task {
-                await processSelectedPhotos(for: snapshot.id)
-                await MainActor.run {
-                    saveTask = nil
-                    finishSaving()
+        saveTask = Task {
+            // Phase 1 — collect every library image before touching persistent storage.
+            var libraryImages: [UIImage] = []
+            for photoItem in selectedPhotosSnapshot {
+                guard !Task.isCancelled else { return }
+                if let image = previewMap[photoItem] {
+                    // Reuse the preview-pass decode
+                    libraryImages.append(image)
+                } else {
+                    // Fallback: decode from the picker item (failed preview or new item)
+                    do {
+                        if let data = try await photoItem.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            libraryImages.append(image)
+                        }
+                    } catch {
+                        Logger.snapshot.error("Failed to process photo: \(error.localizedDescription)")
+                    }
                 }
             }
-        } else {
-            finishSaving()
+
+            // Phase 2 — only write to storage when the save was not cancelled.
+            // Checking here (after the async loop) ensures we never leave a
+            // partial snapshot — i.e. one with only some photos attached — in
+            // the store if Cancel was tapped while photos were still loading.
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                snapshotManager.addSnapshot(snapshot)
+                for image in cameraImages + libraryImages {
+                    snapshotManager.addPhoto(to: snapshot.id, image: image)
+                }
+                saveTask = nil
+                finishSaving()
+            }
         }
     }
 
@@ -338,37 +364,6 @@ struct SnapshotCreationView: View {
         isPresented = false
         tempSelectedPhotos.removeAll()
         isProcessingPhotos = false
-    }
-
-    private func processSelectedPhotos(for snapshotID: UUID) async {
-        // Build an identity map from PhotosPickerItem to its already-decoded preview image
-        // so we don't re-decode images that were loaded during the preview pass.
-        var previewMap: [PhotosPickerItem: UIImage] = [:]
-        for pair in pairedPreviewItems {
-            previewMap[pair.pickerItem] = pair.image
-        }
-
-        for photoItem in tempSelectedPhotos {
-            guard !Task.isCancelled else { return }
-            if let image = previewMap[photoItem] {
-                // Reuse the preview-pass decode
-                await MainActor.run {
-                    _ = snapshotManager.addPhoto(to: snapshotID, image: image)
-                }
-            } else {
-                // Fallback: decode from the picker item (failed preview or new item)
-                do {
-                    if let data = try await photoItem.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        await MainActor.run {
-                            _ = snapshotManager.addPhoto(to: snapshotID, image: image)
-                        }
-                    }
-                } catch {
-                    Logger.snapshot.error("Failed to process photo: \(error.localizedDescription)")
-                }
-            }
-        }
     }
 
     /// Loads preview images only for newly added photos and appends them to pairedPreviewItems.

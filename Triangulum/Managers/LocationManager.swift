@@ -21,11 +21,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         return isAvailable && lastHorizontalAccuracy >= 0 && isAuthorized
     }
 
-    override init() {
+    /// Designated initializer.
+    /// - Parameter skipAvailabilityCheck: When `true` the async availability
+    ///   check is skipped, which prevents background-thread dispatch and
+    ///   CLLocationManager work from running during UI-test launches.
+    init(skipAvailabilityCheck: Bool = false) {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        checkAvailability()
+        if !skipAvailabilityCheck {
+            checkAvailability()
+        }
     }
 
     private func checkAvailability() {
