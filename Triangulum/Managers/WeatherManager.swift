@@ -240,10 +240,19 @@ class WeatherManager: ObservableObject {
             // occurred while monitoring was stopped, then resume the 15-minute schedule.
             Logger.weather.debug("startMonitoring: existing weather data found, revalidating before starting 15-minute timer")
             checkAndFetchWeather()
-            weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    self?.checkAndFetchWeather()
+            // checkAndFetchWeather() is synchronous and updates isAvailable inline.
+            // Only schedule the 15-minute timer when availability is confirmed;
+            // if something changed while monitoring was stopped (e.g. API key
+            // removed, location permission revoked) fall back to the 3-second
+            // polling loop so the UI recovers without manual intervention.
+            if isAvailable {
+                weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
+                    Task { @MainActor in
+                        self?.checkAndFetchWeather()
+                    }
                 }
+            } else {
+                setupLocationObserver()
             }
         } else {
             setupLocationObserver()

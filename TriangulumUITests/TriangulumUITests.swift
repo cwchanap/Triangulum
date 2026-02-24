@@ -8,11 +8,6 @@
 import XCTest
 
 final class TriangulumUITests: XCTestCase {
-    private func makeApp() -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments.append("-ui-testing")
-        return app
-    }
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
