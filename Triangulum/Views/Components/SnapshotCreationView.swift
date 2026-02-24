@@ -115,10 +115,13 @@ struct SnapshotCreationView: View {
                 // the removed photos, which would re-introduce stale thumbnails.
                 previewLoadingTask?.cancel()
                 previewLoadingTask = nil
-                // Immediately clear the spinner; the cancelled task can no longer
-                // run its own cleanup because Task.cancel() only sets the flag —
-                // it does not guarantee the cleanup closure executes promptly.
-                isProcessingPhotos = false
+                // Only clear the spinner when no save is in flight.
+                // isProcessingPhotos also guards saveSnapshot() re-entry, so
+                // resetting it while saveTask is running would re-enable the
+                // Save button and allow a concurrent duplicate save.
+                if saveTask == nil {
+                    isProcessingPhotos = false
+                }
             }
             
             // Load previews only for newly added photos
@@ -320,8 +323,12 @@ struct SnapshotCreationView: View {
         let cameraImages = capturedImages.map { $0.image }
         let selectedPhotosSnapshot = tempSelectedPhotos
         // Reuse already-decoded preview images to avoid a second decode pass.
+        // Use uniquingKeysWith to safely handle any duplicate PhotosPickerItems
+        // that a cancelled preview task may have appended before it was stopped.
+        // Keeping the latest entry (second closure argument) is arbitrary but safe.
         let previewMap: [PhotosPickerItem: UIImage] = Dictionary(
-            uniqueKeysWithValues: pairedPreviewItems.map { ($0.pickerItem, $0.image) }
+            pairedPreviewItems.map { ($0.pickerItem, $0.image) },
+            uniquingKeysWith: { _, latest in latest }
         )
 
         saveTask = Task {
