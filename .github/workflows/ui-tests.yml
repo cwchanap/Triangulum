@@ -28,14 +28,14 @@ jobs:
             xcrun simctl list devices available
             exit 1
           fi
-          DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
+          DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID,arch=arm64"
           RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-uitests.xcresult"
           if command -v xcpretty >/dev/null 2>&1; then
-            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
+            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -parallel-testing-enabled NO -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
             RESULT=${PIPESTATUS[0]}
           else
             echo "xcpretty not found; using raw xcodebuild output"
-            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE"
+            xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -parallel-testing-enabled NO -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE"
             RESULT=$?
           fi
           if [ $RESULT -ne 0 ]; then
