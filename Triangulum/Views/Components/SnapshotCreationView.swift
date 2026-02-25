@@ -126,11 +126,16 @@ struct SnapshotCreationView: View {
             
             // Load previews only for newly added photos
             if !addedPhotos.isEmpty {
-                // Cancel any in-flight task and reset its flag before starting a
-                // new one so the spinner state stays consistent.
+                // Cancel any in-flight preview task before starting a new one.
                 previewLoadingTask?.cancel()
                 previewLoadingTask = nil
-                isProcessingPhotos = false
+                // Only reset the spinner state when no save is in flight.
+                // isProcessingPhotos also guards saveSnapshot() re-entry, so
+                // briefly setting it false while saveTask is running would
+                // enable the Save button for a frame and risk a concurrent save.
+                if saveTask == nil {
+                    isProcessingPhotos = false
+                }
                 isProcessingPhotos = true
                 previewLoadingTask = Task {
                     await loadPhotoPreviewImagesForNewItems(addedPhotos)
@@ -353,12 +358,15 @@ struct SnapshotCreationView: View {
             }
 
             // Phase 2 — only write to storage when the save was not cancelled.
-            // Checking here (after the async loop) ensures we never leave a
-            // partial snapshot — i.e. one with only some photos attached — in
-            // the store if Cancel was tapped while photos were still loading.
+            // We check Task.isCancelled before the MainActor hop, but we must
+            // re-check immediately inside MainActor.run as well: cancellation
+            // can be signalled while awaiting the hop itself, and the block
+            // would otherwise still run on the main actor with stale "not
+            // cancelled" state, persisting the snapshot against the user's intent.
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 snapshotManager.addSnapshot(snapshot)
                 for image in cameraImages + libraryImages {
                     snapshotManager.addPhoto(to: snapshot.id, image: image)
