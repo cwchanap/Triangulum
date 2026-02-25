@@ -141,7 +141,7 @@ class WeatherManager: ObservableObject {
             // fetchWeather() calls stopFrequentPolling() on success, but we also
             // call it here so the 3s → 15m transition happens immediately even
             // while a fetch is already in flight.
-            if !isLoading {
+            if !isLoading && isMonitoringEnabled {
                 Logger.weather.debug("Periodic refresh: re-fetching weather data on schedule")
                 Task {
                     await fetchWeather()
