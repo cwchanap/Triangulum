@@ -132,10 +132,21 @@ class WeatherManager: ObservableObject {
                 await fetchWeather()
             }
         } else if currentWeather != nil {
-            // We already have weather data, but the timer may be the 3-second
-            // availability-polling loop started by the setupLocationObserver()
-            // fallback in startMonitoring(). Now that all conditions are confirmed,
-            // switch to the 15-minute schedule to avoid continuous polling.
+            // We already have weather data. This branch is reached either from the
+            // 3-second availability-polling loop (setupLocationObserver fallback in
+            // startMonitoring()) or from the 15-minute repeating timer.
+            // In both cases we should:
+            //   1. Refresh weather so it never goes stale on the 15-minute cadence.
+            //   2. Ensure we are on the 15-minute schedule (not the 3-second loop).
+            // fetchWeather() calls stopFrequentPolling() on success, but we also
+            // call it here so the 3s → 15m transition happens immediately even
+            // while a fetch is already in flight.
+            if !isLoading {
+                Logger.weather.debug("Periodic refresh: re-fetching weather data on schedule")
+                Task {
+                    await fetchWeather()
+                }
+            }
             stopFrequentPolling()
         }
     }

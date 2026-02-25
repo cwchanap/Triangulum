@@ -303,10 +303,9 @@ struct WeatherManagerTests {
 
         // Store a throwaway API key so Config.hasValidAPIKey returns true.
         let keyStored = Config.storeAPIKey("test_fake_key_coverage_only")
-        guard keyStored else {
-            // Keychain unavailable in this environment — skip gracefully.
-            return
-        }
+        // Use #require so a Keychain failure causes an explicit test failure rather
+        // than a silent no-op pass that could mask regressions.
+        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
         defer { _ = Config.deleteAPIKey() }
 
         let weatherManager = WeatherManager(locationManager: locationManager)
@@ -347,7 +346,7 @@ struct WeatherManagerTests {
         locationManager.longitude = -122.4194
 
         let keyStored = Config.storeAPIKey("test_fake_key_coverage_only")
-        guard keyStored else { return }
+        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
         defer { _ = Config.deleteAPIKey() }
 
         let weatherManager = WeatherManager(locationManager: locationManager)
@@ -391,7 +390,7 @@ struct WeatherManagerTests {
         locationManager.longitude = -122.4194
 
         let keyStored = Config.storeAPIKey("test_fake_key_no_duplicate_timer")
-        guard keyStored else { return }
+        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
         defer { _ = Config.deleteAPIKey() }
 
         let weatherManager = WeatherManager(locationManager: locationManager)
