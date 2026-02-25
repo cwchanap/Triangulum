@@ -6,7 +6,11 @@ import os
 class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
     var locationManager: LocationManager
-    private var weatherCheckTimer: Timer?
+    /// The repeating timer that drives availability checks and weather refreshes.
+    /// Internal (not private) so unit tests can assert that exactly one timer is
+    /// scheduled at any given time — preventing the duplicate-timer regression
+    /// where stopFrequentPolling() and startMonitoring() each schedule their own.
+    var weatherCheckTimer: Timer?
     /// Tracks whether monitoring is active. Set false by stopMonitoring() to prevent
     /// in-flight fetch completions from re-enabling the timer after an explicit stop.
     /// Internal (not private) so unit tests can verify the flag via @testable import.
@@ -252,9 +256,17 @@ class WeatherManager: ObservableObject {
             // removed, location permission revoked) fall back to the 3-second
             // polling loop so the UI recovers without manual intervention.
             if isAvailable {
-                weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
-                    Task { @MainActor in
-                        self?.checkAndFetchWeather()
+                // checkAndFetchWeather() above may have already scheduled a 15-minute
+                // timer via stopFrequentPolling() (the `else if currentWeather != nil`
+                // branch). Only schedule one here when stopFrequentPolling() did NOT
+                // run (e.g. availability check failed mid-way). Overwriting a non-nil
+                // weatherCheckTimer without invalidating it would orphan the existing
+                // timer and allow duplicate firings across stop/start cycles.
+                if weatherCheckTimer == nil {
+                    weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
+                        Task { @MainActor in
+                            self?.checkAndFetchWeather()
+                        }
                     }
                 }
             } else {

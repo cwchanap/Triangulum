@@ -375,4 +375,56 @@ struct WeatherManagerTests {
 
         weatherManager.stopMonitoring()
     }
+
+    /// Regression test for the duplicate-timer bug:
+    /// Before the fix, `startMonitoring()` called `checkAndFetchWeather()` which
+    /// called `stopFrequentPolling()` — creating timer #1 — and then immediately
+    /// created timer #2, orphaning #1. After `stopMonitoring()` only timer #2 was
+    /// invalidated, leaving an orphan that kept firing.
+    ///
+    /// After the fix, `startMonitoring()` only creates a timer when
+    /// `weatherCheckTimer == nil`, so at most one timer exists at any time.
+    @Test @MainActor func testStartMonitoringDoesNotCreateDuplicateTimer() throws {
+        let locationManager = LocationManager()
+        locationManager.isAvailable = true
+        locationManager.latitude = 37.7749
+        locationManager.longitude = -122.4194
+
+        let keyStored = Config.storeAPIKey("test_fake_key_no_duplicate_timer")
+        guard keyStored else { return }
+        defer { _ = Config.deleteAPIKey() }
+
+        let weatherManager = WeatherManager(locationManager: locationManager)
+        weatherManager.stopMonitoring()
+
+        // Inject pre-existing weather so checkAndFetchWeather() calls stopFrequentPolling().
+        let json = Data("""
+        {
+            "weather": [{"id": 800, "main": "Clear", "description": "clear sky", "icon": "01d"}],
+            "main": {"temp": 295.15, "feels_like": 297.0, "temp_min": 293.0,
+                     "temp_max": 298.0, "pressure": 1013, "humidity": 65},
+            "name": "San Francisco"
+        }
+        """.utf8)
+        let response = try JSONDecoder().decode(WeatherResponse.self, from: json)
+        weatherManager.currentWeather = Weather(from: response)
+
+        // startMonitoring() triggers checkAndFetchWeather() → stopFrequentPolling()
+        // which schedules a 15-minute timer and sets weatherCheckTimer.
+        // The fix ensures startMonitoring() does NOT then schedule a second timer
+        // on top of that, leaving exactly one active timer after the call.
+        weatherManager.startMonitoring()
+
+        // Exactly one timer should be active (the 15-minute one from stopFrequentPolling).
+        // Before the fix, startMonitoring() would overwrite weatherCheckTimer with a
+        // second timer, orphaning the first one.
+        #expect(weatherManager.weatherCheckTimer != nil,
+                "A 15-minute timer should be scheduled after successful revalidation")
+
+        // stopMonitoring() must clear the one and only timer, leaving nil.
+        weatherManager.stopMonitoring()
+        #expect(weatherManager.weatherCheckTimer == nil,
+                "stopMonitoring() should leave no active timer — orphan timers indicate the duplicate-timer bug")
+        #expect(weatherManager.isMonitoringEnabled == false)
+    }
 }

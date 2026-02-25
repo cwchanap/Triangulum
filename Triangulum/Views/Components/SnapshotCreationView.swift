@@ -391,8 +391,16 @@ struct SnapshotCreationView: View {
             // already decoded in this task run so they are not lost — a follow-up
             // onChange only processes the diff (newly added items), so discarding
             // mid-task work would leave those photos permanently without previews.
+            // IMPORTANT: filter against the current selection before flushing.
+            // If cancellation was triggered by a photo deselection, newPairs may
+            // contain items for the just-removed photos; appending them would
+            // re-introduce stale thumbnails that the removal handler already cleared.
             if Task.isCancelled {
-                await MainActor.run { pairedPreviewItems.append(contentsOf: newPairs) }
+                await MainActor.run {
+                    let current = tempSelectedPhotos
+                    let validPairs = newPairs.filter { current.contains($0.pickerItem) }
+                    pairedPreviewItems.append(contentsOf: validPairs)
+                }
                 return
             }
             do {
@@ -401,8 +409,12 @@ struct SnapshotCreationView: View {
                     newPairs.append(PairedPreviewItem(pickerItem: photoItem, image: image))
                 }
             } catch is CancellationError {
-                // Task was cancelled mid-transfer — flush decoded pairs and stop.
-                await MainActor.run { pairedPreviewItems.append(contentsOf: newPairs) }
+                // Task was cancelled mid-transfer — flush only still-selected pairs.
+                await MainActor.run {
+                    let current = tempSelectedPhotos
+                    let validPairs = newPairs.filter { current.contains($0.pickerItem) }
+                    pairedPreviewItems.append(contentsOf: validPairs)
+                }
                 return
             } catch {
                 Logger.snapshot.error("Failed to load preview image: \(error.localizedDescription)")
