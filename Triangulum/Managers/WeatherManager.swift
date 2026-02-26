@@ -42,13 +42,9 @@ class WeatherManager: ObservableObject {
 
     deinit {
         // stopMonitoring() is the preferred cleanup path and should be called from
-        // onDisappear. As a defensive fallback, dispatch invalidation back to the
-        // main run loop — the same thread the Timer was scheduled on — so a missed
-        // stopMonitoring() call never leaks a firing Timer.
-        let timer = weatherCheckTimer
-        DispatchQueue.main.async {
-            timer?.invalidate()
-        }
+        // onDisappear. As a defensive fallback, invalidate any remaining timer.
+        weatherCheckTimer?.invalidate()
+        weatherCheckTimer = nil
     }
 
     private func setupLocationObserver() {
@@ -126,10 +122,14 @@ class WeatherManager: ObservableObject {
         errorMessage = ""
 
         // Fetch weather if we don't have any data yet.
-        if currentWeather == nil && !isLoading {
+        if currentWeather == nil && !isLoading && isMonitoringEnabled {
             Logger.weather.debug("Auto-fetching weather data")
-            Task {
-                await fetchWeather()
+            Task { @MainActor [weak self] in
+                guard let self, self.isMonitoringEnabled else {
+                    Logger.weather.debug("Skipping queued weather fetch — monitoring is disabled")
+                    return
+                }
+                await self.fetchWeather()
             }
         } else if currentWeather != nil {
             // We already have weather data. This branch is reached either from the
@@ -143,8 +143,12 @@ class WeatherManager: ObservableObject {
             // while a fetch is already in flight.
             if !isLoading && isMonitoringEnabled {
                 Logger.weather.debug("Periodic refresh: re-fetching weather data on schedule")
-                Task {
-                    await fetchWeather()
+                Task { @MainActor [weak self] in
+                    guard let self, self.isMonitoringEnabled else {
+                        Logger.weather.debug("Skipping queued periodic refresh — monitoring is disabled")
+                        return
+                    }
+                    await self.fetchWeather()
                 }
             }
             stopFrequentPolling()
