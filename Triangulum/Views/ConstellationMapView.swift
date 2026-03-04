@@ -6,6 +6,7 @@ struct ConstellationMapView: View {
     @ObservedObject var locationManager: LocationManager
     @ObservedObject var satelliteManager: SatelliteManager
     @AppStorage("skyShowSatellites") private var skyShowSatellites = true
+    @AppStorage("skyShowPlanets") private var skyShowPlanets = true
     @State private var now: Date = Date()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -145,6 +146,23 @@ struct ConstellationMapView: View {
                             .font(.caption2)
                             .foregroundColor(nightVisionMode ? Color.red.opacity(0.85) : .prussianBlueLight)
                     }
+                    // Next planet rise/set event
+                    if skyShowPlanets,
+                       let event = Astronomer.nextPlanetEvent(
+                           planets: Planet.catalog,
+                           date: now,
+                           latDeg: locationManager.latitude,
+                           lonDeg: locationManager.longitude
+                       ) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(nightVisionMode ? Color.red : event.planet.skyColor)
+                                .frame(width: 6, height: 6)
+                            Text(event.label)
+                                .font(.caption2)
+                                .foregroundColor(nightVisionMode ? Color.red.opacity(0.85) : .prussianBlueLight)
+                        }
+                    }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
@@ -173,6 +191,9 @@ struct ConstellationMapView: View {
                 if skyShowSatellites {
                     LegendDot(color: nightVisionMode ? .red : .cyan, label: "Satellite")
                 }
+                if skyShowPlanets {
+                    LegendDot(color: nightVisionMode ? .red : Color(red: 0.90, green: 0.35, blue: 0.20), label: "Planet")
+                }
             }
             Spacer(minLength: 8)
             // Compact zoom controls (icon-only)
@@ -192,6 +213,7 @@ struct ConstellationMapView: View {
                 Toggle("Star Labels", isOn: $skyShowStarLabels)
                 Toggle("Constellation Labels", isOn: $skyShowConstellationLabels)
                 Toggle("Satellites", isOn: $skyShowSatellites)
+                Toggle("Planets", isOn: $skyShowPlanets)
                 Toggle("Large Compass", isOn: $skyShowLargeCompass)
                 Toggle("Snap North", isOn: $skySnapNorth)
                 Picker("Catalog", selection: $skyCatalog) {
@@ -251,6 +273,23 @@ struct ConstellationMapView: View {
 
             // Sun and Moon markers
             drawSunAndMoon(context: &layer, center: center, radius: radius, observer: observer, current: current)
+
+            // Planets
+            if skyShowPlanets {
+                PlanetRenderer.draw(
+                    context: &layer,
+                    planets: Planet.catalog,
+                    center: center,
+                    radius: radius,
+                    heading: locationManager.heading,
+                    snapNorth: skySnapNorth,
+                    panOffset: pan,
+                    current: current,
+                    observer: observer,
+                    nightVisionMode: nightVisionMode,
+                    pointOnDome: pointOnDome
+                )
+            }
 
             // Satellites
             if skyShowSatellites {
@@ -735,6 +774,202 @@ struct ConstellationMapView: View {
             if diff < 0 { diff += 360 }
             let synodic = 29.53058867
             return (diff / 360.0) * synodic
+        }
+
+        // MARK: - Planet Positions (Meeus Ch.33 Low-Accuracy)
+
+        static func planetEquatorial(planet: Planet, date: Date) -> Equatorial {
+            switch planet.name {
+            case "Mercury": return mercuryEquatorial(date: date)
+            case "Venus":   return venusEquatorial(date: date)
+            case "Mars":    return marsEquatorial(date: date)
+            case "Jupiter": return jupiterEquatorial(date: date)
+            default:        return saturnEquatorial(date: date)
+            }
+        }
+
+        /// Ecliptic longitude of an inner planet (degrees 0..360), used for phase calculation
+        static func planetEclipticLongitude(planet: Planet, date: Date) -> Double {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            switch planet.name {
+            case "Mercury":
+                let Lp = (252.2509 + 4.09233445 * d).truncatingRemainder(dividingBy: 360)
+                let Mp = (174.7925 + 4.09233445 * d) * rad  // M0 = L0 - ω0 = 252.25 - 77.46
+                var lon = Lp + 23.4400 * sin(Mp) + 2.9988 * sin(2 * Mp)
+                lon = lon.truncatingRemainder(dividingBy: 360)
+                return lon < 0 ? lon + 360 : lon
+            case "Venus":
+                let Lp = (181.9798 + 1.60213034 * d).truncatingRemainder(dividingBy: 360)
+                let Mp = (50.3766 + 1.60213034 * d) * rad   // M0 = L0 - ω0 = 181.98 - 131.60
+                var lon = Lp + 0.7758 * sin(Mp) + 0.0033 * sin(2 * Mp)
+                lon = lon.truncatingRemainder(dividingBy: 360)
+                return lon < 0 ? lon + 360 : lon
+            default:
+                // Outer planets: not used for phase calculation (isInner = false)
+                return 0
+            }
+        }
+
+        /// Illuminated fraction for inner planets (Mercury, Venus).
+        /// planetLon and sunLon in degrees.
+        static func innerPlanetIllumination(planetLon: Double, sunLon: Double) -> Double {
+            var elongation = planetLon - sunLon
+            elongation = elongation.truncatingRemainder(dividingBy: 360)
+            if elongation < 0 { elongation += 360 }
+            let phaseAngleRad = elongation * Double.pi / 180.0
+            return 0.5 * (1.0 + cos(phaseAngleRad))
+        }
+
+        static func mercuryEquatorial(date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let Lp = (252.2509 + 4.09233445 * d).truncatingRemainder(dividingBy: 360)
+            let Mp = (174.7925 + 4.09233445 * d) * rad  // M0 = L0 - ω0 = 252.25 - 77.46
+            let lonDeg = Lp + 23.4400 * sin(Mp) + 2.9988 * sin(2 * Mp)
+            let rAU = 0.38710 * (1 - 0.20563 * cos(Mp))
+            return innerPlanetToEquatorial(lonDeg: lonDeg, rAU: rAU, latDeg: 0, date: date)
+        }
+
+        static func venusEquatorial(date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let Lp = (181.9798 + 1.60213034 * d).truncatingRemainder(dividingBy: 360)
+            let Mp = (50.3766 + 1.60213034 * d) * rad   // M0 = L0 - ω0 = 181.98 - 131.60
+            let lonDeg = Lp + 0.7758 * sin(Mp) + 0.0033 * sin(2 * Mp)
+            let rAU = 0.72333 * (1 - 0.00677 * cos(Mp))
+            return innerPlanetToEquatorial(lonDeg: lonDeg, rAU: rAU, latDeg: 0, date: date)
+        }
+
+        static func marsEquatorial(date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let L = (355.433 + 0.52402068 * d).truncatingRemainder(dividingBy: 360)
+            let M = (19.3730 + 0.52402068 * d) * rad
+            let lonDeg = L + 10.6912 * sin(M) + 0.6228 * sin(2 * M) + 0.0503 * sin(3 * M)
+            let latDeg = 1.8497 * sin((49.558 + 0.77481 * d) * rad)
+            let rAU = 1.52366 * (1 - 0.09340 * cos(M))
+            return outerPlanetToEquatorial(lonDeg: lonDeg, latDeg: latDeg, rAU: rAU, date: date)
+        }
+
+        static func jupiterEquatorial(date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let L = (34.351 + 0.08309104 * d).truncatingRemainder(dividingBy: 360)
+            let M = (20.9 + 0.08309104 * d) * rad
+            let lonDeg = L + 5.555 * sin(M) + 0.168 * sin(2 * M)
+            let latDeg = 1.3 * sin((168.6 + 0.0829 * d) * rad)
+            let rAU = 5.2034 * (1 - 0.04849 * cos(M))
+            return outerPlanetToEquatorial(lonDeg: lonDeg, latDeg: latDeg, rAU: rAU, date: date)
+        }
+
+        static func saturnEquatorial(date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let L = (50.077 + 0.03345972 * d).truncatingRemainder(dividingBy: 360)
+            let M = (317.020 + 0.03345972 * d) * rad
+            let lonDeg = L + 6.3585 * sin(M) + 0.2566 * sin(2 * M)
+            let latDeg = 2.487 * sin((279.507 + 0.03345 * d) * rad)
+            let rAU = 9.5371 * (1 - 0.05551 * cos(M))
+            return outerPlanetToEquatorial(lonDeg: lonDeg, latDeg: latDeg, rAU: rAU, date: date)
+        }
+
+        // Shared heliocentric → geocentric → equatorial conversion for inner planets (lat ≈ 0)
+        private static func innerPlanetToEquatorial(lonDeg: Double, rAU: Double, latDeg: Double, date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let sunLon = sunEclipticLongitude(date: date) * rad
+            let lonRad = lonDeg * rad
+            let xg = rAU * cos(lonRad) - cos(sunLon)
+            let yg = rAU * sin(lonRad) - sin(sunLon)
+            let epsilon = (23.439 - 0.0000004 * d) * rad
+            let ra = atan2(cos(epsilon) * yg, xg)
+            let dec = atan2(sin(epsilon) * yg, sqrt(xg * xg + yg * yg))
+            let raHours = (ra < 0 ? ra + 2 * Double.pi : ra) * 12.0 / Double.pi
+            return Equatorial(raHours: raHours, decDeg: dec * 180.0 / Double.pi)
+        }
+
+        // Shared heliocentric → geocentric → equatorial conversion for outer planets
+        private static func outerPlanetToEquatorial(lonDeg: Double, latDeg: Double, rAU: Double, date: Date) -> Equatorial {
+            let jd = julianDay(date: date)
+            let d = jd - 2451545.0
+            let rad = Double.pi / 180.0
+            let sunLon = sunEclipticLongitude(date: date) * rad
+            let lonRad = lonDeg * rad
+            let latRad = latDeg * rad
+            let xh = rAU * cos(latRad) * cos(lonRad)
+            let yh = rAU * cos(latRad) * sin(lonRad)
+            let zh = rAU * sin(latRad)
+            let xg = xh - cos(sunLon)
+            let yg = yh - sin(sunLon)
+            let epsilon = (23.439 - 0.0000004 * d) * rad
+            let xe = xg
+            let ye = yg * cos(epsilon) - zh * sin(epsilon)
+            let ze = yg * sin(epsilon) + zh * cos(epsilon)
+            let ra = atan2(ye, xe)
+            let dec = atan2(ze, sqrt(xe * xe + ye * ye))
+            let raHours = (ra < 0 ? ra + 2 * Double.pi : ra) * 12.0 / Double.pi
+            return Equatorial(raHours: raHours, decDeg: dec * 180.0 / Double.pi)
+        }
+
+        // MARK: - Planet Rise/Set
+
+        struct PlanetEvent {
+            let planet: Planet
+            let label: String  // e.g. "Jupiter rises 21:14"
+        }
+
+        /// Returns the next planet rise or set event within a 24h window.
+        /// Uses the analytical hour-angle formula for the standard horizon (-0.833°).
+        static func nextPlanetEvent(
+            planets: [Planet],
+            date: Date,
+            latDeg: Double,
+            lonDeg: Double
+        ) -> PlanetEvent? {
+            let rad = Double.pi / 180.0
+            let latRad = latDeg * rad
+            let sinH0 = sin(-0.833 * rad)
+            var nearest: (interval: TimeInterval, event: PlanetEvent)?
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            formatter.timeZone = TimeZone.current
+
+            for planet in planets {
+                let eq = planetEquatorial(planet: planet, date: date)
+                let decRad = eq.decDeg * rad
+                let cosH0denom = cos(latRad) * cos(decRad)
+                guard abs(cosH0denom) > 1e-6 else { continue }
+                let cosH0 = (sinH0 - sin(latRad) * sin(decRad)) / cosH0denom
+                guard cosH0 >= -1.0 && cosH0 <= 1.0 else { continue }  // circumpolar or never rises
+                let H0 = acos(cosH0) * 12.0 / Double.pi  // hours
+
+                let lst = localSiderealTime(date: date, longitude: lonDeg)
+                var hoursToTransit = eq.raHours - lst
+                hoursToTransit = hoursToTransit.truncatingRemainder(dividingBy: 24)
+                if hoursToTransit < 0 { hoursToTransit += 24 }
+
+                for (hoursAhead, verb) in [(hoursToTransit - H0, "rises"), (hoursToTransit + H0, "sets")] {
+                    var h = hoursAhead.truncatingRemainder(dividingBy: 24)
+                    if h < 0 { h += 24 }
+                    let intervalSecs = h * 3600
+                    let eventDate = date.addingTimeInterval(intervalSecs)
+                    let timeStr = formatter.string(from: eventDate)
+                    let event = PlanetEvent(planet: planet, label: "\(planet.name) \(verb) \(timeStr)")
+                    if nearest == nil || intervalSecs < nearest!.interval {
+                        nearest = (intervalSecs, event)
+                    }
+                }
+            }
+            return nearest?.event
         }
     }
 
