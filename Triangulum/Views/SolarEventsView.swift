@@ -193,7 +193,8 @@ struct SolarEventsView: View {
             if let t = solarDay.morningGoldenEnd {
                 SolarEventRow(icon: "sun.max.fill", label: "Golden hour ends",
                               time: Self.timeFormatter.string(from: t),
-                              accent: .prussianWarning, isPast: isToday && t < now)
+                              accent: .prussianWarning, isPast: isToday && t < now,
+                              showDivider: false)
             }
         }
     }
@@ -223,7 +224,8 @@ struct SolarEventsView: View {
             if let t = solarDay.astronomicalDusk {
                 SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
                               time: Self.timeFormatter.string(from: t),
-                              accent: .prussianBlueDark, isPast: isToday && t < now)
+                              accent: .prussianBlueDark, isPast: isToday && t < now,
+                              showDivider: false)
             }
         }
     }
@@ -256,6 +258,7 @@ private struct SolarEventRow: View {
     let time: String
     let accent: Color
     let isPast: Bool
+    var showDivider: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -273,7 +276,9 @@ private struct SolarEventRow: View {
             .padding(.horizontal)
             .padding(.vertical, 12)
             .opacity(isPast ? 0.4 : 1.0)
-            Divider().padding(.leading, 52)
+            if showDivider {
+                Divider().padding(.leading, 52)
+            }
         }
     }
 }
@@ -295,7 +300,7 @@ private struct SolarCountdownCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(next.label)
                         .font(.subheadline.weight(.semibold))
-                    Text("in \(hours)h \(minutes)m")
+                    Text(hours > 0 ? "in \(hours)h \(minutes)m" : "in \(minutes)m")
                         .font(.caption)
                         .opacity(0.85)
                 }
