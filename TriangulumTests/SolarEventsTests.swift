@@ -78,6 +78,8 @@ struct SolarEventsTests {
             altitudeDeg: -0.833, rising: false,
             date: march3, latDeg: sfLat, lonDeg: sfLon
         )
+        #expect(sunrise != nil)
+        #expect(sunset != nil)
         if let rise = sunrise, let set = sunset {
             #expect(rise < set)
         }
@@ -99,6 +101,8 @@ struct SolarEventsTests {
     @Test func testGoldenHourEndIsAfterSunrise() {
         let sunrise    = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -0.833, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
         let goldenEnd  = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: 6.0,   rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
+        #expect(sunrise != nil)
+        #expect(goldenEnd != nil)
         if let s = sunrise, let g = goldenEnd {
             #expect(s < g)
         }

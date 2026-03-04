@@ -816,7 +816,8 @@ struct ConstellationMapView: View {
             let lst = localSiderealTime(date: localNoon, longitude: lonDeg)
             var transitOffset = sunEq.raHours - lst
             transitOffset = transitOffset.truncatingRemainder(dividingBy: 24)
-            // Normalize to ±12h so transit stays close to noon
+            // Normalize to ±12 h: negative = transit before noon, positive = after noon
+            // (unlike nextPlanetEvent's [0,24) convention which finds the *next* transit)
             if transitOffset > 12 { transitOffset -= 24 }
             if transitOffset < -12 { transitOffset += 24 }
             let transitDate = localNoon.addingTimeInterval(transitOffset * 3600)
