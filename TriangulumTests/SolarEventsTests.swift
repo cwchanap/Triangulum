@@ -128,6 +128,12 @@ struct SolarDayTests {
         for i in 1..<times.count {
             #expect(times[i-1] < times[i], "Events out of order at index \(i)")
         }
+        // Also verify allEvents (the primary API) is sorted
+        let events = day.allEvents
+        for i in 1..<events.count {
+            #expect(events[i-1].time < events[i].time,
+                    "allEvents out of order at index \(i): \(events[i-1].label) vs \(events[i].label)")
+        }
     }
 
     @Test func testSolarDayAllNilAtNorthPoleInWinter() {

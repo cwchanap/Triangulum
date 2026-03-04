@@ -25,7 +25,7 @@ struct SolarDay {
 
     // Evening (Sun setting through each threshold)
     let eveningGoldenStart: Date?  // Sun at  +6° setting — golden hour begins
-    let sunset: Date?              // Sun at -0.833° setting — blue hour begins
+    let sunset: Date?              // Sun at -0.833° setting — golden hour ends
     let civilDusk: Date?           // Sun at  -6° setting — blue hour ends
     let nauticalDusk: Date?        // Sun at -12° setting
     let astronomicalDusk: Date?    // Sun at -18° setting — sky fully dark
