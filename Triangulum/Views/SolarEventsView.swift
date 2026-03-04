@@ -109,9 +109,11 @@ struct SolarEventsView: View {
         ScrollView {
             VStack(spacing: 0) {
                 headerCard
-                SolarCountdownCard(solarDay: solarDay, now: now)
-                    .padding(.horizontal)
-                    .padding(.top, 12)
+                if isToday {
+                    SolarCountdownCard(solarDay: solarDay, now: now)
+                        .padding(.horizontal)
+                        .padding(.top, 12)
+                }
                 morningSection
                 eveningSection
             }
