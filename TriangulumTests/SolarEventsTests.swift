@@ -108,3 +108,56 @@ struct SolarEventsTests {
         }
     }
 }
+
+// MARK: - SolarDay Tests
+
+struct SolarDayTests {
+
+    let sfLat = 37.7749
+    let sfLon = -122.4194
+    let march3: Date = Date(timeIntervalSince1970: 1741032000)
+
+    @Test func testSolarDayEventsAreChronological() {
+        let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
+        let times = [
+            day.astronomicalDawn, day.nauticalDawn, day.civilDawn,
+            day.sunrise, day.morningGoldenEnd,
+            day.eveningGoldenStart, day.sunset,
+            day.civilDusk, day.nauticalDusk, day.astronomicalDusk
+        ].compactMap { $0 }
+        for i in 1..<times.count {
+            #expect(times[i-1] < times[i], "Events out of order at index \(i)")
+        }
+    }
+
+    @Test func testSolarDayAllNilAtNorthPoleInWinter() {
+        // December 21 — polar night at 89°N, Sun never rises above -0.833°
+        let dec21 = Date(timeIntervalSince1970: 1766361600) // ~2025-12-21
+        let day = SolarDay(date: dec21, latitude: 89.0, longitude: 0.0)
+        #expect(day.sunrise == nil)
+        #expect(day.sunset == nil)
+    }
+
+    @Test func testSolarDayMorningGoldenEndAfterSunrise() {
+        let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
+        if let rise = day.sunrise, let goldEnd = day.morningGoldenEnd {
+            #expect(rise < goldEnd)
+        }
+    }
+
+    @Test func testNextEventReturnsNilWhenAllPast() {
+        let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
+        // Use a far-future "now" — after all events for the day
+        let farFuture = march3.addingTimeInterval(24 * 3600)
+        #expect(day.nextEvent(after: farFuture) == nil)
+    }
+
+    @Test func testNextEventReturnsFirstUpcoming() {
+        let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
+        // Use astronomical dawn as "now" — next should be nautical dawn
+        if let astro = day.astronomicalDawn, let nautical = day.nauticalDawn {
+            let next = day.nextEvent(after: astro.addingTimeInterval(1))
+            #expect(next?.time == nautical)
+        }
+    }
+}
