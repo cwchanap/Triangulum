@@ -105,6 +105,12 @@ struct ContentView: View {
                             .foregroundColor(.white)
                     }
 
+                    NavigationLink(destination: SolarEventsView(locationManager: locationManager)) {
+                        Image(systemName: "sun.max.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+
                     NavigationLink(destination: CompassPageView(locationManager: locationManager)) {
                         Image(systemName: "location.north.fill")
                             .font(.title2)
