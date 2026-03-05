@@ -116,8 +116,8 @@ extension ConstellationMapView.Astronomer {
         let rad = Double.pi / 180.0
         let sunLon = sunEclipticLongitude(date: date) * rad
         let lonRad = lonDeg * rad
-        let xg = rAU * cos(lonRad) - cos(sunLon)
-        let yg = rAU * sin(lonRad) - sin(sunLon)
+        let xg = rAU * cos(lonRad) + cos(sunLon)
+        let yg = rAU * sin(lonRad) + sin(sunLon)
         let epsilon = (23.439 - 0.0000004 * d) * rad
         let ra = atan2(cos(epsilon) * yg, xg)
         let dec = atan2(sin(epsilon) * yg, sqrt(xg * xg + yg * yg))
@@ -141,8 +141,8 @@ extension ConstellationMapView.Astronomer {
         let heliocentricX = rAU * cos(latitudeRad) * cos(longitudeRad)
         let heliocentricY = rAU * cos(latitudeRad) * sin(longitudeRad)
         let heliocentricZ = rAU * sin(latitudeRad)
-        let geocentricX = heliocentricX - cos(sunLongitude)
-        let geocentricY = heliocentricY - sin(sunLongitude)
+        let geocentricX = heliocentricX + cos(sunLongitude)
+        let geocentricY = heliocentricY + sin(sunLongitude)
         let obliquity = (23.439 - 0.0000004 * daysSinceJ2000) * degreesToRadians
         let equatorialX = geocentricX
         let equatorialY = geocentricY * cos(obliquity) - heliocentricZ * sin(obliquity)
