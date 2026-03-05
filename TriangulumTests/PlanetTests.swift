@@ -124,39 +124,45 @@ struct PlanetRiseSetTests {
     }
 
     @Test func testEventLabelContainsPlanetName() {
-        if let event = ConstellationMapView.Astronomer.nextPlanetEvent(
+        let event = ConstellationMapView.Astronomer.nextPlanetEvent(
             planets: Planet.catalog,
             date: testDate,
             latDeg: 37.0,
             lonDeg: -122.0
-        ) {
-            let planetNames = Planet.catalog.map { $0.name }
-            #expect(planetNames.contains(where: { event.label.hasPrefix($0) }))
+        )
+        #expect(event != nil)
+        guard let event else {
+            Issue.record("Expected at least one planet event at mid-latitude")
+            return
         }
+
+        let planetNames = Planet.catalog.map { $0.name }
+        #expect(planetNames.contains(where: { event.label.hasPrefix($0) }))
     }
 
     @Test func testEventLabelContainsRisesOrSets() {
-        if let event = ConstellationMapView.Astronomer.nextPlanetEvent(
+        let event = ConstellationMapView.Astronomer.nextPlanetEvent(
             planets: Planet.catalog,
             date: testDate,
             latDeg: 37.0,
             lonDeg: -122.0
-        ) {
-            #expect(event.label.contains("rises") || event.label.contains("sets"))
+        )
+        #expect(event != nil)
+        guard let event else {
+            Issue.record("Expected at least one planet event at mid-latitude")
+            return
         }
+
+        #expect(event.label.contains("rises") || event.label.contains("sets"))
     }
 
     @Test func testCircumpolarPlanetsSkippedAtPole() {
-        // At latitude ~90° (North Pole), all planets near the ecliptic plane are circumpolar
-        // or below horizon always; nextPlanetEvent may return nil since |cosH0| > 1
-        // This just verifies it doesn't crash
         let event = ConstellationMapView.Astronomer.nextPlanetEvent(
             planets: Planet.catalog,
             date: testDate,
             latDeg: 89.9,
             lonDeg: 0.0
         )
-        // No assertion needed - just verify no crash
-        _ = event
+        #expect(event == nil)
     }
 }

@@ -35,32 +35,32 @@ struct SolarDay {
         self.latitude = latitude
         self.longitude = longitude
 
-        let sc = ConstellationMapView.Astronomer.solarCrossing
-        astronomicalDawn   = sc(-18.0,   true,  date, latitude, longitude)
-        nauticalDawn       = sc(-12.0,   true,  date, latitude, longitude)
-        civilDawn          = sc( -6.0,   true,  date, latitude, longitude)
-        sunrise            = sc( -0.833, true,  date, latitude, longitude)
-        morningGoldenEnd   = sc(  6.0,   true,  date, latitude, longitude)
-        eveningGoldenStart = sc(  6.0,   false, date, latitude, longitude)
-        sunset             = sc( -0.833, false, date, latitude, longitude)
-        civilDusk          = sc( -6.0,   false, date, latitude, longitude)
-        nauticalDusk       = sc(-12.0,   false, date, latitude, longitude)
-        astronomicalDusk   = sc(-18.0,   false, date, latitude, longitude)
+        let solarCrossing = ConstellationMapView.Astronomer.solarCrossing
+        astronomicalDawn = solarCrossing(-18.0, true, date, latitude, longitude)
+        nauticalDawn = solarCrossing(-12.0, true, date, latitude, longitude)
+        civilDawn = solarCrossing(-6.0, true, date, latitude, longitude)
+        sunrise = solarCrossing(-0.833, true, date, latitude, longitude)
+        morningGoldenEnd = solarCrossing(6.0, true, date, latitude, longitude)
+        eveningGoldenStart = solarCrossing(6.0, false, date, latitude, longitude)
+        sunset = solarCrossing(-0.833, false, date, latitude, longitude)
+        civilDusk = solarCrossing(-6.0, false, date, latitude, longitude)
+        nauticalDusk = solarCrossing(-12.0, false, date, latitude, longitude)
+        astronomicalDusk = solarCrossing(-18.0, false, date, latitude, longitude)
     }
 
     /// All non-nil events sorted chronologically.
     var allEvents: [(label: String, time: Date)] {
         let raw: [(String, Date?)] = [
-            ("Astronomical twilight",       astronomicalDawn),
-            ("Nautical twilight",           nauticalDawn),
-            ("Blue hour begins",            civilDawn),
-            ("Sunrise",                     sunrise),
-            ("Golden hour ends",            morningGoldenEnd),
-            ("Golden hour begins",          eveningGoldenStart),
-            ("Sunset",                      sunset),
-            ("Blue hour ends",              civilDusk),
-            ("Nautical twilight ends",      nauticalDusk),
-            ("Astronomical twilight ends",  astronomicalDusk),
+            ("Astronomical twilight", astronomicalDawn),
+            ("Nautical twilight", nauticalDawn),
+            ("Blue hour begins", civilDawn),
+            ("Sunrise", sunrise),
+            ("Golden hour ends", morningGoldenEnd),
+            ("Golden hour begins", eveningGoldenStart),
+            ("Sunset", sunset),
+            ("Blue hour ends", civilDusk),
+            ("Nautical twilight ends", nauticalDusk),
+            ("Astronomical twilight ends", astronomicalDusk)
         ]
         return raw.compactMap { label, time in time.map { (label, $0) } }
                .sorted { $0.time < $1.time }
@@ -95,10 +95,8 @@ struct SolarEventsView: View {
         return f
     }()
 
-    private var solarDay: SolarDay {
-        SolarDay(date: selectedDate,
-                 latitude: locationManager.latitude,
-                 longitude: locationManager.longitude)
+    private var hasUsableLocation: Bool {
+        locationManager.hasValidLocation
     }
 
     private var isToday: Bool {
@@ -106,16 +104,26 @@ struct SolarEventsView: View {
     }
 
     var body: some View {
+        let solarDay = hasUsableLocation
+            ? SolarDay(date: selectedDate,
+                       latitude: locationManager.latitude,
+                       longitude: locationManager.longitude)
+            : nil
+
         ScrollView {
             VStack(spacing: 0) {
                 headerCard
-                if isToday {
-                    SolarCountdownCard(solarDay: solarDay, now: now)
-                        .padding(.horizontal)
-                        .padding(.top, 12)
+                if let solarDay {
+                    if isToday {
+                        SolarCountdownCard(solarDay: solarDay, now: now)
+                            .padding(.horizontal)
+                            .padding(.top, 12)
+                    }
+                    morningSection(solarDay: solarDay)
+                    eveningSection(solarDay: solarDay)
+                } else {
+                    locationUnavailableCard
                 }
-                morningSection
-                eveningSection
             }
         }
         .background(Color.prussianSoft.ignoresSafeArea())
@@ -157,10 +165,18 @@ struct SolarEventsView: View {
             Text(Self.dateFormatter.string(from: selectedDate))
                 .font(.headline)
                 .foregroundColor(.prussianBlueDark)
-            Text(String(format: "%.4f°, %.4f°",
-                        locationManager.latitude, locationManager.longitude))
-                .font(.caption)
-                .foregroundColor(.prussianBlueLight)
+            if hasUsableLocation {
+                Text(String(format: "%.4f°, %.4f°",
+                            locationManager.latitude, locationManager.longitude))
+                    .font(.caption)
+                    .foregroundColor(.prussianBlueLight)
+            } else {
+                Text(locationManager.errorMessage.isEmpty
+                     ? "Waiting for a location fix..."
+                     : locationManager.errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.prussianError)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
@@ -168,7 +184,7 @@ struct SolarEventsView: View {
         .background(Color.white.opacity(0.85))
     }
 
-    private var morningSection: some View {
+    private func morningSection(solarDay: SolarDay) -> some View {
         sectionCard(title: "MORNING") {
             if let t = solarDay.astronomicalDawn {
                 SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
@@ -199,7 +215,7 @@ struct SolarEventsView: View {
         }
     }
 
-    private var eveningSection: some View {
+    private func eveningSection(solarDay: SolarDay) -> some View {
         sectionCard(title: "EVENING") {
             if let t = solarDay.eveningGoldenStart {
                 SolarEventRow(icon: "sun.max.fill", label: "Golden hour begins",
@@ -228,6 +244,23 @@ struct SolarEventsView: View {
                               showDivider: false)
             }
         }
+    }
+
+    private var locationUnavailableCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Location required")
+                .font(.headline)
+                .foregroundColor(.prussianBlueDark)
+            Text("Solar event times appear after location permissions are granted and a valid GPS fix is available.")
+                .font(.subheadline)
+                .foregroundColor(.prussianBlueLight)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.white.opacity(0.85))
+        .cornerRadius(12)
+        .padding(.horizontal)
+        .padding(.top, 12)
     }
 
     @ViewBuilder

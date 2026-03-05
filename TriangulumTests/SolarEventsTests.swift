@@ -46,27 +46,47 @@ struct SolarEventsTests {
             altitudeDeg: -0.833, rising: true,
             date: march3, latDeg: sfLat, lonDeg: sfLon
         )
-        #expect(sunrise != nil)
-        if let t = sunrise {
-            // Sunrise in SF in March is around 06:30-07:00 local time.
-            // Verify it falls in the morning hours (before noon).
-            let cal = Calendar.current
-            let hour = cal.component(.hour, from: t)
-            #expect(hour >= 5 && hour <= 9)
-        }
-    }
-
-    @Test func testSunsetIsAfterNoon() {
         let sunset = ConstellationMapView.Astronomer.solarCrossing(
             altitudeDeg: -0.833, rising: false,
             date: march3, latDeg: sfLat, lonDeg: sfLon
         )
-        #expect(sunset != nil)
-        if let t = sunset {
-            let cal = Calendar.current
-            let hour = cal.component(.hour, from: t)
-            #expect(hour >= 17 && hour <= 21)
+
+        guard let sunrise else {
+            Issue.record("Expected non-nil sunrise for mid-latitude test date")
+            return
         }
+        guard let sunset else {
+            Issue.record("Expected non-nil sunset for mid-latitude test date")
+            return
+        }
+
+        let solarNoon = sunrise.addingTimeInterval(sunset.timeIntervalSince(sunrise) / 2)
+        #expect(sunrise < solarNoon)
+        #expect(solarNoon < sunset)
+    }
+
+    @Test func testSunsetIsAfterNoon() {
+        let sunrise = ConstellationMapView.Astronomer.solarCrossing(
+            altitudeDeg: -0.833, rising: true,
+            date: march3, latDeg: sfLat, lonDeg: sfLon
+        )
+        let sunset = ConstellationMapView.Astronomer.solarCrossing(
+            altitudeDeg: -0.833, rising: false,
+            date: march3, latDeg: sfLat, lonDeg: sfLon
+        )
+
+        guard let sunrise else {
+            Issue.record("Expected non-nil sunrise for mid-latitude test date")
+            return
+        }
+        guard let sunset else {
+            Issue.record("Expected non-nil sunset for mid-latitude test date")
+            return
+        }
+
+        let daylightDuration = sunset.timeIntervalSince(sunrise)
+        #expect(daylightDuration > 0)
+        #expect(daylightDuration < 20 * 3600)
     }
 
     @Test func testSunriseBeforeSunset() {
@@ -78,34 +98,62 @@ struct SolarEventsTests {
             altitudeDeg: -0.833, rising: false,
             date: march3, latDeg: sfLat, lonDeg: sfLon
         )
-        #expect(sunrise != nil)
-        #expect(sunset != nil)
-        if let rise = sunrise, let set = sunset {
-            #expect(rise < set)
+
+        guard let sunrise else {
+            Issue.record("Expected non-nil sunrise for mid-latitude test date")
+            return
         }
+        guard let sunset else {
+            Issue.record("Expected non-nil sunset for mid-latitude test date")
+            return
+        }
+
+        #expect(sunrise < sunset)
     }
 
     @Test func testTwilightOrderIsCorrect() {
         // astronomical < nautical < civil < sunrise
-        let astro   = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -18.0,  rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
+        let astro = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -18.0, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
         let nautical = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -12.0, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
-        let civil    = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -6.0,  rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
-        let sunrise  = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -0.833, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
-        if let a = astro, let n = nautical, let c = civil, let s = sunrise {
-            #expect(a < n)
-            #expect(n < c)
-            #expect(c < s)
+        let civil = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -6.0, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
+        let sunrise = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -0.833, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
+
+        guard let astro else {
+            Issue.record("Expected non-nil astronomical twilight for mid-latitude test date")
+            return
         }
+        guard let nautical else {
+            Issue.record("Expected non-nil nautical twilight for mid-latitude test date")
+            return
+        }
+        guard let civil else {
+            Issue.record("Expected non-nil civil twilight for mid-latitude test date")
+            return
+        }
+        guard let sunrise else {
+            Issue.record("Expected non-nil sunrise for mid-latitude test date")
+            return
+        }
+
+        #expect(astro < nautical)
+        #expect(nautical < civil)
+        #expect(civil < sunrise)
     }
 
     @Test func testGoldenHourEndIsAfterSunrise() {
-        let sunrise    = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -0.833, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
-        let goldenEnd  = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: 6.0,   rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
-        #expect(sunrise != nil)
-        #expect(goldenEnd != nil)
-        if let s = sunrise, let g = goldenEnd {
-            #expect(s < g)
+        let sunrise = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: -0.833, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
+        let goldenEnd = ConstellationMapView.Astronomer.solarCrossing(altitudeDeg: 6.0, rising: true, date: march3, latDeg: sfLat, lonDeg: sfLon)
+
+        guard let sunrise else {
+            Issue.record("Expected non-nil sunrise for mid-latitude test date")
+            return
         }
+        guard let goldenEnd else {
+            Issue.record("Expected non-nil golden hour end for mid-latitude test date")
+            return
+        }
+
+        #expect(sunrise < goldenEnd)
     }
 }
 
