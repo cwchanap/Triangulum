@@ -192,7 +192,7 @@ struct ConstellationMapView: View {
                     LegendDot(color: nightVisionMode ? .red : .cyan, label: "Satellite")
                 }
                 if skyShowPlanets {
-                    LegendDot(color: nightVisionMode ? .red : Color(red: 0.90, green: 0.35, blue: 0.20), label: "Planet")
+                    LegendDot(color: nightVisionMode ? .red : .prussianBlue, label: "Planet")
                 }
             }
             Spacer(minLength: 8)
@@ -279,15 +279,17 @@ struct ConstellationMapView: View {
                 PlanetRenderer.draw(
                     context: &layer,
                     planets: Planet.catalog,
-                    center: center,
-                    radius: radius,
-                    heading: locationManager.heading,
-                    snapNorth: skySnapNorth,
-                    panOffset: pan,
-                    current: current,
-                    observer: observer,
-                    nightVisionMode: nightVisionMode,
-                    pointOnDome: pointOnDome
+                    config: PlanetRenderer.DrawConfig(
+                        center: center,
+                        radius: radius,
+                        heading: locationManager.heading,
+                        snapNorth: skySnapNorth,
+                        panOffset: pan,
+                        current: current,
+                        observer: observer,
+                        nightVisionMode: nightVisionMode,
+                        pointOnDome: pointOnDome
+                    )
                 )
             }
 
@@ -300,80 +302,160 @@ struct ConstellationMapView: View {
                     pointOnDome: pointOnDome)
             }
 
-            // Altitude rings (30°, 60°)
             let fg = nightVisionMode ? Color.red : Color.white
-            for alt in stride(from: 30.0, through: 60.0, by: 30.0) {
-                let r = radius * (1 - alt / 90.0)
-                let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
-                let path = Path(ellipseIn: rect)
-                layer.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
-            }
-
-            // Pan offsets mapped to azimuth/altitude
+            let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
             let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0) // ~90° per radius
             let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
 
-            // Cardinal directions (rotated by heading and panned)
-            let labels = [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]
-            let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
-            for (text, az) in labels {
-                let theta = az * .pi / 180
-                let point = pointOnDome(center: center, radius: radius, azimuthRad: theta - headingRad + azOffsetRad, altitudeDeg: 0 + altOffsetDeg)
-                let resolved = layer.resolve(Text(text).font(.caption).foregroundColor(fg))
-                layer.draw(resolved, at: point, anchor: .center)
-            }
+            drawRingsAndCardinals(
+                context: &layer,
+                center: center,
+                radius: radius,
+                fg: fg,
+                headingRad: headingRad,
+                azOffsetRad: azOffsetRad,
+                altOffsetDeg: altOffsetDeg
+            )
 
-            // Even if location isn't available, draw stars using default lat/lon
-
-            // Compute star positions
-            let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
-            // Constellation lines first (so stars draw over them)
-            for line in ConstellationData.lines {
-                if let a = ConstellationData.star(named: line.0), let b = ConstellationData.star(named: line.1) {
-                    if let pa = project(star: a, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg),
-                       let pb = project(star: b, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg) {
-                        var path = Path()
-                        path.move(to: pa)
-                        path.addLine(to: pb)
-                        layer.stroke(path, with: .color(fg.opacity(0.5 * effectiveNight)), lineWidth: 0.7)
-                    }
-                }
-            }
-
-            // Draw stars
-            let starsToUse: [Star] = skyCatalog == "extended" ? ConstellationData.starsExtended : ConstellationData.stars
-            for star in starsToUse {
-                if let p = project(star: star, lstHours: lstHours, observer: observer, center: center, radius: radius, headingRad: headingRad, azOffsetRad: azOffsetRad, altOffsetDeg: altOffsetDeg) {
-                    let size = max(1.5, 5.2 - 0.8 * star.mag)
-                    let rect = CGRect(x: p.x - size/2, y: p.y - size/2, width: size, height: size)
-                    layer.fill(Path(ellipseIn: rect), with: .color(fg.opacity(effectiveNight)))
-
-                    if skyShowStarLabels && star.mag < 1.0 { // label brighter stars
-                        let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(effectiveNight))
-                        layer.draw(layer.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
-                    }
-                }
-            }
-
-            if skyShowConstellationLabels {
-                drawConstellationLabels(
-                    context: &layer,
-                    center: center,
-                    radius: radius,
-                    lstHours: lstHours,
-                    observer: observer,
-                    headingRad: headingRad,
-                    azOffsetRad: azOffsetRad,
-                    altOffsetDeg: altOffsetDeg,
-                    fg: fg.opacity(effectiveNight)
-                )
-            }
+            drawStarsAndConstellations(
+                context: &layer,
+                center: center,
+                radius: radius,
+                observer: observer,
+                current: current,
+                headingRad: headingRad,
+                azOffsetRad: azOffsetRad,
+                altOffsetDeg: altOffsetDeg,
+                effectiveNight: effectiveNight,
+                fg: fg
+            )
         }
 
         // Outline after fill so it stays crisp
         let fg = nightVisionMode ? Color.red : Color.white
         context.stroke(dome, with: .color(fg.opacity(0.25)), lineWidth: 1)
 
+    }
+
+    private func drawRingsAndCardinals(
+        context: inout GraphicsContext,
+        center: CGPoint,
+        radius: CGFloat,
+        fg: Color,
+        headingRad: Double,
+        azOffsetRad: Double,
+        altOffsetDeg: Double
+    ) {
+        // Altitude rings (30°, 60°)
+        for alt in stride(from: 30.0, through: 60.0, by: 30.0) {
+            let r = radius * (1 - alt / 90.0)
+            let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+            let path = Path(ellipseIn: rect)
+            context.stroke(path, with: .color(fg.opacity(0.15)), lineWidth: 0.8)
+        }
+
+        // Cardinal directions (rotated by heading and panned)
+        let labels = [("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)]
+        for (text, az) in labels {
+            let theta = az * .pi / 180
+            let point = pointOnDome(
+                center: center,
+                radius: radius,
+                azimuthRad: theta - headingRad + azOffsetRad,
+                altitudeDeg: altOffsetDeg
+            )
+            let resolved = context.resolve(Text(text).font(.caption).foregroundColor(fg))
+            context.draw(resolved, at: point, anchor: .center)
+        }
+    }
+
+    private func drawStarsAndConstellations(
+        context: inout GraphicsContext,
+        center: CGPoint,
+        radius: CGFloat,
+        observer: Observer,
+        current: Date,
+        headingRad: Double,
+        azOffsetRad: Double,
+        altOffsetDeg: Double,
+        effectiveNight: Double,
+        fg: Color
+    ) {
+        // Even if location isn't available, draw stars using default lat/lon
+        let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
+
+        // Constellation lines first (so stars draw over them)
+        for line in ConstellationData.lines {
+            guard let a = ConstellationData.star(named: line.0),
+                  let b = ConstellationData.star(named: line.1),
+                  let pa = project(
+                    star: a,
+                    lstHours: lstHours,
+                    observer: observer,
+                    center: center,
+                    radius: radius,
+                    headingRad: headingRad,
+                    azOffsetRad: azOffsetRad,
+                    altOffsetDeg: altOffsetDeg
+                  ),
+                  let pb = project(
+                    star: b,
+                    lstHours: lstHours,
+                    observer: observer,
+                    center: center,
+                    radius: radius,
+                    headingRad: headingRad,
+                    azOffsetRad: azOffsetRad,
+                    altOffsetDeg: altOffsetDeg
+                  )
+            else {
+                continue
+            }
+
+            var path = Path()
+            path.move(to: pa)
+            path.addLine(to: pb)
+            context.stroke(path, with: .color(fg.opacity(0.5 * effectiveNight)), lineWidth: 0.7)
+        }
+
+        let starsToUse: [Star] = skyCatalog == "extended" ? ConstellationData.starsExtended : ConstellationData.stars
+        for star in starsToUse {
+            guard let p = project(
+                star: star,
+                lstHours: lstHours,
+                observer: observer,
+                center: center,
+                radius: radius,
+                headingRad: headingRad,
+                azOffsetRad: azOffsetRad,
+                altOffsetDeg: altOffsetDeg
+            ) else {
+                continue
+            }
+
+            let size = max(1.5, 5.2 - 0.8 * star.mag)
+            let rect = CGRect(x: p.x - size / 2, y: p.y - size / 2, width: size, height: size)
+            context.fill(Path(ellipseIn: rect), with: .color(fg.opacity(effectiveNight)))
+
+            if skyShowStarLabels && star.mag < 1.0 { // label brighter stars
+                let label = Text(star.name).font(.system(size: 8)).foregroundColor(fg.opacity(effectiveNight))
+                context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
+            }
+        }
+
+        if skyShowConstellationLabels {
+            drawConstellationLabels(
+                context: &context,
+                center: center,
+                radius: radius,
+                lstHours: lstHours,
+                observer: observer,
+                headingRad: headingRad,
+                azOffsetRad: azOffsetRad,
+                altOffsetDeg: altOffsetDeg,
+                fg: fg.opacity(effectiveNight)
+            )
+        }
     }
 
     private func drawBackgroundStars(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, nightFactor: Double, current: Date) {
@@ -571,543 +653,6 @@ struct ConstellationMapView: View {
         let x = center.x + r * CGFloat(sin(azimuthRad))
         let y = center.y - r * CGFloat(cos(azimuthRad))
         return CGPoint(x: x, y: y)
-    }
-
-    // MARK: - Types and Data
-
-    struct Observer { let lat: Double; let lon: Double }
-
-    struct Star { let name: String; let raHours: Double; let decDeg: Double; let mag: Double }
-
-    struct Equatorial { let raHours: Double; let decDeg: Double }
-
-    struct AltAz { let altDeg: Double; let azDeg: Double }
-
-    enum Astronomer {
-        static func julianDay(date: Date) -> Double {
-            // JD from Unix time
-            return 2440587.5 + date.timeIntervalSince1970 / 86400.0
-        }
-
-        static func localSiderealTime(date: Date, longitude: Double) -> Double { // hours
-            // Approximate LST (accurate to ~1s for our purpose)
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            var gmst = 18.697374558 + 24.06570982441908 * d // hours
-            gmst = gmst.truncatingRemainder(dividingBy: 24)
-            if gmst < 0 { gmst += 24 }
-            var lst = gmst + longitude / 15.0
-            lst = lst.truncatingRemainder(dividingBy: 24)
-            if lst < 0 { lst += 24 }
-            return lst
-        }
-
-        static func altAz(eq: Equatorial, lstHours: Double, latDeg: Double) -> AltAz {
-            // Convert RA/Dec (hours/deg) to Alt/Az (deg)
-            let raRad = (eq.raHours / 24.0) * 2 * Double.pi
-            let decRad = eq.decDeg * Double.pi / 180.0
-            let latRad = latDeg * Double.pi / 180.0
-            var hRad = (lstHours / 24.0) * 2 * Double.pi - raRad // hour angle
-            // normalize to -pi..pi for stability
-            hRad = atan2(sin(hRad), cos(hRad))
-
-            let sinAlt = sin(decRad) * sin(latRad) + cos(decRad) * cos(latRad) * cos(hRad)
-            let altRad = asin(sinAlt)
-
-            let cosAlt = cos(altRad)
-            let sinAz = -cos(decRad) * sin(hRad) / max(cosAlt, 1e-6)
-            let cosAz = (sin(decRad) - sinAlt * sin(latRad)) / max(cosAlt * cos(latRad), 1e-6)
-            var azRad = atan2(sinAz, cosAz) // 0 at North, increasing eastward
-            if azRad < 0 { azRad += 2 * Double.pi }
-
-            return AltAz(altDeg: altRad * 180.0 / Double.pi, azDeg: azRad * 180.0 / Double.pi)
-        }
-
-        static func sunEquatorial(date: Date) -> Equatorial {
-            // Simplified solar position (sufficient for visibility factor and general orientation)
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let L = (280.460 + 0.9856474 * d).truncatingRemainder(dividingBy: 360)
-            let g = (357.528 + 0.9856003 * d) * Double.pi / 180.0 // rad
-            let lambda = (L + 1.915 * sin(g) + 0.020 * sin(2 * g)) * Double.pi / 180.0 // rad
-            let epsilon = (23.439 - 0.0000004 * d) * Double.pi / 180.0 // rad
-
-            let alpha = atan2(cos(epsilon) * sin(lambda), cos(lambda)) // rad
-            let delta = asin(sin(epsilon) * sin(lambda)) // rad
-
-            var raHours = (alpha >= 0 ? alpha : (alpha + 2 * Double.pi)) * 12.0 / Double.pi
-            if raHours < 0 { raHours += 24 }
-            if raHours >= 24 { raHours -= 24 }
-            let decDeg = delta * 180.0 / Double.pi
-            return Equatorial(raHours: raHours, decDeg: decDeg)
-        }
-
-        static func galacticToEquatorial(lDeg: Double, bDeg: Double) -> Equatorial {
-            // Use J2000 rotation matrix inverse (transpose of EQ->GAL matrix)
-            let l = lDeg * Double.pi / 180.0
-            let b = bDeg * Double.pi / 180.0
-            let xg = cos(b) * cos(l)
-            let yg = cos(b) * sin(l)
-            let zg = sin(b)
-
-            // Transpose of equatorial->galactic matrix (J2000)
-            let r11 = -0.0548755604, r12 = 0.4941094279, r13 = -0.8676661490
-            let r21 = -0.8734370902, r22 = -0.4448296300, r23 = -0.1980763734
-            let r31 = -0.4838350155, r32 = 0.7469822445, r33 = 0.4559837762
-
-            let xe = r11 * xg + r12 * yg + r13 * zg
-            let ye = r21 * xg + r22 * yg + r23 * zg
-            let ze = r31 * xg + r32 * yg + r33 * zg
-
-            var ra = atan2(ye, xe)
-            if ra < 0 { ra += 2 * Double.pi }
-            let dec = asin(ze)
-            let raHours = ra * 12.0 / Double.pi
-            let decDeg = dec * 180.0 / Double.pi
-            return Equatorial(raHours: raHours, decDeg: decDeg)
-        }
-
-        static func moonEquatorial(date: Date) -> Equatorial {
-            // Low-order lunar position sufficient for drawing
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-
-            // Mean elements (deg)
-            let Lp = (218.3164477 + 13.17639648 * d).truncatingRemainder(dividingBy: 360)
-            let D  = (297.8501921 + 12.19074912 * d).truncatingRemainder(dividingBy: 360) // elongation Sun-Moon
-            let M  = (357.5291092 + 0.98560028  * d).truncatingRemainder(dividingBy: 360) // Sun anomaly
-            let Mp = (134.9633964 + 13.06499295 * d).truncatingRemainder(dividingBy: 360) // Moon anomaly
-            let F  = (93.2720950  + 13.22935024 * d).truncatingRemainder(dividingBy: 360) // Moon lat argument
-
-            // Ecliptic longitude (deg), major terms
-            var lon = Lp
-            lon += 6.289 * sin(Mp * rad)
-            lon += 1.274 * sin((2*D - Mp) * rad)
-            lon += 0.658 * sin(2*D * rad)
-            lon += 0.214 * sin((2*Mp) * rad)
-            lon += 0.110 * sin(D * rad)
-            lon -= 0.186 * sin(M * rad) // solar equation of center
-
-            // Ecliptic latitude (deg), major terms
-            var lat = 5.128 * sin(F * rad)
-            lat += 0.280 * sin((Mp + F) * rad)
-            lat += 0.277 * sin((Mp - F) * rad)
-            lat += 0.173 * sin((2*D - F) * rad)
-
-            let epsilon = (23.439 - 0.0000004 * d) * rad
-            let lambda = lon * rad
-            let beta = lat * rad
-
-            // Ecliptic -> Equatorial
-            let sinDec = sin(beta) * cos(epsilon) + cos(beta) * sin(epsilon) * sin(lambda)
-            let dec = asin(sinDec)
-            let y = sin(lambda) * cos(epsilon) - tan(beta) * sin(epsilon)
-            let x = cos(lambda)
-            var ra = atan2(y, x)
-            if ra < 0 { ra += 2 * Double.pi }
-
-            let raHours = ra * 12.0 / Double.pi
-            let decDeg = dec * 180.0 / Double.pi
-            return Equatorial(raHours: raHours, decDeg: decDeg)
-        }
-
-        static func illuminationFraction(sunEq: Equatorial, moonEq: Equatorial) -> Double {
-            // Convert to unit vectors in equatorial frame
-            let raS = sunEq.raHours / 24.0 * 2 * Double.pi
-            let decS = sunEq.decDeg * Double.pi / 180.0
-            let raM = moonEq.raHours / 24.0 * 2 * Double.pi
-            let decM = moonEq.decDeg * Double.pi / 180.0
-
-            let s = SIMD3(
-                cos(decS) * cos(raS),
-                cos(decS) * sin(raS),
-                sin(decS)
-            )
-            let m = SIMD3(
-                cos(decM) * cos(raM),
-                cos(decM) * sin(raM),
-                sin(decM)
-            )
-            let dot = max(-1.0, min(1.0, Double(simd_dot(s, m))))
-            let psi = acos(dot) // elongation
-            let k = 0.5 * (1.0 + cos(psi)) // illuminated fraction [0,1]
-            return k
-        }
-
-        static func sunEclipticLongitude(date: Date) -> Double { // degrees 0..360
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let L = (280.460 + 0.9856474 * d).truncatingRemainder(dividingBy: 360)
-            let g = (357.528 + 0.9856003 * d) * Double.pi / 180.0
-            var lambda = L + 1.915 * sin(g) + 0.020 * sin(2 * g)
-            lambda = lambda.truncatingRemainder(dividingBy: 360)
-            if lambda < 0 { lambda += 360 }
-            return lambda
-        }
-
-        static func moonEclipticLongitude(date: Date) -> Double { // degrees 0..360
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let Lp = (218.3164477 + 13.17639648 * d).truncatingRemainder(dividingBy: 360)
-            let D  = (297.8501921 + 12.19074912 * d).truncatingRemainder(dividingBy: 360)
-            let M  = (357.5291092 + 0.98560028  * d).truncatingRemainder(dividingBy: 360)
-            let Mp = (134.9633964 + 13.06499295 * d).truncatingRemainder(dividingBy: 360)
-            var lon = Lp
-            lon += 6.289 * sin(Mp * rad)
-            lon += 1.274 * sin((2*D - Mp) * rad)
-            lon += 0.658 * sin(2*D * rad)
-            lon += 0.214 * sin((2*Mp) * rad)
-            lon += 0.110 * sin(D * rad)
-            lon -= 0.186 * sin(M * rad)
-            lon = lon.truncatingRemainder(dividingBy: 360)
-            if lon < 0 { lon += 360 }
-            return lon
-        }
-
-        static func moonAgeDays(date: Date) -> Double {
-            let sunLon = sunEclipticLongitude(date: date)
-            let moonLon = moonEclipticLongitude(date: date)
-            var diff = moonLon - sunLon
-            diff = diff.truncatingRemainder(dividingBy: 360)
-            if diff < 0 { diff += 360 }
-            let synodic = 29.53058867
-            return (diff / 360.0) * synodic
-        }
-
-        // MARK: - Solar Crossings (for SolarEventsView)
-
-        /// Returns the time on `date`'s calendar day when the Sun crosses `altitudeDeg`.
-        /// - Parameters:
-        ///   - altitudeDeg: Target altitude (negative = below horizon). e.g. -0.833 for sunrise.
-        ///   - rising: true = morning crossing, false = evening crossing.
-        ///   - date: Any moment on the target calendar day (local calendar used).
-        ///   - latDeg: Observer latitude in degrees.
-        ///   - lonDeg: Observer longitude in degrees.
-        /// - Returns: nil if the Sun never reaches this altitude on this date (polar day/night).
-        static func solarCrossing(
-            altitudeDeg: Double,
-            rising: Bool,
-            date: Date,
-            latDeg: Double,
-            lonDeg: Double
-        ) -> Date? {
-            let rad = Double.pi / 180.0
-            let latRad = latDeg * rad
-
-            // Use local calendar noon as reference (Sun's Dec changes slowly; good approx for the day)
-            var comps = Calendar.current.dateComponents([.year, .month, .day], from: date)
-            comps.hour = 12; comps.minute = 0; comps.second = 0; comps.nanosecond = 0
-            guard let localNoon = Calendar.current.date(from: comps) else { return nil }
-
-            let sunEq = sunEquatorial(date: localNoon)
-            let decRad = sunEq.decDeg * rad
-
-            // Hour angle H for the target altitude: cos(H) = (sin(h) - sin(lat)·sin(dec)) / (cos(lat)·cos(dec))
-            let sinH = sin(altitudeDeg * rad)
-            let cosHdenom = cos(latRad) * cos(decRad)
-            guard abs(cosHdenom) > 1e-6 else { return nil }
-            let cosH = (sinH - sin(latRad) * sin(decRad)) / cosHdenom
-            guard cosH >= -1.0 && cosH <= 1.0 else { return nil }
-            let H = acos(cosH) * 12.0 / Double.pi   // hours
-
-            // Solar transit: when hour angle = 0 → LST = RA_sun
-            let lst = localSiderealTime(date: localNoon, longitude: lonDeg)
-            var transitOffset = sunEq.raHours - lst
-            transitOffset = transitOffset.truncatingRemainder(dividingBy: 24)
-            // Normalize to ±12 h: negative = transit before noon, positive = after noon
-            // (unlike nextPlanetEvent's [0,24) convention which finds the *next* transit)
-            if transitOffset > 12 { transitOffset -= 24 }
-            if transitOffset < -12 { transitOffset += 24 }
-            let transitDate = localNoon.addingTimeInterval(transitOffset * 3600)
-
-            // Rising = transit − H, Setting = transit + H
-            return transitDate.addingTimeInterval((rising ? -H : H) * 3600)
-        }
-
-        // MARK: - Planet Positions (Meeus Ch.33 Low-Accuracy)
-
-        static func planetEquatorial(planet: Planet, date: Date) -> Equatorial {
-            switch planet.name {
-            case "Mercury": return mercuryEquatorial(date: date)
-            case "Venus":   return venusEquatorial(date: date)
-            case "Mars":    return marsEquatorial(date: date)
-            case "Jupiter": return jupiterEquatorial(date: date)
-            default:        return saturnEquatorial(date: date)
-            }
-        }
-
-        /// Ecliptic longitude of an inner planet (degrees 0..360), used for phase calculation
-        static func planetEclipticLongitude(planet: Planet, date: Date) -> Double {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            switch planet.name {
-            case "Mercury":
-                let Lp = (252.2509 + 4.09233445 * d).truncatingRemainder(dividingBy: 360)
-                let Mp = (174.7925 + 4.09233445 * d) * rad  // M0 = L0 - ω0 = 252.25 - 77.46
-                var lon = Lp + 23.4400 * sin(Mp) + 2.9988 * sin(2 * Mp)
-                lon = lon.truncatingRemainder(dividingBy: 360)
-                return lon < 0 ? lon + 360 : lon
-            case "Venus":
-                let Lp = (181.9798 + 1.60213034 * d).truncatingRemainder(dividingBy: 360)
-                let Mp = (50.3766 + 1.60213034 * d) * rad   // M0 = L0 - ω0 = 181.98 - 131.60
-                var lon = Lp + 0.7758 * sin(Mp) + 0.0033 * sin(2 * Mp)
-                lon = lon.truncatingRemainder(dividingBy: 360)
-                return lon < 0 ? lon + 360 : lon
-            default:
-                // Outer planets: not used for phase calculation (isInner = false)
-                return 0
-            }
-        }
-
-        /// Illuminated fraction for inner planets (Mercury, Venus).
-        /// planetLon and sunLon in degrees.
-        static func innerPlanetIllumination(planetLon: Double, sunLon: Double) -> Double {
-            var elongation = planetLon - sunLon
-            elongation = elongation.truncatingRemainder(dividingBy: 360)
-            if elongation < 0 { elongation += 360 }
-            let phaseAngleRad = elongation * Double.pi / 180.0
-            return 0.5 * (1.0 + cos(phaseAngleRad))
-        }
-
-        static func mercuryEquatorial(date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let Lp = (252.2509 + 4.09233445 * d).truncatingRemainder(dividingBy: 360)
-            let Mp = (174.7925 + 4.09233445 * d) * rad  // M0 = L0 - ω0 = 252.25 - 77.46
-            let lonDeg = Lp + 23.4400 * sin(Mp) + 2.9988 * sin(2 * Mp)
-            let rAU = 0.38710 * (1 - 0.20563 * cos(Mp))
-            return innerPlanetToEquatorial(lonDeg: lonDeg, rAU: rAU, latDeg: 0, date: date)
-        }
-
-        static func venusEquatorial(date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let Lp = (181.9798 + 1.60213034 * d).truncatingRemainder(dividingBy: 360)
-            let Mp = (50.3766 + 1.60213034 * d) * rad   // M0 = L0 - ω0 = 181.98 - 131.60
-            let lonDeg = Lp + 0.7758 * sin(Mp) + 0.0033 * sin(2 * Mp)
-            let rAU = 0.72333 * (1 - 0.00677 * cos(Mp))
-            return innerPlanetToEquatorial(lonDeg: lonDeg, rAU: rAU, latDeg: 0, date: date)
-        }
-
-        static func marsEquatorial(date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let L = (355.433 + 0.52402068 * d).truncatingRemainder(dividingBy: 360)
-            let M = (19.3730 + 0.52402068 * d) * rad
-            let lonDeg = L + 10.6912 * sin(M) + 0.6228 * sin(2 * M) + 0.0503 * sin(3 * M)
-            let latDeg = 1.8497 * sin((49.558 + 0.77481 * d) * rad)
-            let rAU = 1.52366 * (1 - 0.09340 * cos(M))
-            return outerPlanetToEquatorial(lonDeg: lonDeg, latDeg: latDeg, rAU: rAU, date: date)
-        }
-
-        static func jupiterEquatorial(date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let L = (34.351 + 0.08309104 * d).truncatingRemainder(dividingBy: 360)
-            let M = (20.9 + 0.08309104 * d) * rad
-            let lonDeg = L + 5.555 * sin(M) + 0.168 * sin(2 * M)
-            let latDeg = 1.3 * sin((168.6 + 0.0829 * d) * rad)
-            let rAU = 5.2034 * (1 - 0.04849 * cos(M))
-            return outerPlanetToEquatorial(lonDeg: lonDeg, latDeg: latDeg, rAU: rAU, date: date)
-        }
-
-        static func saturnEquatorial(date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let L = (50.077 + 0.03345972 * d).truncatingRemainder(dividingBy: 360)
-            let M = (317.020 + 0.03345972 * d) * rad
-            let lonDeg = L + 6.3585 * sin(M) + 0.2566 * sin(2 * M)
-            let latDeg = 2.487 * sin((279.507 + 0.03345 * d) * rad)
-            let rAU = 9.5371 * (1 - 0.05551 * cos(M))
-            return outerPlanetToEquatorial(lonDeg: lonDeg, latDeg: latDeg, rAU: rAU, date: date)
-        }
-
-        // Shared heliocentric → geocentric → equatorial conversion for inner planets (lat ≈ 0)
-        private static func innerPlanetToEquatorial(lonDeg: Double, rAU: Double, latDeg: Double, date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let sunLon = sunEclipticLongitude(date: date) * rad
-            let lonRad = lonDeg * rad
-            let xg = rAU * cos(lonRad) - cos(sunLon)
-            let yg = rAU * sin(lonRad) - sin(sunLon)
-            let epsilon = (23.439 - 0.0000004 * d) * rad
-            let ra = atan2(cos(epsilon) * yg, xg)
-            let dec = atan2(sin(epsilon) * yg, sqrt(xg * xg + yg * yg))
-            let raHours = (ra < 0 ? ra + 2 * Double.pi : ra) * 12.0 / Double.pi
-            return Equatorial(raHours: raHours, decDeg: dec * 180.0 / Double.pi)
-        }
-
-        // Shared heliocentric → geocentric → equatorial conversion for outer planets
-        private static func outerPlanetToEquatorial(lonDeg: Double, latDeg: Double, rAU: Double, date: Date) -> Equatorial {
-            let jd = julianDay(date: date)
-            let d = jd - 2451545.0
-            let rad = Double.pi / 180.0
-            let sunLon = sunEclipticLongitude(date: date) * rad
-            let lonRad = lonDeg * rad
-            let latRad = latDeg * rad
-            let xh = rAU * cos(latRad) * cos(lonRad)
-            let yh = rAU * cos(latRad) * sin(lonRad)
-            let zh = rAU * sin(latRad)
-            let xg = xh - cos(sunLon)
-            let yg = yh - sin(sunLon)
-            let epsilon = (23.439 - 0.0000004 * d) * rad
-            let xe = xg
-            let ye = yg * cos(epsilon) - zh * sin(epsilon)
-            let ze = yg * sin(epsilon) + zh * cos(epsilon)
-            let ra = atan2(ye, xe)
-            let dec = atan2(ze, sqrt(xe * xe + ye * ye))
-            let raHours = (ra < 0 ? ra + 2 * Double.pi : ra) * 12.0 / Double.pi
-            return Equatorial(raHours: raHours, decDeg: dec * 180.0 / Double.pi)
-        }
-
-        // MARK: - Planet Rise/Set
-
-        struct PlanetEvent {
-            let planet: Planet
-            let label: String  // e.g. "Jupiter rises 21:14"
-        }
-
-        /// Returns the next planet rise or set event within a 24h window.
-        /// Uses the analytical hour-angle formula for the standard horizon (-0.833°).
-        static func nextPlanetEvent(
-            planets: [Planet],
-            date: Date,
-            latDeg: Double,
-            lonDeg: Double
-        ) -> PlanetEvent? {
-            let rad = Double.pi / 180.0
-            let latRad = latDeg * rad
-            let sinH0 = sin(-0.833 * rad)
-            var nearest: (interval: TimeInterval, event: PlanetEvent)?
-
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            formatter.timeZone = TimeZone.current
-
-            for planet in planets {
-                let eq = planetEquatorial(planet: planet, date: date)
-                let decRad = eq.decDeg * rad
-                let cosH0denom = cos(latRad) * cos(decRad)
-                guard abs(cosH0denom) > 1e-6 else { continue }
-                let cosH0 = (sinH0 - sin(latRad) * sin(decRad)) / cosH0denom
-                guard cosH0 >= -1.0 && cosH0 <= 1.0 else { continue }  // circumpolar or never rises
-                let H0 = acos(cosH0) * 12.0 / Double.pi  // hours
-
-                let lst = localSiderealTime(date: date, longitude: lonDeg)
-                var hoursToTransit = eq.raHours - lst
-                hoursToTransit = hoursToTransit.truncatingRemainder(dividingBy: 24)
-                if hoursToTransit < 0 { hoursToTransit += 24 }
-
-                for (hoursAhead, verb) in [(hoursToTransit - H0, "rises"), (hoursToTransit + H0, "sets")] {
-                    var h = hoursAhead.truncatingRemainder(dividingBy: 24)
-                    if h < 0 { h += 24 }
-                    let intervalSecs = h * 3600
-                    let eventDate = date.addingTimeInterval(intervalSecs)
-                    let timeStr = formatter.string(from: eventDate)
-                    let event = PlanetEvent(planet: planet, label: "\(planet.name) \(verb) \(timeStr)")
-                    if nearest == nil || intervalSecs < nearest!.interval {
-                        nearest = (intervalSecs, event)
-                    }
-                }
-            }
-            return nearest?.event
-        }
-    }
-
-    enum ConstellationData {
-        static let stars: [Star] = [
-            // Key bright stars (approximate J2000)
-            Star(name: "Sirius", raHours: 6.75, decDeg: -16.716, mag: -1.46),
-            Star(name: "Canopus", raHours: 6.4, decDeg: -52.7, mag: -0.72),
-            Star(name: "Arcturus", raHours: 14.2667, decDeg: 19.183, mag: -0.05),
-            Star(name: "Vega", raHours: 18.6167, decDeg: 38.7837, mag: 0.03),
-            Star(name: "Capella", raHours: 5.2667, decDeg: 46.0, mag: 0.08),
-            Star(name: "Rigel", raHours: 5.242, decDeg: -8.2017, mag: 0.18),
-            Star(name: "Procyon", raHours: 7.655, decDeg: 5.225, mag: 0.38),
-            Star(name: "Betelgeuse", raHours: 5.9195, decDeg: 7.407, mag: 0.42),
-            Star(name: "Achernar", raHours: 1.65, decDeg: -57.15, mag: 0.46),
-            Star(name: "Hadar", raHours: 14.0637, decDeg: -60.373, mag: 0.61),
-            Star(name: "Altair", raHours: 19.8464, decDeg: 8.8683, mag: 0.77),
-            Star(name: "Aldebaran", raHours: 4.5987, decDeg: 16.509, mag: 0.85),
-            Star(name: "Spica", raHours: 13.4199, decDeg: -11.161, mag: 1.04),
-            Star(name: "Antares", raHours: 16.4901, decDeg: -26.432, mag: 1.06),
-            Star(name: "Pollux", raHours: 7.7553, decDeg: 28.026, mag: 1.14),
-            Star(name: "Fomalhaut", raHours: 22.9667, decDeg: -29.6167, mag: 1.16),
-            Star(name: "Deneb", raHours: 20.6905, decDeg: 45.2803, mag: 1.25),
-            Star(name: "Mimosa", raHours: 12.7953, decDeg: -59.6888, mag: 1.25),
-            Star(name: "Regulus", raHours: 10.1395, decDeg: 11.9672, mag: 1.35),
-            Star(name: "Castor", raHours: 7.5797, decDeg: 31.8883, mag: 1.58),
-            Star(name: "Gacrux", raHours: 12.5194, decDeg: -57.1132, mag: 1.63),
-            Star(name: "Bellatrix", raHours: 5.4189, decDeg: 6.3497, mag: 1.64),
-            Star(name: "Elnath", raHours: 5.4382, decDeg: 28.6075, mag: 1.65),
-            Star(name: "Miaplacidus", raHours: 9.2199, decDeg: -69.7172, mag: 1.67),
-            Star(name: "Alnilam", raHours: 5.6036, decDeg: -1.2019, mag: 1.69),
-            Star(name: "Alnair", raHours: 22.1372, decDeg: -46.9611, mag: 1.73),
-            Star(name: "Alioth", raHours: 12.899, decDeg: 55.961, mag: 1.76),
-            Star(name: "Polaris", raHours: 2.5303, decDeg: 89.2641, mag: 1.98),
-            Star(name: "Mintaka", raHours: 5.5334, decDeg: -0.2991, mag: 2.23),
-            Star(name: "Alnitak", raHours: 5.6793, decDeg: -1.9426, mag: 1.74),
-            Star(name: "Saiph", raHours: 5.7959, decDeg: -9.6696, mag: 2.06),
-            Star(name: "Dubhe", raHours: 11.0621, decDeg: 61.7508, mag: 1.81),
-            Star(name: "Merak", raHours: 11.0307, decDeg: 56.3824, mag: 2.37),
-            Star(name: "Phecda", raHours: 11.8972, decDeg: 53.6948, mag: 2.43),
-            Star(name: "Megrez", raHours: 12.2571, decDeg: 57.0326, mag: 3.31),
-            Star(name: "Mizar", raHours: 13.3988, decDeg: 54.9254, mag: 2.27),
-            Star(name: "Alkaid", raHours: 13.7923, decDeg: 49.3133, mag: 1.85)
-        ]
-
-        static let moreStars: [Star] = [
-            Star(name: "Sadr", raHours: 20.3705, decDeg: 40.2567, mag: 2.23),
-            Star(name: "Kochab", raHours: 14.8451, decDeg: 74.1555, mag: 2.08),
-            Star(name: "Schedar", raHours: 0.6751, decDeg: 56.5373, mag: 2.24),
-            Star(name: "Caph", raHours: 0.1529, decDeg: 59.1498, mag: 2.27),
-            Star(name: "Alpheratz", raHours: 0.1398, decDeg: 29.0904, mag: 2.06),
-            Star(name: "Mirfak", raHours: 3.4054, decDeg: 49.8612, mag: 1.79),
-            Star(name: "Algol", raHours: 3.1361, decDeg: 40.9556, mag: 2.1),
-            Star(name: "Denebola", raHours: 11.8177, decDeg: 14.5719, mag: 2.14),
-            Star(name: "Markab", raHours: 23.0794, decDeg: 15.2053, mag: 2.49),
-            Star(name: "Enif", raHours: 21.7364, decDeg: 9.875, mag: 2.38),
-            Star(name: "Rasalhague", raHours: 17.5822, decDeg: 12.5606, mag: 2.08),
-            Star(name: "Atria", raHours: 16.8111, decDeg: -69.0278, mag: 1.91),
-            Star(name: "Peacock", raHours: 20.4275, decDeg: -56.735, mag: 1.94),
-            Star(name: "Alhena", raHours: 6.6285, decDeg: 16.3993, mag: 1.93),
-            Star(name: "Bellatrix", raHours: 5.4189, decDeg: 6.3497, mag: 1.64)
-        ]
-
-        static let starsExtended: [Star] = stars + moreStars
-
-        // Simple line segments for Orion and Big Dipper
-        static let lines: [(String, String)] = [
-            // Orion
-            ("Betelgeuse", "Bellatrix"),
-            ("Betelgeuse", "Alnilam"),
-            ("Bellatrix", "Alnilam"),
-            ("Alnitak", "Alnilam"),
-            ("Alnilam", "Mintaka"),
-            ("Rigel", "Saiph"),
-            ("Rigel", "Alnitak"),
-            ("Saiph", "Mintaka"),
-            // Big Dipper (Ursa Major)
-            ("Dubhe", "Merak"),
-            ("Merak", "Phecda"),
-            ("Phecda", "Megrez"),
-            ("Megrez", "Alioth"),
-            ("Alioth", "Mizar"),
-            ("Mizar", "Alkaid")
-        ]
-
-        static func star(named name: String) -> Star? {
-            return stars.first { $0.name == name }
-        }
     }
 
     // MARK: - Formatters

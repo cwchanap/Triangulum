@@ -37,51 +37,55 @@ struct Planet {
 /// Renders solar system planet positions on the sky dome canvas.
 enum PlanetRenderer {
 
+    struct DrawConfig {
+        let center: CGPoint
+        let radius: CGFloat
+        let heading: Double
+        let snapNorth: Bool
+        let panOffset: CGSize
+        let current: Date
+        let observer: ConstellationMapView.Observer
+        let nightVisionMode: Bool
+        let pointOnDome: (CGPoint, CGFloat, Double, Double) -> CGPoint
+    }
+
     static func draw(
         context: inout GraphicsContext,
         planets: [Planet],
-        center: CGPoint,
-        radius: CGFloat,
-        heading: Double,
-        snapNorth: Bool,
-        panOffset: CGSize,
-        current: Date,
-        observer: ConstellationMapView.Observer,
-        nightVisionMode: Bool,
-        pointOnDome: (CGPoint, CGFloat, Double, Double) -> CGPoint
+        config: DrawConfig
     ) {
-        let headingRad = (snapNorth ? 0.0 : heading) * .pi / 180.0
-        let azOffsetRad = Double(panOffset.width) / Double(radius) * (Double.pi / 2.0)
-        let altOffsetDeg = -Double(panOffset.height) / Double(radius) * 90.0
-        let lstHours = ConstellationMapView.Astronomer.localSiderealTime(date: current, longitude: observer.lon)
-        let sunLon = ConstellationMapView.Astronomer.sunEclipticLongitude(date: current)
+        let headingRad = (config.snapNorth ? 0.0 : config.heading) * .pi / 180.0
+        let azOffsetRad = Double(config.panOffset.width) / Double(config.radius) * (Double.pi / 2.0)
+        let altOffsetDeg = -Double(config.panOffset.height) / Double(config.radius) * 90.0
+        let lstHours = ConstellationMapView.Astronomer.localSiderealTime(date: config.current, longitude: config.observer.lon)
+        let sunLon = ConstellationMapView.Astronomer.sunEclipticLongitude(date: config.current)
 
         for planet in planets {
-            let eq = ConstellationMapView.Astronomer.planetEquatorial(planet: planet, date: current)
+            let eq = ConstellationMapView.Astronomer.planetEquatorial(planet: planet, date: config.current)
             let altaz = ConstellationMapView.Astronomer.altAz(
                 eq: ConstellationMapView.Equatorial(raHours: eq.raHours, decDeg: eq.decDeg),
                 lstHours: lstHours,
-                latDeg: observer.lat
+                latDeg: config.observer.lat
             )
 
             let adjAlt = altaz.altDeg + altOffsetDeg
             guard adjAlt > -5 else { continue }
 
             let azRad = altaz.azDeg * .pi / 180.0
-            let point = pointOnDome(center, radius, azRad - headingRad + azOffsetRad, max(0, adjAlt))
+            let point = config.pointOnDome(config.center, config.radius, azRad - headingRad + azOffsetRad, max(0, adjAlt))
 
             // Magnitude-based sizing: range 7pt (dim) to 12pt (bright, e.g. Venus)
             let sizePt = CGFloat(max(7.0, min(12.0, 8.0 - 1.0 * planet.nominalMag)))
             let r = sizePt / 2
 
             let isVisible = adjAlt > 0
-            let baseColor: Color = nightVisionMode ? .red : planet.skyColor
+            let baseColor: Color = config.nightVisionMode ? .red : planet.skyColor
             let color = isVisible ? baseColor : baseColor.opacity(0.35)
 
             if planet.isInner {
                 drawInnerPlanetPhase(
                     context: &context, at: point, r: r,
-                    sunLon: sunLon, planet: planet, current: current, color: color
+                    sunLon: sunLon, planet: planet, current: config.current, color: color
                 )
             } else {
                 let rect = CGRect(x: point.x - r, y: point.y - r, width: sizePt, height: sizePt)
