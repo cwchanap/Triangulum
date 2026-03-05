@@ -73,6 +73,17 @@ struct PlanetEquatorialTests {
 
     let testDate = Date(timeIntervalSince1970: 1741000000)  // ~March 2026
 
+    private func angularSeparationDeg(_ a: ConstellationMapView.Equatorial, _ b: ConstellationMapView.Equatorial) -> Double {
+        let rad = Double.pi / 180.0
+        let ra1 = a.raHours * 15.0 * rad
+        let dec1 = a.decDeg * rad
+        let ra2 = b.raHours * 15.0 * rad
+        let dec2 = b.decDeg * rad
+        let cosSep = sin(dec1) * sin(dec2) + cos(dec1) * cos(dec2) * cos(ra1 - ra2)
+        let clamped = min(1.0, max(-1.0, cosSep))
+        return acos(clamped) / rad
+    }
+
     @Test func testAllPlanetsProduceValidCoordinates() {
         for planet in Planet.catalog {
             let eq = ConstellationMapView.Astronomer.planetEquatorial(planet: planet, date: testDate)
@@ -100,6 +111,24 @@ struct PlanetEquatorialTests {
                 let eq = ConstellationMapView.Astronomer.planetEquatorial(planet: planet, date: date)
                 #expect(eq.raHours.isFinite, "\(planet.name) RA not finite at day \(dayOffset)")
                 #expect(eq.decDeg.isFinite, "\(planet.name) Dec not finite at day \(dayOffset)")
+            }
+        }
+    }
+
+    @Test func testInnerPlanetsDoNotOpposeSun() {
+        let oneDay: TimeInterval = 86400
+        let start = testDate
+        for dayOffset in stride(from: 0.0, through: 365.0, by: 30.0) {
+            let date = start.addingTimeInterval(dayOffset * oneDay)
+            let sun = ConstellationMapView.Astronomer.sunEquatorial(date: date)
+
+            for planet in Planet.catalog.filter({ $0.isInner }) {
+                let eq = ConstellationMapView.Astronomer.planetEquatorial(planet: planet, date: date)
+                let separation = angularSeparationDeg(eq, sun)
+                #expect(
+                    separation < 120.0,
+                    "Inner planet \(planet.name) too far from Sun (\(separation) deg) at day offset \(dayOffset)"
+                )
             }
         }
     }
