@@ -61,7 +61,10 @@ extension ConstellationMapView {
             Star(name: "Bellatrix", raHours: 5.4189, decDeg: 6.3497, mag: 1.64)
         ]
 
-        static let starsExtended: [Star] = stars + moreStars
+        static let starsExtended: [Star] = {
+            var existingNames = Set(stars.map(\.name))
+            return stars + moreStars.filter { existingNames.insert($0.name).inserted }
+        }()
 
         // Simple line segments for Orion and Big Dipper
         static let lines: [(String, String)] = [

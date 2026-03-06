@@ -148,6 +148,7 @@ struct ConstellationMapView: View {
                     }
                     // Next planet rise/set event
                     if skyShowPlanets,
+                       locationManager.hasValidLocation,
                        let event = Astronomer.nextPlanetEvent(
                            planets: Planet.catalog,
                            date: now,
