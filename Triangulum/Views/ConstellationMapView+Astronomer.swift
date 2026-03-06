@@ -160,7 +160,7 @@ extension ConstellationMapView {
             )
             let dot = max(-1.0, min(1.0, Double(simd_dot(s, m))))
             let psi = acos(dot) // elongation
-            let k = 0.5 * (1.0 + cos(psi)) // illuminated fraction [0,1]
+            let k = 0.5 * (1.0 - cos(psi)) // illuminated fraction [0,1]
             return k
         }
 

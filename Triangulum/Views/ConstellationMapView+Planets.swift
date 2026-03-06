@@ -9,7 +9,8 @@ extension ConstellationMapView.Astronomer {
         case "Venus":   return venusEquatorial(date: date)
         case "Mars":    return marsEquatorial(date: date)
         case "Jupiter": return jupiterEquatorial(date: date)
-        default:          return saturnEquatorial(date: date)
+        case "Saturn":  return saturnEquatorial(date: date)
+        default:          preconditionFailure("Unsupported planet name: \(planet.name)")
         }
     }
 
@@ -31,9 +32,10 @@ extension ConstellationMapView.Astronomer {
             var lon = meanLongitude + 0.7758 * sin(meanAnomaly) + 0.0033 * sin(2 * meanAnomaly)
             lon = lon.truncatingRemainder(dividingBy: 360)
             return lon < 0 ? lon + 360 : lon
-        default:
-            // Outer planets: not used for phase calculation (isInner = false)
+        case "Mars", "Jupiter", "Saturn":
             return 0
+        default:
+            preconditionFailure("Unsupported planet name: \(planet.name)")
         }
     }
 

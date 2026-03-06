@@ -65,6 +65,18 @@ struct PlanetIlluminationTests {
             #expect(k >= 0.0 && k <= 1.0)
         }
     }
+
+    @Test func testMoonIlluminationFractionMapsNewAndFullMoonCorrectly() {
+        let sun = ConstellationMapView.Equatorial(raHours: 0.0, decDeg: 0.0)
+        let newMoon = ConstellationMapView.Equatorial(raHours: 0.0, decDeg: 0.0)
+        let fullMoon = ConstellationMapView.Equatorial(raHours: 12.0, decDeg: 0.0)
+
+        let newMoonFraction = ConstellationMapView.Astronomer.illuminationFraction(sunEq: sun, moonEq: newMoon)
+        let fullMoonFraction = ConstellationMapView.Astronomer.illuminationFraction(sunEq: sun, moonEq: fullMoon)
+
+        #expect(abs(newMoonFraction - 0.0) < 0.001)
+        #expect(abs(fullMoonFraction - 1.0) < 0.001)
+    }
 }
 
 // MARK: - Planet Equatorial Coordinate Tests
@@ -193,5 +205,14 @@ struct PlanetRiseSetTests {
             lonDeg: 0.0
         )
         #expect(event == nil)
+    }
+}
+
+struct ConstellationDataTests {
+
+    @Test func testExtendedStarCatalogDoesNotDuplicateNames() {
+        let names = ConstellationMapView.ConstellationData.starsExtended.map(\.name)
+        #expect(Set(names).count == names.count)
+        #expect(names.filter { $0 == "Bellatrix" }.count == 1)
     }
 }

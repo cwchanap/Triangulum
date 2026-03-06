@@ -7,21 +7,36 @@ import Testing
 import Foundation
 @testable import Triangulum
 
+private func makeUTCDate(year: Int, month: Int, day: Int, hour: Int = 12) -> Date {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+    let components = DateComponents(
+        calendar: calendar,
+        timeZone: calendar.timeZone,
+        year: year,
+        month: month,
+        day: day,
+        hour: hour,
+        minute: 0,
+        second: 0
+    )
+    return calendar.date(from: components)!
+}
+
 struct SolarEventsTests {
 
     // San Francisco, March 3 2026 — mid-latitude, well-defined sunrise/set
     let sfLat = 37.7749
     let sfLon = -122.4194
-    // Unix timestamp for 2026-03-03 local noon in San Francisco (UTC-8 in winter = 20:00 UTC)
-    // 2026-03-03 20:00 UTC = 1741032000
-    let march3: Date = Date(timeIntervalSince1970: 1741032000)
+    // 2026-03-03 local noon in San Francisco (UTC-8 in winter = 20:00 UTC)
+    let march3: Date = makeUTCDate(year: 2026, month: 3, day: 3, hour: 20)
 
     // MARK: - solarCrossing nil for polar conditions
 
     @Test func testCircumpolarReturnsNilForAstronomicalTwilight() {
         // At lat=89°, the Sun never dips to -18° in summer — should return nil for some date
         // Use June 21 (summer solstice), when Arctic has midnight sun
-        let summerSolstice = Date(timeIntervalSince1970: 1750291200) // ~2025-06-19 UTC
+        let summerSolstice = makeUTCDate(year: 2026, month: 6, day: 21)
         let result = ConstellationMapView.Astronomer.solarCrossing(
             altitudeDeg: -18.0, rising: true,
             date: summerSolstice, latDeg: 89.0, lonDeg: 0.0
@@ -31,7 +46,7 @@ struct SolarEventsTests {
 
     @Test func testNeverRisesReturnsNil() {
         // At lat=-89°, the Sun never rises above -18° in June (polar night for South Pole)
-        let summerSolstice = Date(timeIntervalSince1970: 1750291200)
+        let summerSolstice = makeUTCDate(year: 2026, month: 6, day: 21)
         let result = ConstellationMapView.Astronomer.solarCrossing(
             altitudeDeg: -0.833, rising: true,
             date: summerSolstice, latDeg: -89.0, lonDeg: 0.0
@@ -163,21 +178,48 @@ struct SolarDayTests {
 
     let sfLat = 37.7749
     let sfLon = -122.4194
-    let march3: Date = Date(timeIntervalSince1970: 1741032000)
+    let march3: Date = makeUTCDate(year: 2026, month: 3, day: 3, hour: 20)
 
     @Test func testSolarDayEventsAreChronological() {
         let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
+        #expect(day.astronomicalDawn != nil)
+        #expect(day.nauticalDawn != nil)
+        #expect(day.civilDawn != nil)
+        #expect(day.sunrise != nil)
+        #expect(day.morningGoldenEnd != nil)
+        #expect(day.eveningGoldenStart != nil)
+        #expect(day.sunset != nil)
+        #expect(day.civilDusk != nil)
+        #expect(day.nauticalDusk != nil)
+        #expect(day.astronomicalDusk != nil)
+
+        guard let astronomicalDawn = day.astronomicalDawn,
+              let nauticalDawn = day.nauticalDawn,
+              let civilDawn = day.civilDawn,
+              let sunrise = day.sunrise,
+              let morningGoldenEnd = day.morningGoldenEnd,
+              let eveningGoldenStart = day.eveningGoldenStart,
+              let sunset = day.sunset,
+              let civilDusk = day.civilDusk,
+              let nauticalDusk = day.nauticalDusk,
+              let astronomicalDusk = day.astronomicalDusk else {
+            Issue.record("Expected all SolarDay events for the San Francisco test date")
+            return
+        }
+
         let times = [
-            day.astronomicalDawn, day.nauticalDawn, day.civilDawn,
-            day.sunrise, day.morningGoldenEnd,
-            day.eveningGoldenStart, day.sunset,
-            day.civilDusk, day.nauticalDusk, day.astronomicalDusk
-        ].compactMap { $0 }
+            astronomicalDawn, nauticalDawn, civilDawn,
+            sunrise, morningGoldenEnd,
+            eveningGoldenStart, sunset,
+            civilDusk, nauticalDusk, astronomicalDusk
+        ]
+        #expect(times.count == 10)
         for i in 1..<times.count {
             #expect(times[i-1] < times[i], "Events out of order at index \(i)")
         }
         // Also verify allEvents (the primary API) is sorted
         let events = day.allEvents
+        #expect(events.count == 10)
         for i in 1..<events.count {
             #expect(events[i-1].time < events[i].time,
                     "allEvents out of order at index \(i): \(events[i-1].label) vs \(events[i].label)")
@@ -194,9 +236,13 @@ struct SolarDayTests {
 
     @Test func testSolarDayMorningGoldenEndAfterSunrise() {
         let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
-        if let rise = day.sunrise, let goldEnd = day.morningGoldenEnd {
-            #expect(rise < goldEnd)
+        #expect(day.sunrise != nil)
+        #expect(day.morningGoldenEnd != nil)
+        guard let rise = day.sunrise, let goldEnd = day.morningGoldenEnd else {
+            Issue.record("Expected sunrise and morning golden hour end for the San Francisco test date")
+            return
         }
+        #expect(rise < goldEnd)
     }
 
     @Test func testNextEventReturnsNilWhenAllPast() {
@@ -209,9 +255,13 @@ struct SolarDayTests {
     @Test func testNextEventReturnsFirstUpcoming() {
         let day = SolarDay(date: march3, latitude: sfLat, longitude: sfLon)
         // Use astronomical dawn as "now" — next should be nautical dawn
-        if let astro = day.astronomicalDawn, let nautical = day.nauticalDawn {
-            let next = day.nextEvent(after: astro.addingTimeInterval(1))
-            #expect(next?.time == nautical)
+        #expect(day.astronomicalDawn != nil)
+        #expect(day.nauticalDawn != nil)
+        guard let astro = day.astronomicalDawn, let nautical = day.nauticalDawn else {
+            Issue.record("Expected astronomical and nautical dawn for the San Francisco test date")
+            return
         }
+        let next = day.nextEvent(after: astro.addingTimeInterval(1))
+        #expect(next?.time == nautical)
     }
 }
