@@ -10,7 +10,9 @@ extension ConstellationMapView.Astronomer {
         case "Mars":    return marsEquatorial(date: date)
         case "Jupiter": return jupiterEquatorial(date: date)
         case "Saturn":  return saturnEquatorial(date: date)
-        default:          preconditionFailure("Unsupported planet name: \(planet.name)")
+        default:
+            assertionFailure("Unsupported planet name: \(planet.name)")
+            return ConstellationMapView.Equatorial(raHours: 0, decDeg: 0)
         }
     }
 
@@ -35,7 +37,8 @@ extension ConstellationMapView.Astronomer {
         case "Mars", "Jupiter", "Saturn":
             return 0
         default:
-            preconditionFailure("Unsupported planet name: \(planet.name)")
+            assertionFailure("Unsupported planet name: \(planet.name)")
+            return 0
         }
     }
 
@@ -45,7 +48,9 @@ extension ConstellationMapView.Astronomer {
         var elongation = planetLon - sunLon
         elongation = elongation.truncatingRemainder(dividingBy: 360)
         if elongation < 0 { elongation += 360 }
-        let phaseAngleRad = elongation * Double.pi / 180.0
+        // Fold to [0, 180]: elongation > 180 means the planet is on its way back (waxing phase mirrors waning)
+        let phaseAngle = min(elongation, 360 - elongation)
+        let phaseAngleRad = phaseAngle * Double.pi / 180.0
         return 0.5 * (1.0 + cos(phaseAngleRad))
     }
 
@@ -121,8 +126,10 @@ extension ConstellationMapView.Astronomer {
         let xg = rAU * cos(lonRad) + cos(sunLon)
         let yg = rAU * sin(lonRad) + sin(sunLon)
         let epsilon = (23.439 - 0.0000004 * d) * rad
-        let ra = atan2(cos(epsilon) * yg, xg)
-        let dec = atan2(sin(epsilon) * yg, sqrt(xg * xg + yg * yg))
+        let eqY = cos(epsilon) * yg
+        let eqZ = sin(epsilon) * yg
+        let ra = atan2(eqY, xg)
+        let dec = atan2(eqZ, sqrt(xg * xg + eqY * eqY))
         let raHours = (ra < 0 ? ra + 2 * Double.pi : ra) * 12.0 / Double.pi
         return ConstellationMapView.Equatorial(raHours: raHours, decDeg: dec * 180.0 / Double.pi)
     }
@@ -157,6 +164,13 @@ extension ConstellationMapView.Astronomer {
 
     // MARK: - Planet Rise/Set
 
+    private static let riseSetFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        f.timeZone = TimeZone.current
+        return f
+    }()
+
     struct PlanetEvent {
         let planet: Planet
         let label: String  // e.g. "Jupiter rises 21:14"
@@ -174,10 +188,6 @@ extension ConstellationMapView.Astronomer {
         let latRad = latDeg * rad
         let sinH0 = sin(-0.833 * rad)
         var nearest: (interval: TimeInterval, event: PlanetEvent)?
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        formatter.timeZone = TimeZone.current
 
         for planet in planets {
             let eq = planetEquatorial(planet: planet, date: date)
@@ -200,10 +210,11 @@ extension ConstellationMapView.Astronomer {
                 var h = hoursAhead.truncatingRemainder(dividingBy: 24)
                 if h < 0 { h += 24 }
                 let intervalSecs = h * 3600
+                guard intervalSecs > 0 else { continue }
                 let eventDate = date.addingTimeInterval(intervalSecs)
-                let timeStr = formatter.string(from: eventDate)
+                let timeStr = riseSetFormatter.string(from: eventDate)
                 let event = PlanetEvent(planet: planet, label: "\(planet.name) \(verb) \(timeStr)")
-                if nearest == nil || intervalSecs < nearest!.interval {
+                if nearest == nil || intervalSecs < (nearest?.interval ?? .greatestFiniteMagnitude) {
                     nearest = (intervalSecs, event)
                 }
             }
