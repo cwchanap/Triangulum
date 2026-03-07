@@ -156,7 +156,7 @@ struct LocationManagerTests {
     }
 
     @Test func testValidLocationAllowsZeroAccuracy() {
-        let manager = LocationManager()
+        let manager = LocationManager(skipAvailabilityCheck: true)
         let location = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
                                   altitude: 0.0,
                                   horizontalAccuracy: 0.0,
@@ -172,7 +172,7 @@ struct LocationManagerTests {
     }
 
     @Test func testInvalidLocationRejectsNegativeAccuracy() {
-        let manager = LocationManager()
+        let manager = LocationManager(skipAvailabilityCheck: true)
         let location = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
                                   altitude: 0.0,
                                   horizontalAccuracy: -1.0,
