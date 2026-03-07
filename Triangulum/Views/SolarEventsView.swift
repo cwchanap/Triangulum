@@ -185,63 +185,83 @@ struct SolarEventsView: View {
     }
 
     private func morningSection(solarDay: SolarDay) -> some View {
-        sectionCard(title: "MORNING") {
-            if let t = solarDay.astronomicalDawn {
-                SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianBlueDark, isPast: isToday && t < now)
-            }
-            if let t = solarDay.nauticalDawn {
-                SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianBlueDark, isPast: isToday && t < now)
-            }
-            if let t = solarDay.civilDawn {
-                SolarEventRow(icon: "circle.lefthalf.filled", label: "Blue hour begins",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianAccent, isPast: isToday && t < now)
-            }
-            if let t = solarDay.sunrise {
-                SolarEventRow(icon: "sunrise.fill", label: "Sunrise · Golden hour",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianWarning, isPast: isToday && t < now)
-            }
-            if let t = solarDay.morningGoldenEnd {
-                SolarEventRow(icon: "sun.max.fill", label: "Golden hour ends",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianWarning, isPast: isToday && t < now,
-                              showDivider: false)
+        let hasMorningEvents = solarDay.astronomicalDawn != nil || solarDay.nauticalDawn != nil
+            || solarDay.civilDawn != nil || solarDay.sunrise != nil || solarDay.morningGoldenEnd != nil
+        return sectionCard(title: "MORNING") {
+            if hasMorningEvents {
+                if let t = solarDay.astronomicalDawn {
+                    SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianBlueDark, isPast: isToday && t < now)
+                }
+                if let t = solarDay.nauticalDawn {
+                    SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianBlueDark, isPast: isToday && t < now)
+                }
+                if let t = solarDay.civilDawn {
+                    SolarEventRow(icon: "circle.lefthalf.filled", label: "Blue hour begins",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianAccent, isPast: isToday && t < now)
+                }
+                if let t = solarDay.sunrise {
+                    SolarEventRow(icon: "sunrise.fill", label: "Sunrise · Golden hour",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianWarning, isPast: isToday && t < now)
+                }
+                if let t = solarDay.morningGoldenEnd {
+                    SolarEventRow(icon: "sun.max.fill", label: "Golden hour ends",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianWarning, isPast: isToday && t < now,
+                                  showDivider: false)
+                }
+            } else {
+                Text("Sun does not rise at this location today.")
+                    .font(.subheadline)
+                    .foregroundColor(.prussianBlueLight)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
 
     private func eveningSection(solarDay: SolarDay) -> some View {
-        sectionCard(title: "EVENING") {
-            if let t = solarDay.eveningGoldenStart {
-                SolarEventRow(icon: "sun.max.fill", label: "Golden hour begins",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianWarning, isPast: isToday && t < now)
-            }
-            if let t = solarDay.sunset {
-                SolarEventRow(icon: "sunset.fill", label: "Sunset · Blue hour",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianWarning, isPast: isToday && t < now)
-            }
-            if let t = solarDay.civilDusk {
-                SolarEventRow(icon: "circle.righthalf.filled", label: "Blue hour ends",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianAccent, isPast: isToday && t < now)
-            }
-            if let t = solarDay.nauticalDusk {
-                SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianBlueDark, isPast: isToday && t < now)
-            }
-            if let t = solarDay.astronomicalDusk {
-                SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
-                              time: Self.timeFormatter.string(from: t),
-                              accent: .prussianBlueDark, isPast: isToday && t < now,
-                              showDivider: false)
+        let hasEveningEvents = solarDay.eveningGoldenStart != nil || solarDay.sunset != nil
+            || solarDay.civilDusk != nil || solarDay.nauticalDusk != nil || solarDay.astronomicalDusk != nil
+        return sectionCard(title: "EVENING") {
+            if hasEveningEvents {
+                if let t = solarDay.eveningGoldenStart {
+                    SolarEventRow(icon: "sun.max.fill", label: "Golden hour begins",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianWarning, isPast: isToday && t < now)
+                }
+                if let t = solarDay.sunset {
+                    SolarEventRow(icon: "sunset.fill", label: "Sunset · Blue hour",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianWarning, isPast: isToday && t < now)
+                }
+                if let t = solarDay.civilDusk {
+                    SolarEventRow(icon: "circle.righthalf.filled", label: "Blue hour ends",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianAccent, isPast: isToday && t < now)
+                }
+                if let t = solarDay.nauticalDusk {
+                    SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianBlueDark, isPast: isToday && t < now)
+                }
+                if let t = solarDay.astronomicalDusk {
+                    SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
+                                  time: Self.timeFormatter.string(from: t),
+                                  accent: .prussianBlueDark, isPast: isToday && t < now,
+                                  showDivider: false)
+                }
+            } else {
+                Text("Sun does not set at this location today.")
+                    .font(.subheadline)
+                    .foregroundColor(.prussianBlueLight)
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -328,14 +348,20 @@ private struct SolarCountdownCard: View {
                 .font(.title3)
             if let next = solarDay.nextEvent(after: now) {
                 let interval = next.time.timeIntervalSince(now)
-                let hours = Int(interval) / 3600
-                let minutes = (Int(interval) % 3600) / 60
                 VStack(alignment: .leading, spacing: 2) {
                     Text(next.label)
                         .font(.subheadline.weight(.semibold))
-                    Text(hours > 0 ? "in \(hours)h \(minutes)m" : "in \(minutes)m")
-                        .font(.caption)
-                        .opacity(0.85)
+                    if interval > 0 {
+                        let hours = Int(interval) / 3600
+                        let minutes = (Int(interval) % 3600) / 60
+                        Text(hours > 0 ? "in \(hours)h \(minutes)m" : "in \(minutes)m")
+                            .font(.caption)
+                            .opacity(0.85)
+                    } else {
+                        Text("Happening now")
+                            .font(.caption)
+                            .opacity(0.85)
+                    }
                 }
             } else {
                 Text("No more events today")
