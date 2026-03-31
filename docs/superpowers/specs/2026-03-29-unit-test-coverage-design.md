@@ -6,7 +6,7 @@ Triangulum already has a meaningful Swift Testing suite, but the reported CI/Cod
 
 ## Goals
 
-- Increase the reported CI/Codecov unit-test coverage by roughly 10%.
+- Increase the reported CI/Codecov unit-test coverage by approximately 10 percentage points.
 - Keep the work inside `TriangulumTests` and avoid UI-test-only paths.
 - Prefer deterministic tests over network-, timer-, or sensor-dependent behavior.
 - Allow only small, behavior-preserving production refactors when they materially improve testability.
@@ -20,7 +20,7 @@ Triangulum already has a meaningful Swift Testing suite, but the reported CI/Cod
 ## Current Context
 
 - The repository uses Swift Testing (`@Test`, `#expect`, `#require`) rather than `XCTestCase`.
-- CI measures unit-test coverage with `xcodebuild test -only-testing:TriangulumTests -enableCodeCoverage YES`.
+- CI measures unit-test coverage with `xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'platform=iOS Simulator,name=iPhone 15' -only-testing:TriangulumTests -enableCodeCoverage YES -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO`.
 - Codecov ignores `Triangulum/Views/**` and `TriangulumUITests/**`.
 - Existing test suites already cover pressure history, snapshot persistence, widget ordering, keychain helpers, and several model-level astronomy calculations.
 
@@ -35,7 +35,7 @@ Target one large non-view file with weak direct test coverage:
 1. `Triangulum/Managers/SatelliteManager.swift` (preferred)
 2. `Triangulum/Managers/TileCacheManager.swift` (fallback if the satellite manager yields less coverage than expected or proves too awkward to test cleanly)
 
-`SatelliteManager.swift` is the preferred first target because it is sizeable, contains important orchestration logic, and already exposes test-friendly seams such as injected cache state and `applyTLEsForTesting`.
+`SatelliteManager.swift` is the preferred first coverage-expansion target because it is sizeable, contains important orchestration logic, and already exposes test-friendly seams such as injected cache state and `applyTLEsForTesting`. Although the repository already has `SatelliteTests.swift`, direct manager-path coverage still has meaningful room to grow. The same framing applies to `TileCacheManager.swift`: it already has tests, but they are currently too shallow to be the only coverage story.
 
 ### Supporting coverage wins
 
@@ -113,7 +113,7 @@ The work is successful when:
 
 - all existing and new unit tests pass,
 - the new tests are deterministic,
-- and the reported unit-test coverage increases materially toward the 10% goal.
+- and the reported unit-test coverage increases by approximately 10 percentage points from the measured baseline.
 
 ## Risks and Mitigations
 
