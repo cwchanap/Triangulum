@@ -103,17 +103,19 @@ If a high-value branch is otherwise unreachable, small behavior-preserving refac
 
 ## Validation
 
-Use the same measurement path before and after the change:
+Use the same CI-aligned measurement path before and after the change:
 
 - run the existing unit-test command with `-only-testing:TriangulumTests`
 - enable code coverage
-- compare the resulting `xccov` report output
+- export the CI-style coverage artifact from the result bundle
+- use the Codecov-filtered coverage result as the final success metric
+- use `xccov` output only as a supporting per-file diagnostic while iterating locally
 
 The work is successful when:
 
 - all existing and new unit tests pass,
 - the new tests are deterministic,
-- and the reported unit-test coverage increases by approximately 10 percentage points from the measured baseline.
+- and the final Codecov-aligned reported unit-test coverage increases by approximately 10 percentage points from the measured baseline.
 
 ## Risks and Mitigations
 
