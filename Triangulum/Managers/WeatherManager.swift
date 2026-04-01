@@ -5,6 +5,7 @@ import os
 @MainActor
 class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
+    private let urlSession: URLSession
     var locationManager: LocationManager
     /// The repeating timer that drives availability checks and weather refreshes.
     /// Internal (not private) so unit tests can assert that exactly one timer is
@@ -27,8 +28,9 @@ class WeatherManager: ObservableObject {
     ///   - locationManager: The shared `LocationManager` instance.
     ///   - skipMonitoring: When `true` the polling timer and initial fetch
     ///     task are not created, preventing background work in UI-test runs.
-    init(locationManager: LocationManager, skipMonitoring: Bool = false) {
+    init(locationManager: LocationManager, skipMonitoring: Bool = false, urlSession: URLSession = .shared) {
         self.locationManager = locationManager
+        self.urlSession = urlSession
 
         // Start with loading state
         isInitializing = true
@@ -193,7 +195,7 @@ class WeatherManager: ObservableObject {
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await urlSession.data(from: url)
             isLoading = false
 
             guard let httpResponse = response as? HTTPURLResponse else {

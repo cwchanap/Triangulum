@@ -31,22 +31,23 @@ class TileCacheManager: ObservableObject {
         modelContainer != nil
     }
 
-    private init() {
+    nonisolated private static func makeURLSession() -> URLSession {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 60
-        self.urlSession = URLSession(configuration: configuration)
+        return URLSession(configuration: configuration)
+    }
+
+    private init(urlSession: URLSession = TileCacheManager.makeURLSession()) {
+        self.urlSession = urlSession
 
         setupModelContainer()
         updateCacheStats()
     }
 
     /// Internal initializer for testing with in-memory storage
-    init(inMemory: Bool) {
-        let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 30
-        configuration.timeoutIntervalForResource = 60
-        self.urlSession = URLSession(configuration: configuration)
+    init(inMemory: Bool, urlSession: URLSession = TileCacheManager.makeURLSession()) {
+        self.urlSession = urlSession
 
         setupModelContainer(inMemory: inMemory)
         updateCacheStats()

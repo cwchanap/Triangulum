@@ -302,8 +302,118 @@ struct SatellitePassTests {
 
 // MARK: - Satellite Manager Tests
 
+@Suite(.serialized)
 @MainActor
 struct SatelliteManagerTests {
+
+    @Test func testStartUpdatesLoadsFreshCachedTLEsWithoutValidLocation() {
+        let cache = createTestCache()
+        guard let issTLE = makeISSTLE() else {
+            Issue.record("Failed to build ISS TLE for test")
+            return
+        }
+        #expect(cache.save([issTLE]) == true)
+
+        let manager = SatelliteManager(locationManager: LocationManager(skipAvailabilityCheck: true), tleCache: cache)
+        defer { manager.stopUpdates() }
+
+        manager.startUpdates()
+
+        let iss = manager.satellites.first { $0.id == "ISS" }
+
+        #expect(manager.isAvailable == true)
+        #expect(manager.isLoading == false)
+        #expect(manager.errorMessage == "")
+        #expect(manager.tleAge != nil)
+        #expect(manager.nextISSPass == nil)
+        #expect(manager.nextPassWorkItem == nil)
+        #expect(iss?.tle == issTLE)
+        #expect(iss?.currentPosition != nil)
+        #expect(iss?.currentPosition?.azimuthDeg == nil)
+        #expect(iss?.currentPosition?.altitudeDeg == nil)
+        #expect(iss?.currentPosition?.rangeKm == nil)
+        #expect(manager.satellites.allSatisfy { $0.nextPass == nil })
+    }
+
+    @Test func testStartUpdatesComputesTopocentricPositionForValidLocationWithoutISSTLE() {
+        let cache = createTestCache()
+        guard let hubbleTLE = makeHubbleTLE() else {
+            Issue.record("Failed to build Hubble TLE for test")
+            return
+        }
+        #expect(cache.save([hubbleTLE]) == true)
+
+        let locationManager = makeAuthorizedLocationManager(latitude: 37.7749, longitude: -122.4194)
+        let manager = SatelliteManager(locationManager: locationManager, tleCache: cache)
+        defer { manager.stopUpdates() }
+
+        manager.startUpdates()
+
+        let hubble = manager.satellites.first { $0.id == "HST" }
+
+        #expect(manager.isAvailable == true)
+        #expect(manager.errorMessage == "")
+        #expect(manager.nextISSPass == nil)
+        #expect(manager.nextPassWorkItem == nil)
+        #expect(hubble?.tle == hubbleTLE)
+        #expect(hubble?.currentPosition != nil)
+        #expect(hubble?.currentPosition?.azimuthDeg != nil)
+        #expect(hubble?.currentPosition?.altitudeDeg != nil)
+        #expect(hubble?.currentPosition?.rangeKm != nil)
+        #expect(manager.satellites.first { $0.id == "ISS" }?.tle == nil)
+    }
+
+    @Test func testStopUpdatesCancelsWorkItemAndIgnoresFutureLocationChanges() async {
+        let locationManager = makeAuthorizedLocationManager(latitude: 37.7749, longitude: -122.4194)
+        let manager = SatelliteManager(locationManager: locationManager, tleCache: createTestCache())
+        defer { manager.stopUpdates() }
+
+        guard let issTLE = makeISSTLE() else {
+            Issue.record("Failed to build ISS TLE for test")
+            return
+        }
+
+        manager.applyTLEsForTesting([issTLE])
+
+        let firstWorkItem = await waitForWorkItemChange(manager: manager, from: nil)
+        #expect(firstWorkItem != nil)
+
+        manager.stopUpdates()
+
+        #expect(manager.nextPassWorkItem == nil)
+        #expect(firstWorkItem?.isCancelled == true)
+
+        let updatedLocation = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7849, longitude: -122.4094),
+                                         altitude: 0.0,
+                                         horizontalAccuracy: 5.0,
+                                         verticalAccuracy: 5.0,
+                                         timestamp: Date())
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [updatedLocation])
+
+        try? await Task.sleep(for: .milliseconds(200))
+
+        #expect(manager.nextPassWorkItem == nil)
+        #expect(manager.nextISSPass == nil)
+    }
+
+    @Test func testApplyTLEsMatchesSatelliteByNameWhenNoradIdIsZero() {
+        let manager = SatelliteManager(locationManager: LocationManager(skipAvailabilityCheck: true),
+                                       tleCache: createTestCache())
+        defer { manager.stopUpdates() }
+
+        guard let nameMatchedTLE = makeHubbleTLE(name: "HST", noradId: "00000") else {
+            Issue.record("Failed to build name-matched Hubble TLE for test")
+            return
+        }
+
+        manager.applyTLEsForTesting([nameMatchedTLE])
+
+        let hubble = manager.satellites.first { $0.id == "HST" }
+
+        #expect(hubble?.tle == nameMatchedTLE)
+        #expect(hubble?.tle?.noradId == 0)
+        #expect(manager.satellites.first { $0.id == "ISS" }?.tle == nil)
+    }
 
     @Test func testNextPassDebouncesWorkItem() async {
         let locationManager = LocationManager()
@@ -332,7 +442,9 @@ struct SatelliteManagerTests {
         let firstWorkItem = await waitForWorkItemChange(manager: manager, from: nil)
 
         // Trigger another location update to replace the work item
-        let updatedLocation = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7750, longitude: -122.4195),
+        // Move more than the 1000 m next-pass refresh threshold so the debounce
+        // replacement remains deterministic even if the first pass finishes quickly.
+        let updatedLocation = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 37.7900, longitude: -122.4194),
                                          altitude: 0.0,
                                          horizontalAccuracy: 5.0,
                                          verticalAccuracy: 5.0,
@@ -361,6 +473,37 @@ struct SatelliteManagerTests {
             try? await Task.sleep(for: .milliseconds(20))
         }
         return manager.nextPassWorkItem
+    }
+
+    private func createTestCache() -> TLECache {
+        let suiteName = "SatelliteManagerTests_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        return TLECache(userDefaults: testDefaults, cacheKey: "satellite_manager_test_tle_cache")
+    }
+
+    private func makeAuthorizedLocationManager(latitude: Double, longitude: Double) -> LocationManager {
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        locationManager.isAvailable = true
+        locationManager.authorizationStatus = .authorizedWhenInUse
+        let location = CLLocation(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+                                  altitude: 0.0,
+                                  horizontalAccuracy: 5.0,
+                                  verticalAccuracy: 5.0,
+                                  timestamp: Date())
+        locationManager.locationManager(CLLocationManager(), didUpdateLocations: [location])
+        return locationManager
+    }
+
+    private func makeISSTLE() -> TLE? {
+        TLE(name: "ISS (ZARYA)",
+            line1: "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9993",
+            line2: "2 25544  51.6400 208.5400 0006200 314.0000  90.0000 15.50000000100001")
+    }
+
+    private func makeHubbleTLE(name: String = "HST (Hubble)", noradId: String = "20580") -> TLE? {
+        TLE(name: name,
+            line1: "1 \(noradId)U 90037B   24001.50000000  .00000500  00000-0  30000-4 0  9990",
+            line2: "2 20580  28.4700 100.0000 0002500  90.0000 270.0000 15.09000000100001")
     }
 }
 

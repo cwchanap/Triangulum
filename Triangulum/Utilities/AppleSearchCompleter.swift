@@ -2,13 +2,24 @@ import Foundation
 import Combine
 import MapKit
 
+protocol AppleSearchCompleting: AnyObject {
+    var delegate: MKLocalSearchCompleterDelegate? { get set }
+    var resultTypes: MKLocalSearchCompleter.ResultType { get set }
+    var region: MKCoordinateRegion { get set }
+    var queryFragment: String { get set }
+    var results: [MKLocalSearchCompletion] { get }
+}
+
+extension MKLocalSearchCompleter: AppleSearchCompleting {}
+
 final class AppleSearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
     @Published var results: [MKLocalSearchCompletion] = []
     @Published var errorMessage: String?
 
-    private let completer: MKLocalSearchCompleter = MKLocalSearchCompleter()
+    private let completer: any AppleSearchCompleting
 
-    override init() {
+    init(completer: any AppleSearchCompleting = MKLocalSearchCompleter()) {
+        self.completer = completer
         super.init()
         completer.delegate = self
         // Favor addresses and points of interest
@@ -30,7 +41,7 @@ final class AppleSearchCompleter: NSObject, ObservableObject, MKLocalSearchCompl
     // MARK: - MKLocalSearchCompleterDelegate
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
         DispatchQueue.main.async {
-            self.results = completer.results
+            self.results = self.completer.results
             self.errorMessage = nil
         }
     }

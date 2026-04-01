@@ -25,7 +25,8 @@ enum OSMGeocoder {
         query: String,
         limit: Int = 5,
         region: MKCoordinateRegion? = nil,
-        bounded: Bool = false
+        bounded: Bool = false,
+        session: URLSession = .shared
     ) async throws -> [Result] {
         guard var components = URLComponents(string: "https://nominatim.openstreetmap.org/search") else {
             return []
@@ -60,7 +61,7 @@ enum OSMGeocoder {
         request.setValue("Triangulum/1.0 (+\(appId))", forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             return []
         }
