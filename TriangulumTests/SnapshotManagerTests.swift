@@ -108,6 +108,21 @@ struct SnapshotManagerTests {
         )
     }
 
+    private func createSnapshot(photoIDs: [UUID] = []) -> SensorSnapshot {
+        let managers = createTestManagers()
+        var snapshot = SensorSnapshot.capture(
+            barometerManager: managers.barometerManager,
+            locationManager: managers.locationManager,
+            accelerometerManager: managers.accelerometerManager,
+            gyroscopeManager: managers.gyroscopeManager,
+            magnetometerManager: managers.magnetometerManager,
+            weatherManager: nil,
+            satelliteManager: nil
+        )
+        snapshot.photoIDs = photoIDs
+        return snapshot
+    }
+
     @Test func testSnapshotManagerInitialization() {
         let container = createTestManager()
         defer { container.cleanup() }
@@ -621,5 +636,177 @@ struct SnapshotManagerTests {
         #expect(photos.count == 1)
         #expect(photos.first?.id == originalPhotoID)
         #expect(photos.first?.image != nil)
+    }
+
+    @Test func testInitWithCorruptedSnapshotsDataPreservesLoadError() throws {
+        let suiteName = "SnapshotManagerTests_Corrupt_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_CorruptDir_\(UUID().uuidString)")
+        let invalidData = Data("not-json".utf8)
+        defaults.set(invalidData, forKey: "test_sensor_snapshots")
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: dir)
+        }
+
+        let manager = SnapshotManager(userDefaults: defaults, keyPrefix: "test_", photosDirectory: dir)
+
+        #expect(manager.snapshots.isEmpty)
+        #expect(manager.loadError != nil)
+        #expect(defaults.data(forKey: "test_sensor_snapshots") == invalidData)
+    }
+
+    @Test func testClearCorruptedDataRemovesStoredPayloadAndResetsErrors() throws {
+        let suiteName = "SnapshotManagerTests_ClearCorrupt_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_ClearCorruptDir_\(UUID().uuidString)")
+        let invalidData = Data("bad-snapshot-data".utf8)
+        defaults.set(invalidData, forKey: "test_sensor_snapshots")
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: dir)
+        }
+
+        let manager = SnapshotManager(userDefaults: defaults, keyPrefix: "test_", photosDirectory: dir)
+        #expect(manager.loadError != nil)
+
+        manager.clearCorruptedData()
+
+        #expect(defaults.object(forKey: "test_sensor_snapshots") == nil)
+        #expect(manager.loadError == nil)
+        #expect(manager.saveError == nil)
+        #expect(manager.snapshots.isEmpty)
+        #expect(manager.photos.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: dir.path))
+    }
+
+    @Test func testInitMigratesReferencedLegacyPhotosToDisk() throws {
+        let suiteName = "SnapshotManagerTests_LegacyMigration_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_LegacyMigrationDir_\(UUID().uuidString)")
+        let photoID = UUID()
+        let snapshot = createSnapshot(photoIDs: [photoID])
+        let photo = try #require(SnapshotPhoto(image: createTestImage()))
+        let legacyPhotos = [photoID: SnapshotPhoto(id: photoID, imageData: photo.imageData, timestamp: photo.timestamp)]
+
+        defaults.set(try JSONEncoder().encode([snapshot]), forKey: "test_sensor_snapshots")
+        defaults.set(try JSONEncoder().encode(legacyPhotos), forKey: "test_snapshot_photos")
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: dir)
+        }
+
+        let manager = SnapshotManager(userDefaults: defaults, keyPrefix: "test_", photosDirectory: dir)
+
+        let jpgURL = dir.appendingPathComponent("\(photoID).jpg")
+        let jsonURL = dir.appendingPathComponent("\(photoID).json")
+        let migratedPhotos = manager.getPhotos(for: snapshot.id)
+
+        #expect(defaults.data(forKey: "test_snapshot_photos") == nil)
+        #expect(FileManager.default.fileExists(atPath: jpgURL.path))
+        #expect(FileManager.default.fileExists(atPath: jsonURL.path))
+        #expect(manager.photos[photoID] != nil)
+        #expect(migratedPhotos.count == 1)
+        #expect(migratedPhotos.first?.id == photoID)
+    }
+
+    @Test func testInitRetainsLegacyPhotosWhenMigrationFails() throws {
+        let suiteName = "SnapshotManagerTests_LegacyFailure_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let blockedPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_LegacyFailureFile_\(UUID().uuidString)")
+        let photoID = UUID()
+        let snapshot = createSnapshot(photoIDs: [photoID])
+        let photo = try #require(SnapshotPhoto(image: createTestImage()))
+        let legacyPhotos = [photoID: SnapshotPhoto(id: photoID, imageData: photo.imageData, timestamp: photo.timestamp)]
+
+        FileManager.default.createFile(atPath: blockedPath.path, contents: Data(), attributes: nil)
+        defaults.set(try JSONEncoder().encode([snapshot]), forKey: "test_sensor_snapshots")
+        defaults.set(try JSONEncoder().encode(legacyPhotos), forKey: "test_snapshot_photos")
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: blockedPath)
+        }
+
+        _ = SnapshotManager(userDefaults: defaults, keyPrefix: "test_", photosDirectory: blockedPath)
+
+        let retainedData = try #require(defaults.data(forKey: "test_snapshot_photos"))
+        let retainedPhotos = try JSONDecoder().decode([UUID: SnapshotPhoto].self, from: retainedData)
+
+        #expect(retainedPhotos[photoID] != nil)
+    }
+
+    @Test func testPrewarmCacheLoadsPhotoWithoutMetadataFile() async throws {
+        let suiteName = "SnapshotManagerTests_PrewarmMissingMeta_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_PrewarmMissingMetaDir_\(UUID().uuidString)")
+        let photoID = UUID()
+        let snapshot = createSnapshot(photoIDs: [photoID])
+        let photo = try #require(SnapshotPhoto(image: createTestImage()))
+
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try photo.imageData.write(to: dir.appendingPathComponent("\(photoID).jpg"), options: .atomic)
+        defaults.set(try JSONEncoder().encode([snapshot]), forKey: "test_sensor_snapshots")
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: dir)
+        }
+
+        let manager = SnapshotManager(userDefaults: defaults, keyPrefix: "test_", photosDirectory: dir)
+        await manager.prewarmCache(for: snapshot.id)
+
+        let photos = manager.getPhotos(for: snapshot.id)
+
+        #expect(photos.count == 1)
+        #expect(photos.first?.id == photoID)
+        #expect(photos.first?.image != nil)
+    }
+
+    @Test func testAddPhotoFailsWhenPhotosDirectoryIsNotWritable() throws {
+        let suiteName = "SnapshotManagerTests_AddPhotoFailure_\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let blockedPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SnapshotManagerTests_AddPhotoFailureFile_\(UUID().uuidString)")
+
+        FileManager.default.createFile(atPath: blockedPath.path, contents: Data(), attributes: nil)
+
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: blockedPath)
+        }
+
+        let manager = SnapshotManager(userDefaults: defaults, keyPrefix: "test_", photosDirectory: blockedPath)
+        let snapshot = createSnapshot()
+        manager.addSnapshot(snapshot)
+
+        let added = manager.addPhoto(to: snapshot.id, image: createTestImage())
+
+        #expect(added == false)
+        #expect(manager.saveError != nil)
+        #expect(manager.photos.isEmpty)
+        #expect(manager.snapshots.first?.photoIDs.isEmpty == true)
+    }
+
+    @Test func testDeleteSnapshotToleratesMissingPhotoFiles() {
+        let container = createTestManagerContainer()
+        defer { container.cleanup() }
+        let manager = container.manager
+        let photoID = UUID()
+        let snapshot = createSnapshot(photoIDs: [photoID])
+
+        manager.addSnapshot(snapshot)
+        manager.deleteSnapshot(at: 0)
+
+        #expect(manager.snapshots.isEmpty)
+        #expect(manager.photos.isEmpty)
     }
 }

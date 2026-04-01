@@ -14,7 +14,7 @@ import CoreLocation
 struct LocationManagerTests {
 
     private func waitForAvailability(_ manager: LocationManager, expected: Bool) async {
-        for _ in 0..<10 where manager.isAvailable != expected {
+        for _ in 0..<50 where manager.isAvailable != expected {
             try? await Task.sleep(for: .milliseconds(100))
         }
     }

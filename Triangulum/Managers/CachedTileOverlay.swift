@@ -11,9 +11,16 @@ import UIKit
 
 @MainActor
 class CachedTileOverlay: MKTileOverlay {
-    private lazy var cacheManager: TileCacheManager = TileCacheManager.shared
+    private let cacheManager: TileCacheManager
 
     override init(urlTemplate: String?) {
+        self.cacheManager = .shared
+        super.init(urlTemplate: urlTemplate)
+        self.canReplaceMapContent = true
+    }
+
+    init(urlTemplate: String?, cacheManager: TileCacheManager) {
+        self.cacheManager = cacheManager
         super.init(urlTemplate: urlTemplate)
         self.canReplaceMapContent = true
     }
