@@ -13,12 +13,24 @@ import MapKit
 @testable import Triangulum
 
 private final class MockTileURLProtocol: URLProtocol {
-    static var responseProvider: ((URLRequest) throws -> (URLResponse, Data?))?
-    static var requestCount = 0
+    private static let lock = NSLock()
+    private static var _responseProvider: ((URLRequest) throws -> (URLResponse, Data?))?
+    private static var _requestCount = 0
+
+    static var responseProvider: ((URLRequest) throws -> (URLResponse, Data?))? {
+        get { lock.withLock { _responseProvider } }
+        set { lock.withLock { _responseProvider = newValue } }
+    }
+
+    static var requestCount: Int {
+        get { lock.withLock { _requestCount } }
+    }
 
     static func reset() {
-        responseProvider = nil
-        requestCount = 0
+        lock.withLock {
+            _responseProvider = nil
+            _requestCount = 0
+        }
     }
 
     override class func canInit(with request: URLRequest) -> Bool {
@@ -30,9 +42,13 @@ private final class MockTileURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        Self.requestCount += 1
+        var provider: ((URLRequest) throws -> (URLResponse, Data?))?
+        Self.lock.withLock {
+            Self._requestCount += 1
+            provider = Self._responseProvider
+        }
 
-        guard let responseProvider = Self.responseProvider else {
+        guard let responseProvider = provider else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
