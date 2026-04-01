@@ -501,9 +501,10 @@ struct SatelliteManagerTests {
     }
 
     private func makeHubbleTLE(name: String = "HST (Hubble)", noradId: String = "20580") -> TLE? {
-        TLE(name: name,
-            line1: "1 \(noradId)U 90037B   24001.50000000  .00000500  00000-0  30000-4 0  9990",
-            line2: "2 20580  28.4700 100.0000 0002500  90.0000 270.0000 15.09000000100001")
+        let paddedId = String(noradId.replacingOccurrences(of: " ", with: "").padding(toLength: 5, withPad: "0", startingAt: 0))
+        return TLE(name: name,
+                   line1: "1 \(noradId)U 90037B   24001.50000000  .00000500  00000-0  30000-4 0  9990",
+                   line2: "2 \(paddedId)  28.4700 100.0000 0002500  90.0000 270.0000 15.09000000100001")
     }
 }
 
