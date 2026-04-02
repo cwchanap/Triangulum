@@ -178,6 +178,13 @@ struct WeatherManagerTests {
     }
 
     @Test @MainActor func testStartMonitoringWithExistingWeatherRevalidatesImmediately() throws {
+        let savedKey = Config.openWeatherAPIKey
+        let hadKey = !savedKey.isEmpty
+        _ = Config.deleteAPIKey()
+        defer {
+            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
+        }
+
         let locationManager = LocationManager()
         let weatherManager = WeatherManager(locationManager: locationManager)
         weatherManager.stopMonitoring()
