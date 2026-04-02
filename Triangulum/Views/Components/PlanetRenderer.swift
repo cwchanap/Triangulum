@@ -20,15 +20,15 @@ struct Planet {
 
     static let catalog: [Planet] = [
         Planet(name: "Mercury", abbreviation: "Mer",
-               skyColor: Color(red: 0.75, green: 0.72, blue: 0.68), nominalMag: 0.0,  isInner: true),
-        Planet(name: "Venus",   abbreviation: "Ven",
+               skyColor: Color(red: 0.75, green: 0.72, blue: 0.68), nominalMag: 0.0, isInner: true),
+        Planet(name: "Venus", abbreviation: "Ven",
                skyColor: Color(red: 0.98, green: 0.97, blue: 0.85), nominalMag: -4.0, isInner: true),
-        Planet(name: "Mars",    abbreviation: "Mar",
-               skyColor: Color(red: 0.90, green: 0.35, blue: 0.20), nominalMag: 0.5,  isInner: false),
+        Planet(name: "Mars", abbreviation: "Mar",
+               skyColor: Color(red: 0.90, green: 0.35, blue: 0.20), nominalMag: 0.5, isInner: false),
         Planet(name: "Jupiter", abbreviation: "Jup",
                skyColor: Color(red: 0.92, green: 0.84, blue: 0.72), nominalMag: -2.0, isInner: false),
-        Planet(name: "Saturn",  abbreviation: "Sat",
-               skyColor: Color(red: 0.88, green: 0.82, blue: 0.65), nominalMag: 0.7,  isInner: false),
+        Planet(name: "Saturn", abbreviation: "Sat",
+               skyColor: Color(red: 0.88, green: 0.82, blue: 0.65), nominalMag: 0.7, isInner: false)
     ]
 }
 
