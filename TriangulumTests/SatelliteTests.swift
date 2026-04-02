@@ -476,7 +476,8 @@ struct SatelliteManagerTests {
     }
 
     private func createTestCache() -> TLECache {
-        let suiteName = "SatelliteManagerTests_\(UUID().uuidString)"
+        let suiteName = "SatelliteManagerTests_TLECache"
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         let testDefaults = UserDefaults(suiteName: suiteName)!
         return TLECache(userDefaults: testDefaults, cacheKey: "satellite_manager_test_tle_cache")
     }

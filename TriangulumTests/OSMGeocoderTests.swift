@@ -14,6 +14,12 @@ private final class MockOSMURLProtocol: URLProtocol {
         }
     }
 
+    static func unregister(token: String) {
+        queue.sync {
+            responseProviders.removeValue(forKey: token)
+        }
+    }
+
     override static func canInit(with request: URLRequest) -> Bool {
         true
     }
@@ -57,7 +63,7 @@ struct OSMGeocoderTests {
 
     private func createMockSession(
         responseProvider: @escaping (URLRequest) throws -> (URLResponse, Data?)
-    ) -> URLSession {
+    ) -> (session: URLSession, cleanup: () -> Void) {
         let token = UUID().uuidString
         MockOSMURLProtocol.register(token: token, responseProvider: responseProvider)
 
@@ -65,11 +71,13 @@ struct OSMGeocoderTests {
         configuration.protocolClasses = [MockOSMURLProtocol.self]
         configuration.urlCache = nil
         configuration.httpAdditionalHeaders = ["X-Mock-OSM-Token": token]
-        return URLSession(configuration: configuration)
+        let session = URLSession(configuration: configuration)
+        let cleanup = { MockOSMURLProtocol.unregister(token: token) }
+        return (session, cleanup)
     }
 
     @Test func testSearchBuildsRegionQueryAndDecodesResults() async throws {
-        let session = createMockSession { request in
+        let (session, cleanup) = createMockSession { request in
             let url = try #require(request.url)
             let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
             let items = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
@@ -97,6 +105,7 @@ struct OSMGeocoderTests {
             """.utf8)
             return (response, data)
         }
+        defer { cleanup() }
 
         let region = MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 37.8, longitude: -122.42),
@@ -118,11 +127,12 @@ struct OSMGeocoderTests {
     }
 
     @Test func testSearchReturnsEmptyArrayForHTTPError() async throws {
-        let session = createMockSession { request in
+        let (session, cleanup) = createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 503, httpVersion: nil, headerFields: nil))
             return (response, Data("service unavailable".utf8))
         }
+        defer { cleanup() }
 
         let results = try await OSMGeocoder.search(query: "museum", session: session)
 
@@ -130,11 +140,12 @@ struct OSMGeocoderTests {
     }
 
     @Test func testSearchReturnsEmptyArrayForDecodingFailure() async throws {
-        let session = createMockSession { request in
+        let (session, cleanup) = createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
             return (response, Data("not-json".utf8))
         }
+        defer { cleanup() }
 
         let results = try await OSMGeocoder.search(query: "library", session: session)
 

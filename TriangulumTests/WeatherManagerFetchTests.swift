@@ -24,11 +24,12 @@ struct WeatherManagerFetchTests {
             "name": "San Francisco"
         }
         """.utf8)
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
             return (response, json)
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -52,11 +53,12 @@ struct WeatherManagerFetchTests {
             if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
         }
 
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 401, httpVersion: nil, headerFields: nil))
             return (response, Data("unauthorized".utf8))
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -82,11 +84,12 @@ struct WeatherManagerFetchTests {
             if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
         }
 
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 500, httpVersion: nil, headerFields: nil))
             return (response, Data("server exploded".utf8))
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -109,11 +112,12 @@ struct WeatherManagerFetchTests {
             if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
         }
 
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = URLResponse(url: url, mimeType: "application/json", expectedContentLength: 2, textEncodingName: nil)
             return (response, Data("{}".utf8))
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -136,11 +140,12 @@ struct WeatherManagerFetchTests {
             if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
         }
 
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
             return (response, Data("not-json".utf8))
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -163,9 +168,10 @@ struct WeatherManagerFetchTests {
             if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
         }
 
-        let session = WeatherTestHelper.createMockSession { _ in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { _ in
             throw URLError(.timedOut)
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -268,11 +274,12 @@ struct WeatherManagerFetchTests {
             "name": "San Francisco"
         }
         """.utf8)
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
             return (response, json)
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
@@ -374,11 +381,12 @@ struct WeatherManagerFetchTests {
             "name": "San Francisco"
         }
         """.utf8)
-        let session = WeatherTestHelper.createMockSession { request in
+        let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
             let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
             return (response, json)
         }
+        defer { cleanup() }
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,

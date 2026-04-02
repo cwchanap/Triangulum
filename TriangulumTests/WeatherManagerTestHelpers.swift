@@ -12,6 +12,12 @@ final class MockWeatherURLProtocol: URLProtocol {
         }
     }
 
+    static func unregister(token: String) {
+        queue.sync {
+            responseProviders.removeValue(forKey: token)
+        }
+    }
+
     override static func canInit(with request: URLRequest) -> Bool {
         true
     }
@@ -53,7 +59,7 @@ final class MockWeatherURLProtocol: URLProtocol {
 enum WeatherTestHelper {
     static func createMockSession(
         responseProvider: @escaping (URLRequest) throws -> (URLResponse, Data?)
-    ) -> URLSession {
+    ) -> (session: URLSession, cleanup: () -> Void) {
         let token = UUID().uuidString
         MockWeatherURLProtocol.register(token: token, responseProvider: responseProvider)
 
@@ -61,7 +67,9 @@ enum WeatherTestHelper {
         configuration.protocolClasses = [MockWeatherURLProtocol.self]
         configuration.urlCache = nil
         configuration.httpAdditionalHeaders = ["X-Mock-Weather-Token": token]
-        return URLSession(configuration: configuration)
+        let session = URLSession(configuration: configuration)
+        let cleanup = { MockWeatherURLProtocol.unregister(token: token) }
+        return (session, cleanup)
     }
 
     static func createValidLocationManager() -> LocationManager {
