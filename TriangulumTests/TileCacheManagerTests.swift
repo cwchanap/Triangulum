@@ -22,9 +22,7 @@ private final class MockTileURLProtocol: URLProtocol {
         set { lock.withLock { _responseProvider = newValue } }
     }
 
-    static var requestCount: Int {
-        get { lock.withLock { _requestCount } }
-    }
+    static var requestCount: Int { lock.withLock { _requestCount } }
 
     static func reset() {
         lock.withLock {
@@ -33,10 +31,12 @@ private final class MockTileURLProtocol: URLProtocol {
         }
     }
 
+    // swiftlint:disable:next static_over_final_class
     override class func canInit(with request: URLRequest) -> Bool {
         true
     }
 
+    // swiftlint:disable:next static_over_final_class
     override class func canonicalRequest(for request: URLRequest) -> URLRequest {
         request
     }
