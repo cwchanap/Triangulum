@@ -6,7 +6,43 @@ class KeychainHelper {
 
     static let shared = KeychainHelper()
 
+    private static let inMemoryStoreQueue = DispatchQueue(label: "KeychainHelper.InMemoryStore")
+
+    private static var inMemoryStore: [String: Data] = [:]
+
     private init() {}
+
+    private var usesInMemoryStore: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    @discardableResult
+    private func storeInMemory(_ data: Data, forKey key: String) -> Bool {
+        Self.inMemoryStoreQueue.sync {
+            Self.inMemoryStore[key] = data
+        }
+        return true
+    }
+
+    private func retrieveInMemory(forKey key: String) -> Data? {
+        Self.inMemoryStoreQueue.sync {
+            Self.inMemoryStore[key]
+        }
+    }
+
+    @discardableResult
+    private func deleteInMemory(_ key: String) -> Bool {
+        Self.inMemoryStoreQueue.sync {
+            Self.inMemoryStore.removeValue(forKey: key)
+        }
+        return true
+    }
+
+    private func existsInMemory(forKey key: String) -> Bool {
+        Self.inMemoryStoreQueue.sync {
+            Self.inMemoryStore[key] != nil
+        }
+    }
 
     /// Store a string value in the Keychain
     /// - Parameters:
@@ -26,6 +62,10 @@ class KeychainHelper {
     /// - Returns: True if the data was successfully stored, false otherwise
     @discardableResult
     func store(_ data: Data, forKey key: String) -> Bool {
+        if usesInMemoryStore {
+            return storeInMemory(data, forKey: key)
+        }
+
         // Delete existing item first (in case it exists)
         delete(key)
 
@@ -52,6 +92,10 @@ class KeychainHelper {
     /// - Parameter key: The key associated with the data
     /// - Returns: The data if found, nil otherwise
     func retrieveData(forKey key: String) -> Data? {
+        if usesInMemoryStore {
+            return retrieveInMemory(forKey: key)
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -71,6 +115,10 @@ class KeychainHelper {
     /// - Returns: True if the item was successfully deleted or didn't exist, false otherwise
     @discardableResult
     func delete(_ key: String) -> Bool {
+        if usesInMemoryStore {
+            return deleteInMemory(key)
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key
@@ -84,6 +132,10 @@ class KeychainHelper {
     /// - Parameter key: The key to check for
     /// - Returns: True if the item exists, false otherwise
     func exists(forKey key: String) -> Bool {
+        if usesInMemoryStore {
+            return existsInMemory(forKey: key)
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
