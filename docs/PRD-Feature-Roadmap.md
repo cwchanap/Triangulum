@@ -1,8 +1,9 @@
 # Product Requirements Document: Triangulum Feature Roadmap
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Created:** December 30, 2024
-**Status:** Draft
+**Last Updated:** April 7, 2026
+**Status:** Active
 **Product:** Triangulum iOS App
 
 ---
@@ -10,6 +11,18 @@
 ## Executive Summary
 
 Triangulum is an iOS sensor monitoring application that provides real-time visualization of barometric pressure, GPS location, device motion sensors, weather data, and astronomical information. This PRD outlines proposed feature enhancements to extend the app's capabilities in data visualization, outdoor navigation, alerting, astronomy, and data management.
+
+---
+
+## Implementation Status (as of April 2026)
+
+| Status | Count | Features |
+|--------|-------|---------|
+| ✅ Complete | 6 | F1.1, F1.2, F1.3, F2.3, F4.1, F4.2 |
+| ⚠️ Partial | 2 | F6.1, F7.2 |
+| ❌ Not Started | 12 | F2.1, F2.2, F3.1, F3.2, F4.3, F5.1, F5.2, F5.3, F6.2, F6.3, F7.1, F7.3 |
+
+**Status key used throughout this document:** ✅ Complete · ⚠️ Partial · ❌ Not Started
 
 ---
 
@@ -41,10 +54,11 @@ Triangulum is an iOS sensor monitoring application that provides real-time visua
 
 ### Category 1: Data Visualization & Analytics
 
-#### F1.1 Real-Time Sensor Graphs
+#### F1.1 Real-Time Sensor Graphs ✅ Complete
 
 **Priority:** High
 **Effort:** Medium
+**Implemented in:** `BarometerDetailView.swift`, `PressureHistoryManager.swift`
 
 **Description:**
 Add historical trend visualization for sensor data using interactive line charts.
@@ -77,10 +91,11 @@ Add historical trend visualization for sensor data using interactive line charts
 
 ---
 
-#### F1.2 Pressure Trend Predictions
+#### F1.2 Pressure Trend Predictions ✅ Complete
 
 **Priority:** Medium
 **Effort:** Low
+**Implemented in:** `PressureHistoryManager.swift` (`PressureTrend` enum), `BarometerView.swift` (`TrendIndicatorView`)
 
 **Description:**
 Leverage barometric pressure rate-of-change to provide simple weather predictions.
@@ -113,10 +128,11 @@ Leverage barometric pressure rate-of-change to provide simple weather prediction
 
 ---
 
-#### F1.3 Snapshot Comparison View
+#### F1.3 Snapshot Comparison View ✅ Complete
 
 **Priority:** Low
 **Effort:** Medium
+**Implemented in:** `SnapshotComparisonView.swift`
 
 **Description:**
 Enable side-by-side comparison of two sensor snapshots to analyze differences.
@@ -138,7 +154,7 @@ Enable side-by-side comparison of two sensor snapshots to analyze differences.
 
 ### Category 2: Navigation & Outdoor Features
 
-#### F2.1 Track Recording
+#### F2.1 Track Recording ❌ Not Started
 
 **Priority:** High
 **Effort:** High
@@ -183,7 +199,7 @@ Record GPS paths with associated sensor data for route tracking and analysis.
 
 ---
 
-#### F2.2 Waypoint System
+#### F2.2 Waypoint System ❌ Not Started
 
 **Priority:** Medium
 **Effort:** Medium
@@ -214,10 +230,11 @@ Save points of interest and navigate to them using compass bearing and distance.
 
 ---
 
-#### F2.3 Sunrise/Sunset & Golden Hour
+#### F2.3 Sunrise/Sunset & Golden Hour ✅ Complete
 
 **Priority:** Medium
 **Effort:** Low
+**Implemented in:** `SolarEventsView.swift`, `ConstellationMapView.swift` (`Astronomer.solarCrossing`)
 
 **Description:**
 Display solar event times and photography-relevant lighting periods.
@@ -246,7 +263,7 @@ Display solar event times and photography-relevant lighting periods.
 
 ### Category 3: Alerts & Monitoring
 
-#### F3.1 Threshold Alerts
+#### F3.1 Threshold Alerts ❌ Not Started
 
 **Priority:** Medium
 **Effort:** Medium
@@ -283,7 +300,7 @@ Configurable notifications when sensor values cross user-defined thresholds.
 
 ---
 
-#### F3.2 Background Sensor Logging
+#### F3.2 Background Sensor Logging ❌ Not Started
 
 **Priority:** Low
 **Effort:** High
@@ -319,10 +336,11 @@ Passive data collection mode for long-term sensor monitoring.
 
 ### Category 4: Astronomy Enhancements
 
-#### F4.1 Satellite/ISS Tracker
+#### F4.1 Satellite/ISS Tracker ✅ Complete
 
 **Priority:** Low
 **Effort:** High
+**Implemented in:** `SatelliteManager.swift`, `SGP4Propagator.swift`, `TLECache.swift`
 
 **Description:**
 Track artificial satellites including the International Space Station.
@@ -354,10 +372,11 @@ Track artificial satellites including the International Space Station.
 
 ---
 
-#### F4.2 Planet Positions
+#### F4.2 Planet Positions ✅ Complete
 
 **Priority:** Medium
 **Effort:** Medium
+**Implemented in:** `ConstellationMapView+Planets.swift`, `PlanetRenderer.swift`
 
 **Description:**
 Display major planets on the constellation map with visibility information.
@@ -384,7 +403,7 @@ Display major planets on the constellation map with visibility information.
 
 ---
 
-#### F4.3 Eclipse Predictor
+#### F4.3 Eclipse Predictor ❌ Not Started
 
 **Priority:** Low
 **Effort:** High
@@ -411,7 +430,7 @@ Predict solar and lunar eclipses visible from the user's location.
 
 ### Category 5: Data Management & Export
 
-#### F5.1 Export Snapshots
+#### F5.1 Export Snapshots ❌ Not Started
 
 **Priority:** High
 **Effort:** Low
@@ -478,7 +497,7 @@ Export sensor snapshot data in multiple formats for analysis and sharing.
 
 ---
 
-#### F5.2 iCloud Sync
+#### F5.2 iCloud Sync ❌ Not Started
 
 **Priority:** Low
 **Effort:** High
@@ -512,7 +531,7 @@ Synchronize snapshots across devices using iCloud.
 
 ---
 
-#### F5.3 Siri Shortcuts Integration
+#### F5.3 Siri Shortcuts Integration ❌ Not Started
 
 **Priority:** Medium
 **Effort:** Medium
@@ -544,10 +563,11 @@ Enable voice commands and automation through Siri and Shortcuts app.
 
 ### Category 6: Motion Sensor Features
 
-#### F6.1 Enable Motion Sensors
+#### F6.1 Enable Motion Sensors ⚠️ Partial
 
 **Priority:** High
 **Effort:** Low
+**Notes:** `NSMotionUsageDescription` is present in `PrivacyInfo.plist` and all three sensor managers exist and function correctly. However, the sensor start calls in `ContentView.swift` remain commented out (lines 146–150) with a TODO. Completing this feature requires uncommenting those three lines.
 
 **Description:**
 Complete the privacy permission configuration to enable currently disabled motion sensors.
@@ -576,7 +596,7 @@ Complete the privacy permission configuration to enable currently disabled motio
 
 ---
 
-#### F6.2 Step Counter & Pedometer
+#### F6.2 Step Counter & Pedometer ❌ Not Started
 
 **Priority:** Medium
 **Effort:** Low
@@ -604,10 +624,11 @@ Display step count and walking/running distance using CoreMotion pedometer.
 
 ---
 
-#### F6.3 Device Level Indicator
+#### F6.3 Device Level Indicator ❌ Not Started
 
 **Priority:** Low
 **Effort:** Low
+**Notes:** Roll/pitch/yaw values are displayed numerically in `BarometerView.swift`, but no visual bubble-level UI exists yet.
 
 **Description:**
 Bubble level functionality using accelerometer data.
@@ -628,10 +649,11 @@ Bubble level functionality using accelerometer data.
 
 ### Category 7: UX Improvements
 
-#### F7.1 Home Screen Widgets
+#### F7.1 Home Screen Widgets ❌ Not Started
 
 **Priority:** Medium
 **Effort:** Medium
+**Notes:** `WidgetCardModifier.swift` and `WidgetOrder.swift` handle in-app widget ordering only; no WidgetKit extension target exists in the project.
 
 **Description:**
 iOS Home Screen widgets for glanceable sensor information.
@@ -658,10 +680,11 @@ iOS Home Screen widgets for glanceable sensor information.
 
 ---
 
-#### F7.2 Theme System
+#### F7.2 Theme System ⚠️ Partial
 
 **Priority:** Low
 **Effort:** Medium
+**Notes:** Night vision mode (red overlay) exists in `CompassPageView`. The Prussian Blue color scheme in `Color+Theme.swift` is applied consistently. Dark/light mode awareness exists in `ConstellationMapView`. Missing: full system dark/light mode toggle, manual theme override, and custom accent color selection.
 
 **Description:**
 Comprehensive theming with light/dark mode support beyond night vision.
@@ -681,7 +704,7 @@ Comprehensive theming with light/dark mode support beyond night vision.
 
 ---
 
-#### F7.3 Haptic Feedback
+#### F7.3 Haptic Feedback ❌ Not Started
 
 **Priority:** Low
 **Effort:** Low
@@ -709,47 +732,47 @@ Tactile feedback for enhanced interaction experience.
 
 ## Implementation Prioritization
 
-### Phase 1: Foundation (Recommended First)
+### Phase 1: Foundation — ✅ Mostly Complete
 
-| Feature | ID | Priority | Effort | Rationale |
-|---------|-----|----------|--------|-----------|
-| Enable Motion Sensors | F6.1 | High | Low | Unlocks existing functionality |
-| Export Snapshots | F5.1 | High | Low | High user value, low complexity |
-| Real-Time Sensor Graphs | F1.1 | High | Medium | Core data visualization |
-| Pressure Trend Predictions | F1.2 | Medium | Low | Enhances existing barometer |
+| Feature | ID | Priority | Effort | Status | Notes |
+|---------|-----|----------|--------|--------|-------|
+| Enable Motion Sensors | F6.1 | High | Low | ⚠️ Partial | Uncomment 3 lines in ContentView.swift |
+| Export Snapshots | F5.1 | High | Low | ❌ Not Started | High value, quick win remaining |
+| Real-Time Sensor Graphs | F1.1 | High | Medium | ✅ Complete | BarometerDetailView + PressureHistoryManager |
+| Pressure Trend Predictions | F1.2 | Medium | Low | ✅ Complete | PressureTrend enum in PressureHistoryManager |
 
-### Phase 2: Navigation & Outdoor
+### Phase 2: Navigation & Outdoor — ✅ Partially Complete
 
-| Feature | ID | Priority | Effort | Rationale |
-|---------|-----|----------|--------|-----------|
-| Sunrise/Sunset & Golden Hour | F2.3 | Medium | Low | Extends existing astronomy |
-| Waypoint System | F2.2 | Medium | Medium | Useful for outdoor users |
-| Track Recording | F2.1 | High | High | Major feature addition |
+| Feature | ID | Priority | Effort | Status | Notes |
+|---------|-----|----------|--------|--------|-------|
+| Sunrise/Sunset & Golden Hour | F2.3 | Medium | Low | ✅ Complete | SolarEventsView with full twilight/golden-hour times |
+| Waypoint System | F2.2 | Medium | Medium | ❌ Not Started | |
+| Track Recording | F2.1 | High | High | ❌ Not Started | Largest remaining feature |
 
-### Phase 3: Monitoring & Alerts
+### Phase 3: Monitoring & Alerts — ❌ Not Started
 
-| Feature | ID | Priority | Effort | Rationale |
-|---------|-----|----------|--------|-----------|
-| Threshold Alerts | F3.1 | Medium | Medium | Proactive monitoring |
-| Step Counter | F6.2 | Medium | Low | Popular fitness feature |
-| Home Screen Widgets | F7.1 | Medium | Medium | Increased engagement |
+| Feature | ID | Priority | Effort | Status | Notes |
+|---------|-----|----------|--------|--------|-------|
+| Threshold Alerts | F3.1 | Medium | Medium | ❌ Not Started | |
+| Step Counter | F6.2 | Medium | Low | ❌ Not Started | |
+| Home Screen Widgets | F7.1 | Medium | Medium | ❌ Not Started | Requires new WidgetKit target |
 
-### Phase 4: Advanced Features
+### Phase 4: Advanced Features — ✅ Partially Complete
 
-| Feature | ID | Priority | Effort | Rationale |
-|---------|-----|----------|--------|-----------|
-| Planet Positions | F4.2 | Medium | Medium | Astronomy enhancement |
-| Siri Shortcuts | F5.3 | Medium | Medium | Convenience feature |
-| Device Level | F6.3 | Low | Low | Utility feature |
+| Feature | ID | Priority | Effort | Status | Notes |
+|---------|-----|----------|--------|--------|-------|
+| Planet Positions | F4.2 | Medium | Medium | ✅ Complete | ConstellationMapView+Planets + PlanetRenderer |
+| Siri Shortcuts | F5.3 | Medium | Medium | ❌ Not Started | |
+| Device Level | F6.3 | Low | Low | ❌ Not Started | Roll/pitch data available, needs UI |
 
-### Phase 5: Long-term
+### Phase 5: Long-term — ✅ Partially Complete
 
-| Feature | ID | Priority | Effort | Rationale |
-|---------|-----|----------|--------|-----------|
-| Satellite/ISS Tracker | F4.1 | Low | High | Niche but valuable |
-| Eclipse Predictor | F4.3 | Low | High | Specialized astronomy |
-| iCloud Sync | F5.2 | Low | High | Multi-device support |
-| Background Logging | F3.2 | Low | High | Research use case |
+| Feature | ID | Priority | Effort | Status | Notes |
+|---------|-----|----------|--------|--------|-------|
+| Satellite/ISS Tracker | F4.1 | Low | High | ✅ Complete | SGP4Propagator + TLECache + SatelliteManager |
+| Eclipse Predictor | F4.3 | Low | High | ❌ Not Started | |
+| iCloud Sync | F5.2 | Low | High | ❌ Not Started | |
+| Background Logging | F3.2 | Low | High | ❌ Not Started | |
 
 ---
 
@@ -858,4 +881,5 @@ Triangulum/
 ---
 
 *Document maintained by: Development Team*
-*Next review date: Q1 2025*
+*Last reviewed: April 7, 2026*
+*Next review date: Q3 2026*
