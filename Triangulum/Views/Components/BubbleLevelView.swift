@@ -17,6 +17,7 @@ public struct BubbleLevelView: View {
             let outerRadius = min(size.width, size.height) * 0.48
             let scale = outerRadius / 90.0  // 1 degree = this many points; +/-90 deg fills the ring
             let bubbleRadius: CGFloat = 14
+            let clampedThresholdDeg = LevelMath.clampedThreshold(thresholdDeg)
 
             // Outer ring
             let outerRing = Path(ellipseIn: CGRect(
@@ -52,7 +53,7 @@ public struct BubbleLevelView: View {
             }
 
             // Level zone indicator (dashed circle at threshold radius)
-            let thresholdRadius = CGFloat(thresholdDeg) * scale
+            let thresholdRadius = CGFloat(clampedThresholdDeg) * scale
             context.stroke(
                 Path(ellipseIn: CGRect(
                     x: center.x - thresholdRadius, y: center.y - thresholdRadius,
@@ -66,7 +67,8 @@ public struct BubbleLevelView: View {
             let rawX = CGFloat(rollDeg) * scale
             let rawY = CGFloat(-pitchDeg) * scale  // negate: positive pitch (top away) -> bubble moves up
             let dist = sqrt(rawX * rawX + rawY * rawY)
-            let clampedDist = min(dist, outerRadius - bubbleRadius)
+            let safeClamp = max(0, outerRadius - bubbleRadius)
+            let clampedDist = min(dist, safeClamp)
             let bx: CGFloat
             let by: CGFloat
             if dist > 0 {
@@ -78,7 +80,7 @@ public struct BubbleLevelView: View {
                 by = center.y
             }
 
-            let isLevel = sqrt(rollDeg * rollDeg + pitchDeg * pitchDeg) <= thresholdDeg
+            let isLevel = LevelMath.isLevel(roll: rollDeg, pitch: pitchDeg, threshold: clampedThresholdDeg)
             let bubbleColor: Color = isLevel ? .green : .prussianAccent
             let bubbleRect = CGRect(
                 x: bx - bubbleRadius, y: by - bubbleRadius,
@@ -96,7 +98,7 @@ public struct BubbleLevelView: View {
     }
 
     private var isLevelState: Bool {
-        sqrt(rollDeg * rollDeg + pitchDeg * pitchDeg) <= thresholdDeg
+        LevelMath.isLevel(roll: rollDeg, pitch: pitchDeg, threshold: LevelMath.clampedThreshold(thresholdDeg))
     }
 }
 

@@ -4,6 +4,7 @@ import os
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
+    private let skipAvailabilityCheck: Bool
 
     @Published var latitude: Double = 0.0
     @Published var longitude: Double = 0.0
@@ -26,6 +27,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     ///   check is skipped, which prevents background-thread dispatch and
     ///   CLLocationManager work from running during UI-test launches.
     init(skipAvailabilityCheck: Bool = false) {
+        self.skipAvailabilityCheck = skipAvailabilityCheck
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
@@ -159,7 +161,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         authorizationStatus = status
-        checkAvailability()
+        if !skipAvailabilityCheck {
+            checkAvailability()
+        }
 
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
