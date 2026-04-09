@@ -13,8 +13,11 @@ import CoreLocation
 @Suite(.serialized)
 struct LocationManagerTests {
 
-    private func waitForAvailability(_ manager: LocationManager, expected: Bool) async {
-        for _ in 0..<50 where manager.isAvailable != expected {
+    private func waitForAvailabilityToMatchSystem(_ manager: LocationManager) async {
+        for _ in 0..<50 {
+            if manager.isAvailable == CLLocationManager.locationServicesEnabled() {
+                return
+            }
             try? await Task.sleep(for: .milliseconds(100))
         }
     }
@@ -50,13 +53,10 @@ struct LocationManagerTests {
     @Test func testAvailabilityCheck() async {
         let manager = LocationManager()
 
-        // Wait for async availability check to complete
-        // The LocationManager.checkAvailability() runs on a background queue
-        let expectedAvailability = CLLocationManager.locationServicesEnabled()
-        await waitForAvailability(manager, expected: expectedAvailability)
+        // Wait for async availability check to settle against the current system state.
+        await waitForAvailabilityToMatchSystem(manager)
 
-        // Both should report the same location services state
-        #expect(manager.isAvailable == expectedAvailability)
+        #expect(manager.isAvailable == CLLocationManager.locationServicesEnabled())
     }
 
     @Test func testAuthorizationStatusInitialization() {
@@ -74,10 +74,9 @@ struct LocationManagerTests {
     @Test func testLocationUnavailableError() async {
         let manager = LocationManager()
 
-        let expectedAvailability = CLLocationManager.locationServicesEnabled()
-        await waitForAvailability(manager, expected: expectedAvailability)
+        await waitForAvailabilityToMatchSystem(manager)
 
-        if !expectedAvailability {
+        if !CLLocationManager.locationServicesEnabled() {
             manager.startLocationUpdates()
             // Wait for async error message to be set
             try? await Task.sleep(for: .milliseconds(100))
@@ -235,15 +234,14 @@ struct LocationManagerTests {
     @Test func testLocationManagerInitialState() async {
         let manager = LocationManager()
 
-        // Wait for async availability check to complete
-        let expectedAvailability = CLLocationManager.locationServicesEnabled()
-        await waitForAvailability(manager, expected: expectedAvailability)
+        // Wait for async availability check to settle against the current system state.
+        await waitForAvailabilityToMatchSystem(manager)
 
         #expect(manager.latitude == 0.0)
         #expect(manager.longitude == 0.0)
         #expect(manager.altitude == 0.0)
         #expect(manager.accuracy == 0.0)
         #expect(manager.errorMessage.isEmpty)
-        #expect(manager.isAvailable == expectedAvailability)
+        #expect(manager.isAvailable == CLLocationManager.locationServicesEnabled())
     }
 }
