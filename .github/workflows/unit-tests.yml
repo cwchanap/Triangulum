@@ -31,12 +31,16 @@ jobs:
           DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID"
           RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-tests.xcresult"
           if command -v xcpretty >/dev/null 2>&1; then
+            set +e
             xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
             RESULT=${PIPESTATUS[0]}
+            set -e
           else
             echo "xcpretty not found; using raw xcodebuild output"
+            set +e
             xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE"
             RESULT=$?
+            set -e
           fi
           if [ $RESULT -ne 0 ]; then
             echo "xcodebuild failed. Extracting test failures from xcresult..."
