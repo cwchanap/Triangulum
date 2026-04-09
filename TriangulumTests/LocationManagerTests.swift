@@ -131,10 +131,9 @@ struct LocationManagerTests {
 
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .denied)
 
-        // The delegate method sets authorizationStatus synchronously before calling checkAvailability async
-        // But checkAvailability will eventually overwrite with the system's actual status
-        // We check immediately after the delegate call, before async completes
-        #expect(manager.authorizationStatus == .denied)
+        // checkAvailability() can asynchronously re-sync status with the system status,
+        // so validate using the shared transition assertion.
+        assertAuthorizationStatus(manager, expected: .denied)
     }
 
     @Test func testLocationUpdateWithAccuracy() {
