@@ -23,20 +23,15 @@ struct LocationManagerTests {
     }
 
     private func assertAuthorizationStatus(_ manager: LocationManager, expected: CLAuthorizationStatus) {
-        let systemStatus = CLLocationManager().authorizationStatus
-        #expect(manager.authorizationStatus == expected || manager.authorizationStatus == systemStatus)
+        #expect(manager.authorizationStatus == expected)
 
-        if manager.authorizationStatus == expected {
-            switch expected {
-            case .authorizedWhenInUse, .authorizedAlways, .notDetermined:
-                #expect(manager.errorMessage.isEmpty)
-            case .denied, .restricted:
-                #expect(manager.errorMessage.isEmpty == false)
-            @unknown default:
-                break
-            }
-        } else if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
+        switch expected {
+        case .authorizedWhenInUse, .authorizedAlways, .notDetermined:
             #expect(manager.errorMessage.isEmpty)
+        case .denied, .restricted:
+            #expect(manager.errorMessage.isEmpty == false)
+        @unknown default:
+            break
         }
     }
 
@@ -123,12 +118,13 @@ struct LocationManagerTests {
     }
 
     @Test func testAuthorizationStatusChange() async {
-        let manager = LocationManager()
+        let manager = LocationManager(skipAvailabilityCheck: true)
 
         // Wait for initial async availability check to complete
         try? await Task.sleep(for: .milliseconds(100))
 
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .denied)
+        try? await Task.sleep(for: .milliseconds(100))
 
         // checkAvailability() can asynchronously re-sync status with the system status,
         // so validate using the shared transition assertion.
@@ -209,7 +205,7 @@ struct LocationManagerTests {
     }
 
     @Test func testAuthorizationStatusTransitions() async {
-        let manager = LocationManager()
+        let manager = LocationManager(skipAvailabilityCheck: true)
 
         // Wait for initial async availability check to complete
         try? await Task.sleep(for: .milliseconds(100))

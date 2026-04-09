@@ -32,7 +32,7 @@ struct LevelPageView: View {
                             Text("\(adjustedRoll, specifier: "%.1f")°")
                                 .font(.title3)
                                 .fontWeight(.medium)
-                                .foregroundColor(abs(adjustedRoll) <= thresholdDeg ? .green : .prussianBlueDark)
+                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
                         }
                         VStack(spacing: 4) {
                             Text("Pitch")
@@ -41,7 +41,7 @@ struct LevelPageView: View {
                             Text("\(adjustedPitch, specifier: "%.1f")°")
                                 .font(.title3)
                                 .fontWeight(.medium)
-                                .foregroundColor(abs(adjustedPitch) <= thresholdDeg ? .green : .prussianBlueDark)
+                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
                         }
                     }
                 } else {
@@ -92,17 +92,32 @@ struct LevelPageView: View {
         return attitude.pitch * 180.0 / .pi
     }
 
-    private var adjustedRoll: Double { rawRollDeg - calibrationRoll }
-    private var adjustedPitch: Double { rawPitchDeg - calibrationPitch }
+    private var adjustedRoll: Double { LevelMath.adjusted(raw: rawRollDeg, calibration: calibrationRoll) }
+    private var adjustedPitch: Double { LevelMath.adjusted(raw: rawPitchDeg, calibration: calibrationPitch) }
 
     private var isLevel: Bool {
-        sqrt(adjustedRoll * adjustedRoll + adjustedPitch * adjustedPitch) <= thresholdDeg
+        LevelMath.isLevel(roll: adjustedRoll, pitch: adjustedPitch, threshold: thresholdDeg)
     }
 
     private func calibrate() {
         guard barometerManager.attitude != nil else { return }
         calibrationRoll = rawRollDeg
         calibrationPitch = rawPitchDeg
+    }
+}
+
+enum LevelMath {
+    static func adjusted(raw: Double, calibration: Double) -> Double {
+        raw - calibration
+    }
+
+    static func clampedThreshold(_ threshold: Double) -> Double {
+        max(threshold, 0)
+    }
+
+    static func isLevel(roll: Double, pitch: Double, threshold: Double) -> Bool {
+        let normalizedThreshold = clampedThreshold(threshold)
+        return sqrt(roll * roll + pitch * pitch) <= normalizedThreshold
     }
 }
 
