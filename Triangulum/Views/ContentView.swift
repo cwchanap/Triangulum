@@ -117,6 +117,12 @@ struct ContentView: View {
                             .foregroundColor(.white)
                     }
 
+                    NavigationLink(destination: LevelPageView(barometerManager: barometerManager)) {
+                        Image(systemName: "level")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+
                     NavigationLink(destination: PreferencesView(locationManager: locationManager)) {
                         Image(systemName: "gearshape.fill")
                             .font(.title2)

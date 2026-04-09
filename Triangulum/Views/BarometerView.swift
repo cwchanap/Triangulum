@@ -1,5 +1,4 @@
 import SwiftUI
-import CoreMotion
 
 struct BarometerView: View {
     @ObservedObject var barometerManager: BarometerManager
@@ -79,52 +78,6 @@ struct BarometerView: View {
                             .padding(.horizontal, 8)
                             .background(Color.prussianWarning.opacity(0.1))
                             .cornerRadius(6)
-                        }
-
-                        // Attitude display
-                        if let attitude = barometerManager.attitude {
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Text("Attitude")
-                                        .font(.caption)
-                                        .foregroundColor(.prussianBlueLight)
-                                    Spacer()
-                                }
-
-                                HStack(spacing: 16) {
-                                    VStack {
-                                        Text("Roll")
-                                            .font(.caption2)
-                                            .foregroundColor(.prussianBlueLight)
-                                        Text("\(attitude.roll * 180 / .pi, specifier: "%.1f")°")
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.prussianBlueDark)
-                                    }
-
-                                    VStack {
-                                        Text("Pitch")
-                                            .font(.caption2)
-                                            .foregroundColor(.prussianBlueLight)
-                                        Text("\(attitude.pitch * 180 / .pi, specifier: "%.1f")°")
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.prussianBlueDark)
-                                    }
-
-                                    VStack {
-                                        Text("Yaw")
-                                            .font(.caption2)
-                                            .foregroundColor(.prussianBlueLight)
-                                        Text("\(attitude.yaw * 180 / .pi, specifier: "%.1f")°")
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.prussianBlueDark)
-                                    }
-
-                                    Spacer()
-                                }
-                            }
                         }
 
                         ProgressView(value: min(max(barometerManager.pressure / 110.0, 0.0), 1.0))
