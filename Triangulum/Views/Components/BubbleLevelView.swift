@@ -1,17 +1,17 @@
 import SwiftUI
 
-public struct BubbleLevelView: View {
-    public let rollDeg: Double       // calibrated, degrees; positive = right side down
-    public let pitchDeg: Double      // calibrated, degrees; positive = top tilts away from user
-    public let thresholdDeg: Double  // bubble turns green within this radius
+struct BubbleLevelView: View {
+    let rollDeg: Double       // calibrated, degrees; positive = right side down
+    let pitchDeg: Double      // calibrated, degrees; positive = top tilts away from user
+    let thresholdDeg: Double  // bubble turns green within this radius
 
-    public init(rollDeg: Double, pitchDeg: Double, thresholdDeg: Double) {
+    init(rollDeg: Double, pitchDeg: Double, thresholdDeg: Double) {
         self.rollDeg = rollDeg
         self.pitchDeg = pitchDeg
         self.thresholdDeg = thresholdDeg
     }
 
-    public var body: some View {
+    var body: some View {
         Canvas { context, size in
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
             let outerRadius = min(size.width, size.height) * 0.48

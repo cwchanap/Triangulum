@@ -168,14 +168,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
             errorMessage = ""
-            startLocationUpdates()
+            if !skipAvailabilityCheck {
+                startLocationUpdates()
+            }
         case .denied, .restricted:
             errorMessage = "Location access denied"
         case .notDetermined:
             // Permission request handled automatically in checkAvailability
             errorMessage = ""
         @unknown default:
-            break
+            Logger.location.warning("LocationManager: Unhandled CLAuthorizationStatus rawValue \(status.rawValue)")
+            errorMessage = "Location permission status unknown. Please check Location settings."
         }
     }
 
