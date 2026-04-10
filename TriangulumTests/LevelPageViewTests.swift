@@ -73,4 +73,46 @@ import Foundation
         #expect(LevelMath.adjusted(raw: raw, calibration: 0.0) == 30.0)
     }
 
+    // MARK: - Bubble offset (bubble drifts to the HIGH side)
+
+    @Test func bubbleOffsetAtLevelIsZero() {
+        let offset = LevelMath.bubbleOffset(rollDeg: 0.0, pitchDeg: 0.0, scale: 1.0)
+        #expect(offset.x == 0.0)
+        #expect(offset.y == 0.0)
+    }
+
+    @Test func bubbleOffsetPositiveRollMovesBubbleLeft() {
+        // Positive roll = right side down → high side is LEFT → bubble goes left (negative x)
+        let offset = LevelMath.bubbleOffset(rollDeg: 10.0, pitchDeg: 0.0, scale: 1.0)
+        #expect(offset.x < 0)
+        #expect(offset.y == 0.0)
+    }
+
+    @Test func bubbleOffsetNegativeRollMovesBubbleRight() {
+        // Negative roll = left side down → high side is RIGHT → bubble goes right (positive x)
+        let offset = LevelMath.bubbleOffset(rollDeg: -10.0, pitchDeg: 0.0, scale: 1.0)
+        #expect(offset.x > 0)
+        #expect(offset.y == 0.0)
+    }
+
+    @Test func bubbleOffsetPositivePitchMovesBubbleDown() {
+        // Positive pitch = top tilts away → bottom is high → bubble goes down (positive y)
+        let offset = LevelMath.bubbleOffset(rollDeg: 0.0, pitchDeg: 10.0, scale: 1.0)
+        #expect(offset.x == 0.0)
+        #expect(offset.y > 0)
+    }
+
+    @Test func bubbleOffsetNegativePitchMovesBubbleUp() {
+        // Negative pitch = top tilts toward user → top is high → bubble goes up (negative y)
+        let offset = LevelMath.bubbleOffset(rollDeg: 0.0, pitchDeg: -10.0, scale: 1.0)
+        #expect(offset.x == 0.0)
+        #expect(offset.y < 0)
+    }
+
+    @Test func bubbleOffsetScalesWithScaleFactor() {
+        let offset1 = LevelMath.bubbleOffset(rollDeg: 10.0, pitchDeg: 0.0, scale: 1.0)
+        let offset2 = LevelMath.bubbleOffset(rollDeg: 10.0, pitchDeg: 0.0, scale: 2.0)
+        #expect(offset2.x == offset1.x * 2)
+    }
+
 }

@@ -124,6 +124,17 @@ enum LevelMath {
         let normalizedThreshold = clampedThreshold(threshold)
         return sqrt(roll * roll + pitch * pitch) <= normalizedThreshold
     }
+
+    /// Returns the (x, y) offset for the bubble inside a level indicator.
+    ///
+    /// Convention: positive roll = right side down, positive pitch = top tilts away.
+    /// A real bubble rises to the HIGH side, so both axes are negated.
+    /// `scale` converts degrees to points (e.g. `outerRadius / 90`).
+    static func bubbleOffset(rollDeg: Double, pitchDeg: Double, scale: Double) -> (x: Double, y: Double) {
+        let x = -rollDeg * scale
+        let y = pitchDeg * scale
+        return (x, y)
+    }
 }
 
 #Preview {

@@ -143,6 +143,22 @@ struct BarometerManagerTests {
         }
     }
 
+    @Test func testIsAttitudeAvailableReflectsHardwareCapabilityOnly() {
+        let locationManager = LocationManager()
+        let manager = BarometerManager(locationManager: locationManager)
+
+        // isAttitudeAvailable should match the hardware check from CMMotionManager
+        let hardwareAvailable = CMMotionManager().isDeviceMotionAvailable
+        #expect(manager.isAttitudeAvailable == hardwareAvailable)
+
+        // Starting and stopping updates should not change the hardware capability flag
+        manager.startBarometerUpdates()
+        #expect(manager.isAttitudeAvailable == hardwareAvailable)
+
+        manager.stopBarometerUpdates()
+        #expect(manager.isAttitudeAvailable == hardwareAvailable)
+    }
+
     @Test func testBarometerManagerPublishedProperties() {
         let locationManager = LocationManager()
         let manager = BarometerManager(locationManager: locationManager)

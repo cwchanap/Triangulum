@@ -139,7 +139,9 @@ class BarometerManager: ObservableObject {
 
             if let error = error {
                 self.errorMessage = "Motion sensor error: \(error.localizedDescription)"
-                self.isAttitudeAvailable = false
+                // Do NOT set isAttitudeAvailable = false here — transient errors should
+                // not permanently disable attitude updates. Hardware capability is determined
+                // solely by checkAvailability() so that startAttitudeUpdates() can be retried.
                 return
             }
 
