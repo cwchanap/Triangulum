@@ -17,32 +17,37 @@ struct LevelPageView: View {
                 Spacer()
 
                 if barometerManager.isAttitudeAvailable {
-                    BubbleLevelView(
-                        rollDeg: adjustedRoll,
-                        pitchDeg: adjustedPitch,
-                        thresholdDeg: thresholdDeg
-                    )
-                    .frame(width: 260, height: 260)
+                    if barometerManager.attitude != nil {
+                        BubbleLevelView(
+                            rollDeg: adjustedRoll,
+                            pitchDeg: adjustedPitch,
+                            thresholdDeg: thresholdDeg
+                        )
+                        .frame(width: 260, height: 260)
 
-                    HStack(spacing: 40) {
-                        VStack(spacing: 4) {
-                            Text("Roll")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(adjustedRoll, specifier: "%.1f")°")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
+                        HStack(spacing: 40) {
+                            VStack(spacing: 4) {
+                                Text("Roll")
+                                    .font(.caption)
+                                    .foregroundColor(.prussianBlueLight)
+                                Text("\(adjustedRoll, specifier: "%.1f")°")
+                                    .font(.title3)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(isLevel ? .green : .prussianBlueDark)
+                            }
+                            VStack(spacing: 4) {
+                                Text("Pitch")
+                                    .font(.caption)
+                                    .foregroundColor(.prussianBlueLight)
+                                Text("\(adjustedPitch, specifier: "%.1f")°")
+                                    .font(.title3)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(isLevel ? .green : .prussianBlueDark)
+                            }
                         }
-                        VStack(spacing: 4) {
-                            Text("Pitch")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(adjustedPitch, specifier: "%.1f")°")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
-                        }
+                    } else {
+                        ProgressView("Waiting for sensor data…")
+                            .foregroundColor(.prussianBlueLight)
                     }
                 } else {
                     Image(systemName: "exclamationmark.triangle")
@@ -69,7 +74,7 @@ struct LevelPageView: View {
                     Image(systemName: "scope")
                         .foregroundColor(.white)
                 }
-                .disabled(!barometerManager.isAttitudeAvailable)
+                .disabled(!barometerManager.isAttitudeAvailable || barometerManager.attitude == nil)
                 .accessibilityLabel("Calibrate level")
                 .accessibilityHint("Sets current tilt as the zero reference")
             }
@@ -100,9 +105,9 @@ struct LevelPageView: View {
     }
 
     private func calibrate() {
-        guard barometerManager.attitude != nil else { return }
-        calibrationRoll = rawRollDeg
-        calibrationPitch = rawPitchDeg
+        guard let attitude = barometerManager.attitude else { return }
+        calibrationRoll = attitude.roll * 180.0 / .pi
+        calibrationPitch = attitude.pitch * 180.0 / .pi
     }
 }
 

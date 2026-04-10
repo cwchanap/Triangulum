@@ -139,6 +139,7 @@ class BarometerManager: ObservableObject {
 
             if let error = error {
                 self.errorMessage = "Motion sensor error: \(error.localizedDescription)"
+                self.isAttitudeAvailable = false
                 return
             }
 

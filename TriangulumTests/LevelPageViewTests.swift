@@ -26,8 +26,16 @@ import Foundation
         #expect(!LevelMath.isLevel(roll: 1.5, pitch: 2.5, threshold: 2.0))
     }
 
-    @Test func isLevelWithNegativeAnglesWithinThreshold() {
+    @Test func notLevelWhenNegativeAnglesExceedThreshold() {
+        // sqrt(1.9^2 + 1.9^2) ≈ 2.687, outside the 2.0 threshold
         #expect(!LevelMath.isLevel(roll: -1.9, pitch: -1.9, threshold: 2.0))
+    }
+
+    @Test func isLevelWhenRadialDistanceEqualsThresholdOnDiagonal() {
+        // sqrt(v^2 + v^2) == 2.0 exactly when v == sqrt(2)
+        let v = sqrt(2.0)
+        #expect(LevelMath.isLevel(roll: v, pitch: v, threshold: 2.0))
+        #expect(!LevelMath.isLevel(roll: v + 0.001, pitch: v + 0.001, threshold: 2.0))
     }
 
     @Test func isLevelWhenRadialMagnitudeIsWithinThreshold() {
@@ -65,20 +73,4 @@ import Foundation
         #expect(LevelMath.adjusted(raw: raw, calibration: 0.0) == 30.0)
     }
 
-    // MARK: - Radians to degrees conversion
-
-    @Test func radiansToDegreesPiOverTwo() {
-        let degrees = Double.pi / 2.0 * 180.0 / .pi
-        #expect(abs(degrees - 90.0) < 0.0001)
-    }
-
-    @Test func radiansToDegreesPiOverFour() {
-        let degrees = Double.pi / 4.0 * 180.0 / .pi
-        #expect(abs(degrees - 45.0) < 0.0001)
-    }
-
-    @Test func radiansToDegreesZero() {
-        let degrees = 0.0 * 180.0 / .pi
-        #expect(degrees == 0.0)
-    }
 }
