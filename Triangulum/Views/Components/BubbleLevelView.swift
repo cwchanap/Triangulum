@@ -64,8 +64,10 @@ struct BubbleLevelView: View {
             )
 
             // Bubble position — clamped to stay inside outer ring
-            let rawX = CGFloat(rollDeg) * scale
-            let rawY = CGFloat(-pitchDeg) * scale  // negate: positive pitch (top away) -> bubble moves up
+            // Bubble drifts toward the HIGH side (opposite the low/tilted side)
+            let offset = LevelMath.bubbleOffset(rollDeg: rollDeg, pitchDeg: pitchDeg, scale: Double(scale))
+            let rawX = CGFloat(offset.x)
+            let rawY = CGFloat(offset.y)
             let dist = sqrt(rawX * rawX + rawY * rawY)
             let safeClamp = max(0, outerRadius - bubbleRadius)
             let clampedDist = min(dist, safeClamp)
