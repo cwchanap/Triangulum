@@ -8,6 +8,7 @@ class BarometerManager: ObservableObject {
     private let altimeter = CMAltimeter()
     private let motionManager: CMMotionManager
     private let locationManager: LocationManager
+    private let barometerAvailability: () -> Bool
 
     @Published var pressure: Double = 0.0
     @Published var attitude: CMAttitude?
@@ -25,9 +26,14 @@ class BarometerManager: ObservableObject {
     @MainActor
     private(set) var historyManager: PressureHistoryManager?
 
-    init(locationManager: LocationManager, motionManager: CMMotionManager = MotionService.shared) {
+    init(
+        locationManager: LocationManager,
+        motionManager: CMMotionManager = MotionService.shared,
+        barometerAvailability: @escaping () -> Bool = CMAltimeter.isRelativeAltitudeAvailable
+    ) {
         self.locationManager = locationManager
         self.motionManager = motionManager
+        self.barometerAvailability = barometerAvailability
         checkAvailability()
     }
 
@@ -47,13 +53,17 @@ class BarometerManager: ObservableObject {
     }
 
     private func checkAvailability() {
-        isAvailable = CMAltimeter.isRelativeAltitudeAvailable()
+        isAvailable = barometerAvailability()
         isAttitudeAvailable = motionManager.isDeviceMotionAvailable
     }
 
     func startBarometerUpdates() {
+        startAttitudeUpdates()
+
         guard isAvailable else {
-            errorMessage = "Barometer not available on this device"
+            if !isAttitudeAvailable {
+                errorMessage = "Barometer not available on this device"
+            }
             return
         }
 
@@ -73,8 +83,6 @@ class BarometerManager: ObservableObject {
             let currentPressure = data.pressure.doubleValue
             self.handlePressureUpdate(currentPressure: currentPressure)
         }
-
-        startAttitudeUpdates()
     }
 
     func handlePressureUpdate(currentPressure: Double) {

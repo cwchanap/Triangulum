@@ -11,6 +11,30 @@ import CoreMotion
 import SwiftData
 @testable import Triangulum
 
+private final class MockMotionManager: CMMotionManager, @unchecked Sendable {
+    var mockIsDeviceMotionAvailable = false
+    var startDeviceMotionUpdatesCallCount = 0
+    var stopDeviceMotionUpdatesCallCount = 0
+    var recordedUpdateInterval: TimeInterval?
+
+    override var isDeviceMotionAvailable: Bool {
+        mockIsDeviceMotionAvailable
+    }
+
+    override var deviceMotionUpdateInterval: TimeInterval {
+        get { recordedUpdateInterval ?? super.deviceMotionUpdateInterval }
+        set { recordedUpdateInterval = newValue }
+    }
+
+    override func startDeviceMotionUpdates(to queue: OperationQueue, withHandler handler: CMDeviceMotionHandler? = nil) {
+        startDeviceMotionUpdatesCallCount += 1
+    }
+
+    override func stopDeviceMotionUpdates() {
+        stopDeviceMotionUpdatesCallCount += 1
+    }
+}
+
 @Suite(.serialized)
 struct BarometerManagerTests {
 
@@ -101,6 +125,41 @@ struct BarometerManagerTests {
             manager.startBarometerUpdates()
             #expect(manager.errorMessage == "Barometer not available on this device")
         }
+    }
+
+    @Test func testStartsAttitudeUpdatesWhenBarometerUnavailableButMotionAvailable() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        manager.startBarometerUpdates()
+
+        #expect(manager.isAvailable == false)
+        #expect(manager.isAttitudeAvailable)
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+        #expect(motionManager.recordedUpdateInterval == 0.1)
+        #expect(manager.errorMessage.isEmpty)
+    }
+
+    @Test func testBarometerUnavailableErrorStillShownWhenMotionAlsoUnavailable() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = false
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        manager.startBarometerUpdates()
+
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
+        #expect(manager.errorMessage == "Barometer not available on this device")
     }
 
     @Test func testStopBarometerUpdates() {

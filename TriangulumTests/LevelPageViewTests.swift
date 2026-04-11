@@ -130,9 +130,42 @@ import UIKit
         #expect(result.screenPitch == -3.0)
     }
 
-    @Test func remapFaceUpIsIdentity() {
+    @Test func remapFaceUpDefaultsToPortraitWithoutFallback() {
         let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .faceUp)
         #expect(result.screenRoll == 5.0)
+        #expect(result.screenPitch == -3.0)
+    }
+
+    @Test func remapFaceUpUsesLandscapeFallback() {
+        let result = LevelMath.remapForOrientation(
+            roll: 5.0,
+            pitch: -3.0,
+            orientation: .faceUp,
+            fallbackInterfaceOrientation: .landscapeRight
+        )
+        #expect(result.screenRoll == -3.0)
+        #expect(result.screenPitch == 5.0)
+    }
+
+    @Test func remapFaceDownUsesLandscapeFallback() {
+        let result = LevelMath.remapForOrientation(
+            roll: 5.0,
+            pitch: -3.0,
+            orientation: .faceDown,
+            fallbackInterfaceOrientation: .landscapeLeft
+        )
+        #expect(result.screenRoll == 3.0)
+        #expect(result.screenPitch == -5.0)
+    }
+
+    @Test func remapUnknownUsesPortraitUpsideDownFallback() {
+        let result = LevelMath.remapForOrientation(
+            roll: 5.0,
+            pitch: -3.0,
+            orientation: .unknown,
+            fallbackInterfaceOrientation: .portraitUpsideDown
+        )
+        #expect(result.screenRoll == -5.0)
         #expect(result.screenPitch == -3.0)
     }
 

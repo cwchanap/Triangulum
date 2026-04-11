@@ -100,19 +100,29 @@ struct LevelPageView: View {
     private var adjustedRoll: Double { LevelMath.adjusted(raw: rawRollDeg, calibration: calibrationRoll) }
     private var adjustedPitch: Double { LevelMath.adjusted(raw: rawPitchDeg, calibration: calibrationPitch) }
 
+    private var fallbackInterfaceOrientation: UIInterfaceOrientation? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }?
+            .interfaceOrientation
+    }
+
+    private var screenAttitude: (screenRoll: Double, screenPitch: Double) {
+        LevelMath.remapForOrientation(
+            roll: adjustedRoll,
+            pitch: adjustedPitch,
+            orientation: UIDevice.current.orientation,
+            fallbackInterfaceOrientation: fallbackInterfaceOrientation
+        )
+    }
+
     /// Screen-space roll/pitch after orientation remap.
     private var screenRoll: Double {
-        LevelMath.remapForOrientation(
-            roll: adjustedRoll, pitch: adjustedPitch,
-            orientation: UIDevice.current.orientation
-        ).screenRoll
+        screenAttitude.screenRoll
     }
 
     private var screenPitch: Double {
-        LevelMath.remapForOrientation(
-            roll: adjustedRoll, pitch: adjustedPitch,
-            orientation: UIDevice.current.orientation
-        ).screenPitch
+        screenAttitude.screenPitch
     }
 
     private var isLevel: Bool {
@@ -165,9 +175,13 @@ enum LevelMath {
     static func remapForOrientation(
         roll: Double,
         pitch: Double,
-        orientation: UIDeviceOrientation
+        orientation: UIDeviceOrientation,
+        fallbackInterfaceOrientation: UIInterfaceOrientation? = nil
     ) -> (screenRoll: Double, screenPitch: Double) {
-        switch orientation {
+        switch resolvedOrientation(
+            orientation,
+            fallbackInterfaceOrientation: fallbackInterfaceOrientation
+        ) {
         case .portrait, .unknown, .faceUp, .faceDown:
             return (roll, pitch)
         case .portraitUpsideDown:
@@ -178,6 +192,29 @@ enum LevelMath {
             return (-pitch, -roll)
         @unknown default:
             return (roll, pitch)
+        }
+    }
+
+    static func resolvedOrientation(
+        _ orientation: UIDeviceOrientation,
+        fallbackInterfaceOrientation: UIInterfaceOrientation?
+    ) -> UIDeviceOrientation {
+        switch orientation {
+        case .faceUp, .faceDown, .unknown:
+            switch fallbackInterfaceOrientation {
+            case .portrait:
+                return .portrait
+            case .portraitUpsideDown:
+                return .portraitUpsideDown
+            case .landscapeLeft:
+                return .landscapeRight
+            case .landscapeRight:
+                return .landscapeLeft
+            default:
+                return .portrait
+            }
+        default:
+            return orientation
         }
     }
 }
