@@ -38,7 +38,6 @@ jobs:
             set -e
             if [ $RESULT -eq 0 ] && [ "$FORMATTER_RESULT" -ne 0 ] 2>/dev/null; then
               echo "::warning::xcpretty exited with code $FORMATTER_RESULT"
-              RESULT=$FORMATTER_RESULT
             fi
           else
             echo "xcpretty not found; using raw xcodebuild output"
