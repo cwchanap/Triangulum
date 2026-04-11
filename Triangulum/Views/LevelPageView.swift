@@ -19,8 +19,8 @@ struct LevelPageView: View {
                 if barometerManager.isAttitudeAvailable {
                     if barometerManager.attitude != nil {
                         BubbleLevelView(
-                            rollDeg: adjustedRoll,
-                            pitchDeg: adjustedPitch,
+                            rollDeg: screenRoll,
+                            pitchDeg: screenPitch,
                             thresholdDeg: thresholdDeg
                         )
                         .frame(width: 260, height: 260)
@@ -30,7 +30,7 @@ struct LevelPageView: View {
                                 Text("Roll")
                                     .font(.caption)
                                     .foregroundColor(.prussianBlueLight)
-                                Text("\(adjustedRoll, specifier: "%.1f")°")
+                                Text("\(screenRoll, specifier: "%.1f")°")
                                     .font(.title3)
                                     .fontWeight(.medium)
                                     .foregroundColor(isLevel ? .green : .prussianBlueDark)
@@ -39,7 +39,7 @@ struct LevelPageView: View {
                                 Text("Pitch")
                                     .font(.caption)
                                     .foregroundColor(.prussianBlueLight)
-                                Text("\(adjustedPitch, specifier: "%.1f")°")
+                                Text("\(screenPitch, specifier: "%.1f")°")
                                     .font(.title3)
                                     .fontWeight(.medium)
                                     .foregroundColor(isLevel ? .green : .prussianBlueDark)
@@ -100,7 +100,23 @@ struct LevelPageView: View {
     private var adjustedRoll: Double { LevelMath.adjusted(raw: rawRollDeg, calibration: calibrationRoll) }
     private var adjustedPitch: Double { LevelMath.adjusted(raw: rawPitchDeg, calibration: calibrationPitch) }
 
+    /// Screen-space roll/pitch after orientation remap.
+    private var screenRoll: Double {
+        LevelMath.remapForOrientation(
+            roll: adjustedRoll, pitch: adjustedPitch,
+            orientation: UIDevice.current.orientation
+        ).screenRoll
+    }
+
+    private var screenPitch: Double {
+        LevelMath.remapForOrientation(
+            roll: adjustedRoll, pitch: adjustedPitch,
+            orientation: UIDevice.current.orientation
+        ).screenPitch
+    }
+
     private var isLevel: Bool {
+        // Radial distance is orientation-invariant (remap only swaps/negates axes).
         LevelMath.isLevel(roll: adjustedRoll, pitch: adjustedPitch, threshold: thresholdDeg)
     }
 
@@ -134,6 +150,35 @@ enum LevelMath {
         let x = -rollDeg * scale
         let y = pitchDeg * scale
         return (x, y)
+    }
+
+    /// Remaps device-frame roll/pitch to screen-frame values based on the
+    /// current device orientation so that the bubble always drifts in the
+    /// correct on-screen direction.
+    ///
+    /// Core Motion reports roll and pitch in the device's physical reference
+    /// frame (portrait axes). When the device is rotated to landscape or
+    /// upside-down, those axes no longer align with the screen's horizontal
+    /// and vertical axes. This function performs the axis swap/negation so
+    /// downstream math (bubble offset, numeric readouts) matches what the
+    /// user sees on screen.
+    static func remapForOrientation(
+        roll: Double,
+        pitch: Double,
+        orientation: UIDeviceOrientation
+    ) -> (screenRoll: Double, screenPitch: Double) {
+        switch orientation {
+        case .portrait, .unknown, .faceUp, .faceDown:
+            return (roll, pitch)
+        case .portraitUpsideDown:
+            return (-roll, pitch)
+        case .landscapeLeft:
+            return (pitch, roll)
+        case .landscapeRight:
+            return (-pitch, -roll)
+        @unknown default:
+            return (roll, pitch)
+        }
     }
 }
 
