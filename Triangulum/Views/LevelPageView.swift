@@ -100,7 +100,7 @@ struct LevelPageView: View {
     private var adjustedRoll: Double { LevelMath.adjusted(raw: rawRollDeg, calibration: calibrationRoll) }
     private var adjustedPitch: Double { LevelMath.adjusted(raw: rawPitchDeg, calibration: calibrationPitch) }
 
-    private var fallbackInterfaceOrientation: UIInterfaceOrientation? {
+    private var interfaceOrientation: UIInterfaceOrientation? {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }?
@@ -112,7 +112,7 @@ struct LevelPageView: View {
             roll: adjustedRoll,
             pitch: adjustedPitch,
             orientation: UIDevice.current.orientation,
-            fallbackInterfaceOrientation: fallbackInterfaceOrientation
+            interfaceOrientation: interfaceOrientation
         )
     }
 
@@ -176,16 +176,16 @@ enum LevelMath {
         roll: Double,
         pitch: Double,
         orientation: UIDeviceOrientation,
-        fallbackInterfaceOrientation: UIInterfaceOrientation? = nil
+        interfaceOrientation: UIInterfaceOrientation? = nil
     ) -> (screenRoll: Double, screenPitch: Double) {
         switch resolvedOrientation(
             orientation,
-            fallbackInterfaceOrientation: fallbackInterfaceOrientation
+            interfaceOrientation: interfaceOrientation
         ) {
         case .portrait, .unknown, .faceUp, .faceDown:
             return (roll, pitch)
         case .portraitUpsideDown:
-            return (-roll, pitch)
+            return (-roll, -pitch)
         case .landscapeLeft:
             return (pitch, roll)
         case .landscapeRight:
@@ -197,24 +197,24 @@ enum LevelMath {
 
     static func resolvedOrientation(
         _ orientation: UIDeviceOrientation,
-        fallbackInterfaceOrientation: UIInterfaceOrientation?
+        interfaceOrientation: UIInterfaceOrientation?
     ) -> UIDeviceOrientation {
-        switch orientation {
-        case .faceUp, .faceDown, .unknown:
-            switch fallbackInterfaceOrientation {
-            case .portrait:
-                return .portrait
-            case .portraitUpsideDown:
-                return .portraitUpsideDown
-            case .landscapeLeft:
-                return .landscapeRight
-            case .landscapeRight:
-                return .landscapeLeft
-            default:
-                return .portrait
-            }
+        switch interfaceOrientation {
+        case .portrait:
+            return .portrait
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        case .landscapeLeft:
+            return .landscapeRight
+        case .landscapeRight:
+            return .landscapeLeft
         default:
-            return orientation
+            switch orientation {
+            case .faceUp, .faceDown, .unknown:
+                return .portrait
+            default:
+                return orientation
+            }
         }
     }
 }

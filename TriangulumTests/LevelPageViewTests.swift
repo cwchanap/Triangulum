@@ -136,12 +136,23 @@ import UIKit
         #expect(result.screenPitch == -3.0)
     }
 
+    @Test func remapUsesInterfaceOrientationOverDeviceOrientation() {
+        let result = LevelMath.remapForOrientation(
+            roll: 5.0,
+            pitch: -3.0,
+            orientation: .landscapeLeft,
+            interfaceOrientation: .portrait
+        )
+        #expect(result.screenRoll == 5.0)
+        #expect(result.screenPitch == -3.0)
+    }
+
     @Test func remapFaceUpUsesLandscapeFallback() {
         let result = LevelMath.remapForOrientation(
             roll: 5.0,
             pitch: -3.0,
             orientation: .faceUp,
-            fallbackInterfaceOrientation: .landscapeRight
+            interfaceOrientation: .landscapeRight
         )
         #expect(result.screenRoll == -3.0)
         #expect(result.screenPitch == 5.0)
@@ -152,7 +163,7 @@ import UIKit
             roll: 5.0,
             pitch: -3.0,
             orientation: .faceDown,
-            fallbackInterfaceOrientation: .landscapeLeft
+            interfaceOrientation: .landscapeLeft
         )
         #expect(result.screenRoll == 3.0)
         #expect(result.screenPitch == -5.0)
@@ -163,10 +174,10 @@ import UIKit
             roll: 5.0,
             pitch: -3.0,
             orientation: .unknown,
-            fallbackInterfaceOrientation: .portraitUpsideDown
+            interfaceOrientation: .portraitUpsideDown
         )
         #expect(result.screenRoll == -5.0)
-        #expect(result.screenPitch == -3.0)
+        #expect(result.screenPitch == 3.0)
     }
 
     @Test func remapLandscapeLeftSwapsAxes() {
@@ -183,11 +194,10 @@ import UIKit
         #expect(result.screenPitch == -5.0)
     }
 
-    @Test func remapPortraitUpsideDownNegatesRoll() {
-        // PortraitUpsideDown: (screenRoll, screenPitch) = (-deviceRoll, devicePitch)
+    @Test func remapPortraitUpsideDownNegatesBothAxes() {
         let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .portraitUpsideDown)
         #expect(result.screenRoll == -5.0)
-        #expect(result.screenPitch == -3.0)
+        #expect(result.screenPitch == 3.0)
     }
 
     // Verify that the remap produces correct bubble behaviour in landscape-left:
