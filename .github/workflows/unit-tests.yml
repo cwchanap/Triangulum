@@ -34,7 +34,12 @@ jobs:
             set +e
             xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
             RESULT=${PIPESTATUS[0]}
+            FORMATTER_RESULT=${PIPESTATUS[1]}
             set -e
+            if [ $RESULT -eq 0 ] && [ "$FORMATTER_RESULT" -ne 0 ] 2>/dev/null; then
+              echo "::warning::xcpretty exited with code $FORMATTER_RESULT"
+              RESULT=$FORMATTER_RESULT
+            fi
           else
             echo "xcpretty not found; using raw xcodebuild output"
             xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE"

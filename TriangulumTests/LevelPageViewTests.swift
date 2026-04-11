@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import UIKit
 @testable import Triangulum
 
 @Suite struct LevelPageViewTests {
@@ -113,6 +114,75 @@ import Foundation
         let offset1 = LevelMath.bubbleOffset(rollDeg: 10.0, pitchDeg: 0.0, scale: 1.0)
         let offset2 = LevelMath.bubbleOffset(rollDeg: 10.0, pitchDeg: 0.0, scale: 2.0)
         #expect(offset2.x == offset1.x * 2)
+    }
+
+    // MARK: - Orientation remap
+
+    @Test func remapPortraitIsIdentity() {
+        let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .portrait)
+        #expect(result.screenRoll == 5.0)
+        #expect(result.screenPitch == -3.0)
+    }
+
+    @Test func remapUnknownIsIdentity() {
+        let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .unknown)
+        #expect(result.screenRoll == 5.0)
+        #expect(result.screenPitch == -3.0)
+    }
+
+    @Test func remapFaceUpIsIdentity() {
+        let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .faceUp)
+        #expect(result.screenRoll == 5.0)
+        #expect(result.screenPitch == -3.0)
+    }
+
+    @Test func remapLandscapeLeftSwapsAxes() {
+        // LandscapeLeft: (screenRoll, screenPitch) = (devicePitch, deviceRoll)
+        let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .landscapeLeft)
+        #expect(result.screenRoll == -3.0)
+        #expect(result.screenPitch == 5.0)
+    }
+
+    @Test func remapLandscapeRightSwapsAndNegatesAxes() {
+        // LandscapeRight: (screenRoll, screenPitch) = (-devicePitch, -deviceRoll)
+        let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .landscapeRight)
+        #expect(result.screenRoll == 3.0)
+        #expect(result.screenPitch == -5.0)
+    }
+
+    @Test func remapPortraitUpsideDownNegatesRoll() {
+        // PortraitUpsideDown: (screenRoll, screenPitch) = (-deviceRoll, devicePitch)
+        let result = LevelMath.remapForOrientation(roll: 5.0, pitch: -3.0, orientation: .portraitUpsideDown)
+        #expect(result.screenRoll == -5.0)
+        #expect(result.screenPitch == -3.0)
+    }
+
+    // Verify that the remap produces correct bubble behaviour in landscape-left:
+    // Device roll positive (right side down) → physical right is screen-top →
+    // bubble should move screen-down → screenPitch positive → y positive.
+    @Test func landscapeLeftDeviceRollPositiveBubbleMovesScreenDown() {
+        let remapped = LevelMath.remapForOrientation(
+            roll: 10.0, pitch: 0.0, orientation: .landscapeLeft
+        )
+        let offset = LevelMath.bubbleOffset(
+            rollDeg: remapped.screenRoll, pitchDeg: remapped.screenPitch, scale: 1.0
+        )
+        #expect(offset.x == 0.0)   // no horizontal drift
+        #expect(offset.y > 0)      // bubble moves toward screen bottom
+    }
+
+    // Device pitch positive (top tilts away) → physical top is screen-left →
+    // screen-left tilts away → screen-right goes down → screen-left is high →
+    // bubble moves screen-LEFT.
+    @Test func landscapeLeftDevicePitchPositiveBubbleMovesScreenLeft() {
+        let remapped = LevelMath.remapForOrientation(
+            roll: 0.0, pitch: 10.0, orientation: .landscapeLeft
+        )
+        let offset = LevelMath.bubbleOffset(
+            rollDeg: remapped.screenRoll, pitchDeg: remapped.screenPitch, scale: 1.0
+        )
+        #expect(offset.x < 0)      // bubble moves toward screen left (high side)
+        #expect(offset.y == 0.0)   // no vertical drift
     }
 
 }
