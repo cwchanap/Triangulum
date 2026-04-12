@@ -49,6 +49,46 @@ import UIKit
         #expect(!LevelMath.isLevel(roll: 0.1, pitch: 0.0, threshold: -2.0))
     }
 
+    @Test func displayStateIsUnavailableWhenAttitudeIsUnavailable() {
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: false,
+            hasAttitude: false,
+            errorMessage: "Motion sensor error: unavailable"
+        )
+
+        #expect(state == .unavailable)
+    }
+
+    @Test func displayStatePrefersLevelWhenAttitudeExists() {
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: true,
+            hasAttitude: true,
+            errorMessage: "Motion sensor error: transient"
+        )
+
+        #expect(state == .level)
+    }
+
+    @Test func displayStateShowsMotionSensorErrorsBeforeLoading() {
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: true,
+            hasAttitude: false,
+            errorMessage: " Motion sensor error: failed to start "
+        )
+
+        #expect(state == .error("Motion sensor error: failed to start"))
+    }
+
+    @Test func displayStateIgnoresNonMotionErrorsWhileWaitingForAttitude() {
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: true,
+            hasAttitude: false,
+            errorMessage: "Barometer not available on this device"
+        )
+
+        #expect(state == .loading)
+    }
+
     // MARK: - Calibration offset arithmetic
 
     @Test func calibrationZeroesAdjustedAngle() {

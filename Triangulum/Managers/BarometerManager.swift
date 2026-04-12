@@ -10,6 +10,11 @@ class BarometerManager: ObservableObject {
     private let locationManager: LocationManager
     private let barometerAvailability: () -> Bool
 
+    private enum AttitudeUpdateRequester: Hashable {
+        case barometer
+        case explicit
+    }
+
     @Published var pressure: Double = 0.0
     @Published var attitude: CMAttitude?
     @Published var seaLevelPressure: Double?
@@ -21,7 +26,7 @@ class BarometerManager: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var didStartBarometerUpdates = false
     private var didStartDeviceMotion = false
-    private var attitudeUpdateRequestCount = 0
+    private var attitudeUpdateRequesters = Set<AttitudeUpdateRequester>()
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -62,7 +67,7 @@ class BarometerManager: ObservableObject {
     func startBarometerUpdates() {
         guard !didStartBarometerUpdates else { return }
         didStartBarometerUpdates = true
-        startAttitudeUpdates()
+        startAttitudeUpdates(for: .barometer)
 
         guard isAvailable else {
             if !isAttitudeAvailable {
@@ -137,12 +142,17 @@ class BarometerManager: ObservableObject {
         guard didStartBarometerUpdates else { return }
         altimeter.stopRelativeAltitudeUpdates()
         didStartBarometerUpdates = false
-        stopAttitudeUpdates()
+        stopAttitudeUpdates(for: .barometer)
     }
 
     public func startAttitudeUpdates() {
+        startAttitudeUpdates(for: .explicit)
+    }
+
+    private func startAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard isAttitudeAvailable else { return }
-        attitudeUpdateRequestCount += 1
+        let inserted = attitudeUpdateRequesters.insert(requester).inserted
+        guard inserted else { return }
         guard !didStartDeviceMotion else { return } // Already running
 
         motionManager.deviceMotionUpdateInterval = 0.1
@@ -167,9 +177,12 @@ class BarometerManager: ObservableObject {
     }
 
     public func stopAttitudeUpdates() {
-        guard attitudeUpdateRequestCount > 0 else { return }
-        attitudeUpdateRequestCount -= 1
-        guard attitudeUpdateRequestCount == 0 else { return }
+        stopAttitudeUpdates(for: .explicit)
+    }
+
+    private func stopAttitudeUpdates(for requester: AttitudeUpdateRequester) {
+        guard attitudeUpdateRequesters.remove(requester) != nil else { return }
+        guard attitudeUpdateRequesters.isEmpty else { return }
         guard didStartDeviceMotion else { return }
         motionManager.stopDeviceMotionUpdates()
         didStartDeviceMotion = false
