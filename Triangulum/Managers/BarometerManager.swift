@@ -58,8 +58,6 @@ class BarometerManager: ObservableObject {
     }
 
     func startBarometerUpdates() {
-        startAttitudeUpdates()
-
         guard isAvailable else {
             if !isAttitudeAvailable {
                 errorMessage = "Barometer not available on this device"
@@ -131,14 +129,11 @@ class BarometerManager: ObservableObject {
 
     func stopBarometerUpdates() {
         altimeter.stopRelativeAltitudeUpdates()
-        if didStartDeviceMotion {
-            motionManager.stopDeviceMotionUpdates()
-            didStartDeviceMotion = false
-        }
     }
 
-    private func startAttitudeUpdates() {
+    public func startAttitudeUpdates() {
         guard isAttitudeAvailable else { return }
+        guard !didStartDeviceMotion else { return } // Already running
 
         motionManager.deviceMotionUpdateInterval = 0.1
         didStartDeviceMotion = true
@@ -159,6 +154,13 @@ class BarometerManager: ObservableObject {
             }
             self.attitude = motion.attitude
         }
+    }
+
+    public func stopAttitudeUpdates() {
+        guard didStartDeviceMotion else { return }
+        motionManager.stopDeviceMotionUpdates()
+        didStartDeviceMotion = false
+        attitude = nil
     }
 
     public func calculateSeaLevelPressure(currentPressure: Double, altitude: Double) -> Double {

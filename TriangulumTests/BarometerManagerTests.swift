@@ -127,7 +127,7 @@ struct BarometerManagerTests {
         }
     }
 
-    @Test func testStartsAttitudeUpdatesWhenBarometerUnavailableButMotionAvailable() {
+    @Test func testStartBarometerUpdatesDoesNotStartAttitudeUpdates() {
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -141,9 +141,71 @@ struct BarometerManagerTests {
 
         #expect(manager.isAvailable == false)
         #expect(manager.isAttitudeAvailable)
+        // startBarometerUpdates should NOT start device motion —
+        // attitude updates are now lazy, started only when LevelPageView appears
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
+    }
+
+    @Test func testStartAttitudeUpdatesExplicitly() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        manager.startAttitudeUpdates()
+
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
         #expect(motionManager.recordedUpdateInterval == 0.1)
-        #expect(manager.errorMessage.isEmpty)
+    }
+
+    @Test func testStartAttitudeUpdatesIdempotent() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager
+        )
+
+        manager.startAttitudeUpdates()
+        manager.startAttitudeUpdates() // second call should be a no-op
+
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+    }
+
+    @Test func testStopAttitudeUpdates() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager
+        )
+
+        manager.startAttitudeUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        manager.stopAttitudeUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+        #expect(manager.attitude == nil)
+    }
+
+    @Test func testStopAttitudeUpdatesWithoutStartIsNoOp() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager
+        )
+
+        manager.stopAttitudeUpdates() // should not crash or call stop without start
+
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 0)
     }
 
     @Test func testBarometerUnavailableErrorStillShownWhenMotionAlsoUnavailable() {
@@ -160,6 +222,10 @@ struct BarometerManagerTests {
 
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
         #expect(manager.errorMessage == "Barometer not available on this device")
+
+        // Explicitly trying to start attitude when unavailable should also be a no-op
+        manager.startAttitudeUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
     }
 
     @Test func testStopBarometerUpdates() {
@@ -210,11 +276,11 @@ struct BarometerManagerTests {
         let hardwareAvailable = CMMotionManager().isDeviceMotionAvailable
         #expect(manager.isAttitudeAvailable == hardwareAvailable)
 
-        // Starting and stopping updates should not change the hardware capability flag
-        manager.startBarometerUpdates()
+        // Starting and stopping attitude updates should not change the hardware capability flag
+        manager.startAttitudeUpdates()
         #expect(manager.isAttitudeAvailable == hardwareAvailable)
 
-        manager.stopBarometerUpdates()
+        manager.stopAttitudeUpdates()
         #expect(manager.isAttitudeAvailable == hardwareAvailable)
     }
 

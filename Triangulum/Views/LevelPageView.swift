@@ -79,7 +79,13 @@ struct LevelPageView: View {
                 .accessibilityHint("Sets current tilt as the zero reference")
             }
         }
-        .onAppear { hapticGenerator.prepare() }
+        .onAppear {
+            hapticGenerator.prepare()
+            barometerManager.startAttitudeUpdates()
+        }
+        .onDisappear {
+            barometerManager.stopAttitudeUpdates()
+        }
         .onChange(of: isLevel) { _, nowLevel in
             if nowLevel { hapticGenerator.impactOccurred() }
         }
