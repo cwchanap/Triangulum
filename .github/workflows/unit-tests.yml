@@ -33,8 +33,9 @@ jobs:
           if command -v xcpretty >/dev/null 2>&1; then
             set +e
             xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -enableCodeCoverage YES -only-testing:TriangulumTests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
-            RESULT=${PIPESTATUS[0]}
-            FORMATTER_RESULT=${PIPESTATUS[1]}
+            PIPE_RESULTS=("${PIPESTATUS[@]}")
+            RESULT=${PIPE_RESULTS[0]}
+            FORMATTER_RESULT=${PIPE_RESULTS[1]}
             set -e
             if [ $RESULT -eq 0 ] && [ "$FORMATTER_RESULT" -ne 0 ] 2>/dev/null; then
               echo "::warning::xcpretty exited with code $FORMATTER_RESULT"

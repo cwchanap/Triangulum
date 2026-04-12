@@ -19,7 +19,9 @@ class BarometerManager: ObservableObject {
     @Published var historyRecordingError: Error?
 
     private var cancellables = Set<AnyCancellable>()
+    private var didStartBarometerUpdates = false
     private var didStartDeviceMotion = false
+    private var attitudeUpdateRequestCount = 0
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -58,6 +60,10 @@ class BarometerManager: ObservableObject {
     }
 
     func startBarometerUpdates() {
+        guard !didStartBarometerUpdates else { return }
+        didStartBarometerUpdates = true
+        startAttitudeUpdates()
+
         guard isAvailable else {
             if !isAttitudeAvailable {
                 errorMessage = "Barometer not available on this device"
@@ -128,11 +134,15 @@ class BarometerManager: ObservableObject {
     }
 
     func stopBarometerUpdates() {
+        guard didStartBarometerUpdates else { return }
         altimeter.stopRelativeAltitudeUpdates()
+        didStartBarometerUpdates = false
+        stopAttitudeUpdates()
     }
 
     public func startAttitudeUpdates() {
         guard isAttitudeAvailable else { return }
+        attitudeUpdateRequestCount += 1
         guard !didStartDeviceMotion else { return } // Already running
 
         motionManager.deviceMotionUpdateInterval = 0.1
@@ -157,6 +167,9 @@ class BarometerManager: ObservableObject {
     }
 
     public func stopAttitudeUpdates() {
+        guard attitudeUpdateRequestCount > 0 else { return }
+        attitudeUpdateRequestCount -= 1
+        guard attitudeUpdateRequestCount == 0 else { return }
         guard didStartDeviceMotion else { return }
         motionManager.stopDeviceMotionUpdates()
         didStartDeviceMotion = false
