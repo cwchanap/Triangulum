@@ -127,7 +127,7 @@ struct BarometerManagerTests {
         }
     }
 
-    @Test func testStartBarometerUpdatesDoesNotStartAttitudeUpdates() {
+    @Test func testStartBarometerUpdatesStartsAttitudeUpdates() {
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -141,9 +141,7 @@ struct BarometerManagerTests {
 
         #expect(manager.isAvailable == false)
         #expect(manager.isAttitudeAvailable)
-        // startBarometerUpdates should NOT start device motion —
-        // attitude updates are now lazy, started only when LevelPageView appears
-        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testStartAttitudeUpdatesExplicitly() {
@@ -160,6 +158,28 @@ struct BarometerManagerTests {
 
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
         #expect(motionManager.recordedUpdateInterval == 0.1)
+    }
+
+    @Test func testExplicitAttitudeStopDoesNotStopSharedBarometerMotionUpdates() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        manager.startBarometerUpdates()
+        manager.startAttitudeUpdates()
+        manager.stopAttitudeUpdates()
+
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 0)
+
+        manager.stopBarometerUpdates()
+
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testStartAttitudeUpdatesIdempotent() {
