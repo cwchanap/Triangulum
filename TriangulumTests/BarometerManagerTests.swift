@@ -195,6 +195,10 @@ struct BarometerManagerTests {
         manager.startAttitudeUpdates() // second call should be a no-op
 
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        manager.stopAttitudeUpdates()
+
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testStopAttitudeUpdates() {

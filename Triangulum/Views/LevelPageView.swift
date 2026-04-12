@@ -9,6 +9,7 @@ struct LevelPageView: View {
 
     private let thresholdDeg = 2.0
     @State private var hapticGenerator = UIImpactFeedbackGenerator(style: .medium)
+    @State private var interfaceOrientation: UIInterfaceOrientation?
 
     var body: some View {
         ZStack {
@@ -16,40 +17,39 @@ struct LevelPageView: View {
             VStack(spacing: 24) {
                 Spacer()
 
-                if barometerManager.isAttitudeAvailable {
-                    if barometerManager.attitude != nil {
-                        BubbleLevelView(
-                            rollDeg: screenRoll,
-                            pitchDeg: screenPitch,
-                            thresholdDeg: thresholdDeg
-                        )
-                        .frame(width: 260, height: 260)
+                switch displayState {
+                case .level:
+                    BubbleLevelView(
+                        rollDeg: screenRoll,
+                        pitchDeg: screenPitch,
+                        thresholdDeg: thresholdDeg
+                    )
+                    .frame(width: 260, height: 260)
 
-                        HStack(spacing: 40) {
-                            VStack(spacing: 4) {
-                                Text("Roll")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                                Text("\(screenRoll, specifier: "%.1f")°")
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(isLevel ? .green : .prussianBlueDark)
-                            }
-                            VStack(spacing: 4) {
-                                Text("Pitch")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                                Text("\(screenPitch, specifier: "%.1f")°")
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(isLevel ? .green : .prussianBlueDark)
-                            }
+                    HStack(spacing: 40) {
+                        VStack(spacing: 4) {
+                            Text("Roll")
+                                .font(.caption)
+                                .foregroundColor(.prussianBlueLight)
+                            Text("\(screenRoll, specifier: "%.1f")°")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
                         }
-                    } else {
-                        ProgressView("Waiting for sensor data…")
-                            .foregroundColor(.prussianBlueLight)
+                        VStack(spacing: 4) {
+                            Text("Pitch")
+                                .font(.caption)
+                                .foregroundColor(.prussianBlueLight)
+                            Text("\(screenPitch, specifier: "%.1f")°")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
+                        }
                     }
-                } else {
+                case .loading:
+                    ProgressView("Waiting for sensor data…")
+                        .foregroundColor(.prussianBlueLight)
+                case .unavailable:
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
                         .foregroundColor(.prussianWarning)
@@ -58,11 +58,25 @@ struct LevelPageView: View {
                         .foregroundColor(.prussianBlueLight)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                case .error(let message):
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.prussianError)
+                    Text(message)
+                        .font(.body)
+                        .foregroundColor(.prussianError)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
 
                 Spacer()
             }
         }
+        .background(
+            InterfaceOrientationReader { orientation in
+                interfaceOrientation = orientation
+            }
+        )
         .navigationTitle("Level")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -93,6 +107,14 @@ struct LevelPageView: View {
 
     // MARK: - Private helpers
 
+    private var displayState: LevelPageDisplayState {
+        LevelPageDisplayState.resolve(
+            isAttitudeAvailable: barometerManager.isAttitudeAvailable,
+            hasAttitude: barometerManager.attitude != nil,
+            errorMessage: barometerManager.errorMessage
+        )
+    }
+
     private var rawRollDeg: Double {
         guard let attitude = barometerManager.attitude else { return 0.0 }
         return attitude.roll * 180.0 / .pi
@@ -105,13 +127,6 @@ struct LevelPageView: View {
 
     private var adjustedRoll: Double { LevelMath.adjusted(raw: rawRollDeg, calibration: calibrationRoll) }
     private var adjustedPitch: Double { LevelMath.adjusted(raw: rawPitchDeg, calibration: calibrationPitch) }
-
-    private var interfaceOrientation: UIInterfaceOrientation? {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }?
-            .interfaceOrientation
-    }
 
     private var screenAttitude: (screenRoll: Double, screenPitch: Double) {
         LevelMath.remapForOrientation(
@@ -140,6 +155,34 @@ struct LevelPageView: View {
         guard let attitude = barometerManager.attitude else { return }
         calibrationRoll = attitude.roll * 180.0 / .pi
         calibrationPitch = attitude.pitch * 180.0 / .pi
+    }
+}
+
+enum LevelPageDisplayState: Equatable {
+    case level
+    case loading
+    case unavailable
+    case error(String)
+
+    static func resolve(
+        isAttitudeAvailable: Bool,
+        hasAttitude: Bool,
+        errorMessage: String
+    ) -> Self {
+        guard isAttitudeAvailable else {
+            return .unavailable
+        }
+
+        if hasAttitude {
+            return .level
+        }
+
+        let normalizedErrorMessage = errorMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedErrorMessage.hasPrefix("Motion sensor error:") {
+            return .error(normalizedErrorMessage)
+        }
+
+        return .loading
     }
 }
 
@@ -221,6 +264,58 @@ enum LevelMath {
             default:
                 return orientation
             }
+        }
+    }
+}
+
+private struct InterfaceOrientationReader: UIViewRepresentable {
+    let onChange: (UIInterfaceOrientation?) -> Void
+
+    func makeUIView(context: Context) -> InterfaceOrientationReportingView {
+        let view = InterfaceOrientationReportingView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateUIView(_ uiView: InterfaceOrientationReportingView, context: Context) {
+        uiView.onChange = onChange
+        uiView.reportOrientationIfNeeded()
+    }
+}
+
+private final class InterfaceOrientationReportingView: UIView {
+    var onChange: ((UIInterfaceOrientation?) -> Void)?
+
+    private weak var lastWindowScene: UIWindowScene?
+    private var lastOrientation: UIInterfaceOrientation?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        reportOrientationIfNeeded(force: true)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        reportOrientationIfNeeded()
+    }
+
+    func reportOrientationIfNeeded(force: Bool = false) {
+        let windowScene = window?.windowScene
+        let orientation = windowScene?.interfaceOrientation
+
+        guard force || windowScene !== lastWindowScene || orientation != lastOrientation else {
+            return
+        }
+
+        lastWindowScene = windowScene
+        lastOrientation = orientation
+
+        guard let onChange else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            onChange(orientation)
         }
     }
 }
