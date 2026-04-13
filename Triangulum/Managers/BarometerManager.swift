@@ -165,6 +165,11 @@ class BarometerManager: ObservableObject {
                 // Do NOT set isAttitudeAvailable = false here — transient errors should
                 // not permanently disable attitude updates. Hardware capability is determined
                 // solely by checkAvailability() so that startAttitudeUpdates() can be retried.
+                //
+                // Reset the running state so a subsequent startAttitudeUpdates() call can
+                // re-initiate device motion updates after a transient failure.
+                self.motionManager.stopDeviceMotionUpdates()
+                self.didStartDeviceMotion = false
                 return
             }
 
