@@ -16,6 +16,7 @@ private final class MockMotionManager: CMMotionManager, @unchecked Sendable {
     var startDeviceMotionUpdatesCallCount = 0
     var stopDeviceMotionUpdatesCallCount = 0
     var recordedUpdateInterval: TimeInterval?
+    private var handler: CMDeviceMotionHandler?
 
     override var isDeviceMotionAvailable: Bool {
         mockIsDeviceMotionAvailable
@@ -28,10 +29,17 @@ private final class MockMotionManager: CMMotionManager, @unchecked Sendable {
 
     override func startDeviceMotionUpdates(to queue: OperationQueue, withHandler handler: CMDeviceMotionHandler? = nil) {
         startDeviceMotionUpdatesCallCount += 1
+        self.handler = handler
     }
 
     override func stopDeviceMotionUpdates() {
         stopDeviceMotionUpdatesCallCount += 1
+        handler = nil
+    }
+
+    /// Simulate delivering an error to the motion update handler
+    func simulateError(_ error: Error) {
+        handler?(nil, error)
     }
 }
 
@@ -306,6 +314,33 @@ struct BarometerManagerTests {
 
         manager.stopAttitudeUpdates()
         #expect(manager.isAttitudeAvailable == hardwareAvailable)
+    }
+
+    @Test func testAttitudeUpdatesRecoverAfterTransientError() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        // First call: barometer starts attitude updates
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        // Simulate a transient CoreMotion error (no samples ever delivered)
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+        motionManager.simulateError(error)
+
+        #expect(manager.errorMessage.contains("Motion sensor error"))
+        // stopDeviceMotionUpdates should have been called to clean up
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+
+        // Now LevelPageView calls startAttitudeUpdates() — this should NOT be a no-op
+        manager.startAttitudeUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
     }
 
     @Test func testBarometerManagerPublishedProperties() {
