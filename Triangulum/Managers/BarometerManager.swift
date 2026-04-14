@@ -180,6 +180,9 @@ class BarometerManager: ObservableObject {
                 // re-initiate device motion updates after a transient failure.
                 self.motionManager.stopDeviceMotionUpdates()
                 self.didStartDeviceMotion = false
+                // Clear all requesters so a retry can re-insert and actually restart updates.
+                // Without this, the insert guard blocks the same requester from re-entering.
+                self.attitudeUpdateRequesters.removeAll()
                 return
             }
 
