@@ -33,10 +33,10 @@ import UIKit
     }
 
     @Test func isLevelWhenRadialDistanceEqualsThresholdOnDiagonal() {
-        // sqrt(v^2 + v^2) == 2.0 exactly when v == sqrt(2)
-        let v = sqrt(2.0)
-        #expect(LevelMath.isLevel(roll: v, pitch: v, threshold: 2.0))
-        #expect(!LevelMath.isLevel(roll: v + 0.001, pitch: v + 0.001, threshold: 2.0))
+        // sqrt(d^2 + d^2) == 2.0 exactly when d == sqrt(2)
+        let diagonalComponent = sqrt(2.0)
+        #expect(LevelMath.isLevel(roll: diagonalComponent, pitch: diagonalComponent, threshold: 2.0))
+        #expect(!LevelMath.isLevel(roll: diagonalComponent + 0.001, pitch: diagonalComponent + 0.001, threshold: 2.0))
     }
 
     @Test func isLevelWhenRadialMagnitudeIsWithinThreshold() {
