@@ -216,7 +216,8 @@ enum LevelMath {
     /// Returns the (x, y) offset for the bubble inside a level indicator.
     ///
     /// Convention: positive roll = right side down, positive pitch = top tilts away.
-    /// A real bubble rises to the HIGH side, so both axes are negated.
+    /// Roll is negated so the bubble moves toward the high side (right side down → bubble goes left).
+    /// Pitch is kept positive so the bubble moves down when the top tilts away.
     /// `scale` converts degrees to points (e.g. `outerRadius / 90`).
     static func bubbleOffset(rollDeg: Double, pitchDeg: Double, scale: Double) -> (x: Double, y: Double) {
         let x = -rollDeg * scale
