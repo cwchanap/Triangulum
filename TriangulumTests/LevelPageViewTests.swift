@@ -89,6 +89,43 @@ import UIKit
         #expect(state == .loading)
     }
 
+    // MARK: - motionStreamFailed flag handling
+
+    @Test func displayStateShowsErrorWhenMotionStreamFailedEvenWithoutErrorMessage() {
+        // After a motion error, a subsequent pressure update clears errorMessage.
+        // The motionStreamFailed flag ensures we still show an error, not loading.
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: true,
+            hasAttitude: false,
+            errorMessage: "",
+            motionStreamFailed: true
+        )
+
+        #expect(state == .error("Motion sensor error: updates stopped unexpectedly"))
+    }
+
+    @Test func displayStateShowsSpecificErrorWhenMotionStreamFailedWithErrorMessage() {
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: true,
+            hasAttitude: false,
+            errorMessage: "Motion sensor error: hardware failure",
+            motionStreamFailed: true
+        )
+
+        #expect(state == .error("Motion sensor error: hardware failure"))
+    }
+
+    @Test func displayStateShowsLoadingWhenMotionStreamNotFailed() {
+        let state = LevelPageDisplayState.resolve(
+            isAttitudeAvailable: true,
+            hasAttitude: false,
+            errorMessage: "",
+            motionStreamFailed: false
+        )
+
+        #expect(state == .loading)
+    }
+
     // MARK: - Calibration offset arithmetic
 
     @Test func calibrationZeroesAdjustedAngle() {

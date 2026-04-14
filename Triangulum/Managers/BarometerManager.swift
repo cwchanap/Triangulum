@@ -21,6 +21,7 @@ class BarometerManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var isAttitudeAvailable: Bool = false
     @Published var errorMessage: String = ""
+    @Published var motionStreamFailed: Bool = false
     @Published var historyRecordingError: Error?
 
     private var cancellables = Set<AnyCancellable>()
@@ -155,6 +156,8 @@ class BarometerManager: ObservableObject {
         guard inserted else { return }
         guard !didStartDeviceMotion else { return } // Already running
 
+        motionStreamFailed = false
+
         motionManager.deviceMotionUpdateInterval = 0.1
         didStartDeviceMotion = true
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
@@ -162,6 +165,13 @@ class BarometerManager: ObservableObject {
 
             if let error = error {
                 self.errorMessage = "Motion sensor error: \(error.localizedDescription)"
+                // Clear stale attitude so the Level page doesn't render frozen orientation
+                // data after the motion stream has stopped.
+                self.attitude = nil
+                // Track that the motion stream has failed so the Level page can distinguish
+                // this from an initial-loading state even after errorMessage is cleared by
+                // a subsequent pressure update.
+                self.motionStreamFailed = true
                 // Do NOT set isAttitudeAvailable = false here — transient errors should
                 // not permanently disable attitude updates. Hardware capability is determined
                 // solely by checkAvailability() so that startAttitudeUpdates() can be retried.

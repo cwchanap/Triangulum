@@ -111,7 +111,8 @@ struct LevelPageView: View {
         LevelPageDisplayState.resolve(
             isAttitudeAvailable: barometerManager.isAttitudeAvailable,
             hasAttitude: barometerManager.attitude != nil,
-            errorMessage: barometerManager.errorMessage
+            errorMessage: barometerManager.errorMessage,
+            motionStreamFailed: barometerManager.motionStreamFailed
         )
     }
 
@@ -167,7 +168,8 @@ enum LevelPageDisplayState: Equatable {
     static func resolve(
         isAttitudeAvailable: Bool,
         hasAttitude: Bool,
-        errorMessage: String
+        errorMessage: String,
+        motionStreamFailed: Bool = false
     ) -> Self {
         guard isAttitudeAvailable else {
             return .unavailable
@@ -175,6 +177,17 @@ enum LevelPageDisplayState: Equatable {
 
         if hasAttitude {
             return .level
+        }
+
+        // If the motion stream failed (even if errorMessage was subsequently cleared
+        // by a pressure update), show the error state rather than a loading spinner.
+        if motionStreamFailed {
+            let normalizedErrorMessage = errorMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+            if normalizedErrorMessage.hasPrefix("Motion sensor error:") {
+                return .error(normalizedErrorMessage)
+            }
+            // errorMessage was wiped by a pressure update — use a generic message
+            return .error("Motion sensor error: updates stopped unexpectedly")
         }
 
         let normalizedErrorMessage = errorMessage.trimmingCharacters(in: .whitespacesAndNewlines)
