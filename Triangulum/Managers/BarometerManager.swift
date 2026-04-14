@@ -82,6 +82,10 @@ class BarometerManager: ObservableObject {
 
             if let error = error {
                 self.errorMessage = "Error reading barometer: \(error.localizedDescription)"
+                // Reset latch so a future startBarometerUpdates() call can retry.
+                // Stop first to avoid duplicate altimeter callback streams.
+                self.altimeter.stopRelativeAltitudeUpdates()
+                self.didStartBarometerUpdates = false
                 return
             }
 
@@ -152,8 +156,7 @@ class BarometerManager: ObservableObject {
 
     private func startAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard isAttitudeAvailable else { return }
-        let inserted = attitudeUpdateRequesters.insert(requester).inserted
-        guard inserted else { return }
+        attitudeUpdateRequesters.insert(requester)
         guard !didStartDeviceMotion else { return } // Already running
 
         motionStreamFailed = false
@@ -180,9 +183,10 @@ class BarometerManager: ObservableObject {
                 // re-initiate device motion updates after a transient failure.
                 self.motionManager.stopDeviceMotionUpdates()
                 self.didStartDeviceMotion = false
-                // Clear all requesters so a retry can re-insert and actually restart updates.
-                // Without this, the insert guard blocks the same requester from re-entering.
-                self.attitudeUpdateRequesters.removeAll()
+                // Keep attitudeUpdateRequesters intact so that requesters (e.g. .barometer,
+                // .explicit) are preserved across transient errors. A subsequent call to
+                // startAttitudeUpdates(for:) will detect that motion is not running and
+                // restart the stream without needing to re-insert requesters.
                 return
             }
 
