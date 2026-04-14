@@ -445,6 +445,92 @@ struct BarometerManagerTests {
         #expect(manager.motionStreamFailed == true)
     }
 
+    @Test func testBarometerRequesterPreservedAfterTransientMotionError() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        // startBarometerUpdates registers .barometer requester and starts motion
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        // Simulate a transient CoreMotion error
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+        motionManager.simulateError(error)
+
+        #expect(manager.errorMessage.contains("Motion sensor error"))
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+
+        // After error, the .barometer requester should still be registered.
+        // When the Level page appears and calls startAttitudeUpdates(), motion should restart
+        // because .barometer is still in the set and didStartDeviceMotion is false.
+        manager.startAttitudeUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
+
+        // Stopping only the explicit requester should NOT stop motion because
+        // the .barometer requester is still registered (preserved across the error).
+        manager.stopAttitudeUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // only the error-cleanup stop
+    }
+
+    @Test func testBothRequestersPreservedAfterTransientMotionError() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        // Both .barometer and .explicit requesters registered
+        manager.startBarometerUpdates()
+        manager.startAttitudeUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        // Simulate a transient error
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+        motionManager.simulateError(error)
+        #expect(manager.motionStreamFailed == true)
+
+        // Both requesters should be preserved — neither .barometer nor .explicit was dropped.
+        // Calling startAttitudeUpdates() should restart motion (insert is a no-op since
+        // .explicit is already in the set, but didStartDeviceMotion is false so stream restarts).
+        manager.startAttitudeUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
+        #expect(manager.motionStreamFailed == false)
+
+        // Stopping only explicit should NOT stop motion because .barometer is still registered
+        manager.stopAttitudeUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // only the error-cleanup stop
+    }
+
+    @Test func testStopBarometerUpdatesAllowsRestart() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+
+        // After stop, startBarometerUpdates should work again (latch is reset)
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
+    }
+
     @Test func testBarometerManagerPublishedProperties() {
         let locationManager = LocationManager()
         let manager = BarometerManager(locationManager: locationManager)
