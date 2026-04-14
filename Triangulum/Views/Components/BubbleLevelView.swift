@@ -71,21 +71,21 @@ struct BubbleLevelView: View {
             let dist = sqrt(rawX * rawX + rawY * rawY)
             let safeClamp = max(0, outerRadius - bubbleRadius)
             let clampedDist = min(dist, safeClamp)
-            let bx: CGFloat
-            let by: CGFloat
+            let bubbleX: CGFloat
+            let bubbleY: CGFloat
             if dist > 0 {
-                let a = atan2(rawY, rawX)
-                bx = center.x + cos(a) * clampedDist
-                by = center.y + sin(a) * clampedDist
+                let angle = atan2(rawY, rawX)
+                bubbleX = center.x + cos(angle) * clampedDist
+                bubbleY = center.y + sin(angle) * clampedDist
             } else {
-                bx = center.x
-                by = center.y
+                bubbleX = center.x
+                bubbleY = center.y
             }
 
             let isLevel = LevelMath.isLevel(roll: rollDeg, pitch: pitchDeg, threshold: clampedThresholdDeg)
             let bubbleColor: Color = isLevel ? .green : .prussianAccent
             let bubbleRect = CGRect(
-                x: bx - bubbleRadius, y: by - bubbleRadius,
+                x: bubbleX - bubbleRadius, y: bubbleY - bubbleRadius,
                 width: bubbleRadius * 2, height: bubbleRadius * 2
             )
             context.fill(Path(ellipseIn: bubbleRect), with: .color(bubbleColor.opacity(0.85)))
