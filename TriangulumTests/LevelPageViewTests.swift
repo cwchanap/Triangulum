@@ -305,4 +305,23 @@ import UIKit
         #expect(offset.y == 0.0)   // no vertical drift
     }
 
+    // MARK: - LevelMath.isLevel with raw zeros (nil-attitude guard)
+
+    // When attitude is nil, rawRollDeg/rawPitchDeg return 0 and adjusted values
+    // become -(calibration). With default calibration (0,0), LevelMath.isLevel
+    // would report true for (0,0). The view's isLevel property guards against
+    // this by checking attitude != nil first. This test documents that LevelMath
+    // alone cannot distinguish "truly level" from "no data (0,0)".
+    @Test func levelMathReportsLevelForZeroZero() {
+        // This is correct math; the nil-attitude guard lives in the view layer.
+        #expect(LevelMath.isLevel(roll: 0.0, pitch: 0.0, threshold: 2.0))
+    }
+
+    @Test func levelMathReportsNotLevelWhenCalibratedOffsetExceedsThreshold() {
+        // If calibrated at 5°, a nil-attitude fallback (raw=0) gives adjusted = -5,
+        // which correctly exceeds the 2° threshold.
+        let adjustedFromNil = LevelMath.adjusted(raw: 0.0, calibration: 5.0)
+        #expect(!LevelMath.isLevel(roll: adjustedFromNil, pitch: 0.0, threshold: 2.0))
+    }
+
 }
