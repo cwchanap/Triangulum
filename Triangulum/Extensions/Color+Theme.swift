@@ -10,4 +10,5 @@ extension Color {
     static let prussianWarning = Color(red: 0.92, green: 0.49, blue: 0.13)       // #EB7D21
     static let prussianError = Color(red: 0.82, green: 0.18, blue: 0.18)         // #D12E2E
     static let prussianSuccess = Color(red: 0.13, green: 0.59, blue: 0.95)       // #2196F3
+    static let prussianGreen = Color(red: 0.20, green: 0.78, blue: 0.35)          // #33C759
 }

@@ -34,7 +34,8 @@ struct LevelPageView: View {
                             Text("\(screenRoll, specifier: "%.1f")°")
                                 .font(.title3)
                                 .fontWeight(.medium)
-                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
+                                .foregroundColor(isLevel ? .prussianGreen : .prussianBlueDark)
+                                .accessibilityLabel("Roll: \(String(format: "%.1f", screenRoll)) degrees")
                         }
                         VStack(spacing: 4) {
                             Text("Pitch")
@@ -43,7 +44,8 @@ struct LevelPageView: View {
                             Text("\(screenPitch, specifier: "%.1f")°")
                                 .font(.title3)
                                 .fontWeight(.medium)
-                                .foregroundColor(isLevel ? .green : .prussianBlueDark)
+                                .foregroundColor(isLevel ? .prussianGreen : .prussianBlueDark)
+                                .accessibilityLabel("Pitch: \(String(format: "%.1f", screenPitch)) degrees")
                         }
                     }
                 case .loading:
@@ -149,7 +151,10 @@ struct LevelPageView: View {
 
     private var isLevel: Bool {
         // Radial distance is orientation-invariant (remap only swaps/negates axes).
-        LevelMath.isLevel(roll: adjustedRoll, pitch: adjustedPitch, threshold: thresholdDeg)
+        // Must have a real attitude reading; otherwise rawRoll/rawPitch default to 0,
+        // which can falsely report "level" and trigger haptics.
+        guard barometerManager.attitude != nil else { return false }
+        return LevelMath.isLevel(roll: adjustedRoll, pitch: adjustedPitch, threshold: thresholdDeg)
     }
 
     private func calibrate() {
