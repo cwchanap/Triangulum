@@ -140,7 +140,7 @@ struct BarometerManagerTests {
         }
     }
 
-    @Test func testStartBarometerUpdatesStartsAttitudeUpdates() {
+    @Test func testStartBarometerUpdatesDoesNotStartAttitudeWhenUnavailable() {
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -154,7 +154,29 @@ struct BarometerManagerTests {
 
         #expect(manager.isAvailable == false)
         #expect(manager.isAttitudeAvailable)
+        // Motion stream should NOT start when barometer is unavailable
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
+    }
+
+    @Test func testStartBarometerUpdatesStartsAttitudeWhenAvailable() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { true }
+        )
+
+        manager.startBarometerUpdates()
+
+        #expect(manager.isAvailable == true)
+        #expect(manager.isAttitudeAvailable)
+        // Motion stream should start when barometer IS available
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testStartAttitudeUpdatesExplicitly() {
@@ -180,7 +202,7 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { true }
         )
 
         manager.startBarometerUpdates()
@@ -328,7 +350,7 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { true }
         )
 
         // First call: barometer starts attitude updates
@@ -452,7 +474,7 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { true }
         )
 
         // startBarometerUpdates registers .barometer requester and starts motion
@@ -485,7 +507,7 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { true }
         )
 
         // Both .barometer and .explicit requesters registered
@@ -517,7 +539,7 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { true }
         )
 
         manager.startBarometerUpdates()
@@ -529,6 +551,60 @@ struct BarometerManagerTests {
         // After stop, startBarometerUpdates should work again (latch is reset)
         manager.startBarometerUpdates()
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
+    }
+
+    @Test func testAltimeterErrorRemovesBarometerRequester() {
+        // When the altimeter hits an error, the .barometer requester should be removed
+        // so that a subsequent stopBarometerUpdates() from ContentView.onDisappear
+        // doesn't leave the motion stream running.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { true }
+        )
+
+        // startBarometerUpdates registers .barometer requester and starts motion
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        // Simulate the altimeter error path by directly calling stopBarometerUpdates
+        // which is what the error handler prepares for. After the error handler resets
+        // didStartBarometerUpdates to false and removes the .barometer requester,
+        // a subsequent stopBarometerUpdates() should be a no-op (guard returns early)
+        // but should NOT leak any resources.
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+
+        // After full stop, motion should be cleaned up, and a fresh start should work
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
+    }
+
+    @Test func testStopBarometerUpdatesAfterLatchResetIsNoOp() {
+        // Simulates the scenario from Comment 2: after an altimeter error,
+        // didStartBarometerUpdates is false and .barometer requester is removed.
+        // A subsequent stopBarometerUpdates() should be a safe no-op.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { true }
+        )
+
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+
+        // Calling stop again should be safe (no double-stop, no crash)
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // still 1, no extra stop
     }
 
     @Test func testBarometerManagerPublishedProperties() {

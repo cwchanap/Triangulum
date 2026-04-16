@@ -68,7 +68,6 @@ class BarometerManager: ObservableObject {
     func startBarometerUpdates() {
         guard !didStartBarometerUpdates else { return }
         didStartBarometerUpdates = true
-        startAttitudeUpdates(for: .barometer)
 
         guard isAvailable else {
             if !isAttitudeAvailable {
@@ -76,6 +75,8 @@ class BarometerManager: ObservableObject {
             }
             return
         }
+
+        startAttitudeUpdates(for: .barometer)
 
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
@@ -86,6 +87,9 @@ class BarometerManager: ObservableObject {
                 // Stop first to avoid duplicate altimeter callback streams.
                 self.altimeter.stopRelativeAltitudeUpdates()
                 self.didStartBarometerUpdates = false
+                // Remove the .barometer requester so stopBarometerUpdates() can
+                // still tear down the motion stream from ContentView.onDisappear.
+                self.stopAttitudeUpdates(for: .barometer)
                 return
             }
 
