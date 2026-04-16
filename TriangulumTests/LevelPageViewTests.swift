@@ -151,6 +151,110 @@ import UIKit
         #expect(LevelMath.adjusted(raw: raw, calibration: 0.0) == 30.0)
     }
 
+    // MARK: - Screen-space calibration pipeline (remap → adjust)
+
+    /// Simulates the full pipeline: raw device-frame → remap → subtract calibration.
+    /// Verifies that calibrating in a given orientation zeroes the output when the
+    /// device stays in that same orientation.
+    @Test func screenSpaceCalibrationZeroesInSameOrientation() {
+        // Device reports roll=5, pitch=-3 in portrait.
+        let rawRoll = 5.0, rawPitch = -3.0
+
+        // Calibrate in portrait: remap(identity) → store screen-space (5, -3)
+        let calScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .portrait
+        )
+        #expect(calScreen.screenRoll == 5.0)
+        #expect(calScreen.screenPitch == -3.0)
+
+        // Display in portrait (same orientation): remap(identity) → (5, -3)
+        let displayScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .portrait
+        )
+        let adjustedRoll = LevelMath.adjusted(
+            raw: displayScreen.screenRoll, calibration: calScreen.screenRoll
+        )
+        let adjustedPitch = LevelMath.adjusted(
+            raw: displayScreen.screenPitch, calibration: calScreen.screenPitch
+        )
+        #expect(adjustedRoll == 0.0)
+        #expect(adjustedPitch == 0.0)
+    }
+
+    /// Verifies that calibrating in landscape-left correctly zeroes when displayed
+    /// in landscape-left (same orientation).
+    @Test func screenSpaceCalibrationZeroesInLandscapeLeft() {
+        let rawRoll = 5.0, rawPitch = -3.0
+
+        // Calibrate in landscape-left: remap → (pitch, roll) = (-3, 5)
+        let calScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .landscapeLeft
+        )
+        #expect(calScreen.screenRoll == -3.0)
+        #expect(calScreen.screenPitch == 5.0)
+
+        // Display in landscape-left (same orientation, same raw values)
+        let displayScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .landscapeLeft
+        )
+        let adjustedRoll = LevelMath.adjusted(
+            raw: displayScreen.screenRoll, calibration: calScreen.screenRoll
+        )
+        let adjustedPitch = LevelMath.adjusted(
+            raw: displayScreen.screenPitch, calibration: calScreen.screenPitch
+        )
+        #expect(adjustedRoll == 0.0)
+        #expect(adjustedPitch == 0.0)
+    }
+
+    /// Verifies that calibrating in one orientation and displaying in another
+    /// produces a meaningful (non-zero) screen-space offset. This is the expected
+    /// behaviour for a spirit level: rotating on a tilted surface changes the reading.
+    @Test func screenSpaceCalibrationAcrossOrientationsIsNonZero() {
+        let rawRoll = 5.0, rawPitch = -3.0
+
+        // Calibrate in portrait
+        let calScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .portrait
+        )
+
+        // Display in landscape-left (same raw device-frame values)
+        let displayScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .landscapeLeft
+        )
+        let adjustedRoll = LevelMath.adjusted(
+            raw: displayScreen.screenRoll, calibration: calScreen.screenRoll
+        )
+        let adjustedPitch = LevelMath.adjusted(
+            raw: displayScreen.screenPitch, calibration: calScreen.screenPitch
+        )
+
+        // The device has rotated on the same surface, so screen-space tilt changes.
+        // This is physically correct for a 2D bubble level.
+        // portrait screen: (5, -3), landscape-left screen: (-3, 5)
+        // adjusted: (-3 - 5, 5 - (-3)) = (-8, 8)
+        #expect(adjustedRoll == -8.0)
+        #expect(adjustedPitch == 8.0)
+    }
+
+    /// Verifies that with zero calibration the output equals the raw remapped value.
+    @Test func screenSpaceZeroCalibrationIsIdentity() {
+        let rawRoll = 7.0, rawPitch = 2.0
+
+        let displayScreen = LevelMath.remapForOrientation(
+            roll: rawRoll, pitch: rawPitch, orientation: .landscapeRight
+        )
+        let adjustedRoll = LevelMath.adjusted(
+            raw: displayScreen.screenRoll, calibration: 0.0
+        )
+        let adjustedPitch = LevelMath.adjusted(
+            raw: displayScreen.screenPitch, calibration: 0.0
+        )
+        // landscapeRight remap: (-pitch, -roll) = (-2, -7)
+        #expect(adjustedRoll == -2.0)
+        #expect(adjustedPitch == -7.0)
+    }
+
     // MARK: - Bubble offset (bubble drifts to the HIGH side)
 
     @Test func bubbleOffsetAtLevelIsZero() {
