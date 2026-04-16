@@ -128,25 +128,26 @@ struct LevelPageView: View {
         return attitude.pitch * 180.0 / .pi
     }
 
-    private var adjustedRoll: Double { LevelMath.adjusted(raw: rawRollDeg, calibration: calibrationRoll) }
-    private var adjustedPitch: Double { LevelMath.adjusted(raw: rawPitchDeg, calibration: calibrationPitch) }
-
-    private var screenAttitude: (screenRoll: Double, screenPitch: Double) {
+    /// Raw roll/pitch remapped to screen-space (no calibration applied).
+    private var rawScreenAttitude: (screenRoll: Double, screenPitch: Double) {
         LevelMath.remapForOrientation(
-            roll: adjustedRoll,
-            pitch: adjustedPitch,
+            roll: rawRollDeg,
+            pitch: rawPitchDeg,
             orientation: UIDevice.current.orientation,
             interfaceOrientation: interfaceOrientation
         )
     }
 
-    /// Screen-space roll/pitch after orientation remap.
+    /// Screen-space roll/pitch after orientation remap and calibration.
+    /// Calibration offsets are stored in screen-space (remapped at calibration
+    /// time) so that subtraction happens in the same coordinate basis as the
+    /// displayed values.
     private var screenRoll: Double {
-        screenAttitude.screenRoll
+        LevelMath.adjusted(raw: rawScreenAttitude.screenRoll, calibration: calibrationRoll)
     }
 
     private var screenPitch: Double {
-        screenAttitude.screenPitch
+        LevelMath.adjusted(raw: rawScreenAttitude.screenPitch, calibration: calibrationPitch)
     }
 
     private var isLevel: Bool {
@@ -154,13 +155,23 @@ struct LevelPageView: View {
         // Must have a real attitude reading; otherwise rawRoll/rawPitch default to 0,
         // which can falsely report "level" and trigger haptics.
         guard barometerManager.attitude != nil else { return false }
-        return LevelMath.isLevel(roll: adjustedRoll, pitch: adjustedPitch, threshold: thresholdDeg)
+        return LevelMath.isLevel(roll: screenRoll, pitch: screenPitch, threshold: thresholdDeg)
     }
 
     private func calibrate() {
         guard let attitude = barometerManager.attitude else { return }
-        calibrationRoll = attitude.roll * 180.0 / .pi
-        calibrationPitch = attitude.pitch * 180.0 / .pi
+        let rawRoll = attitude.roll * 180.0 / .pi
+        let rawPitch = attitude.pitch * 180.0 / .pi
+        // Store calibration in screen-space so it shares the same coordinate
+        // basis as the displayed values regardless of device orientation.
+        let screen = LevelMath.remapForOrientation(
+            roll: rawRoll,
+            pitch: rawPitch,
+            orientation: UIDevice.current.orientation,
+            interfaceOrientation: interfaceOrientation
+        )
+        calibrationRoll = screen.screenRoll
+        calibrationPitch = screen.screenPitch
     }
 }
 
