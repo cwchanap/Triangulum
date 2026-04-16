@@ -355,6 +355,17 @@ enum LevelMath {
         Quat(x: -q.x, y: -q.y, z: -q.z, w: q.w)
     }
 
+    /// Rotates a 3D vector by a unit quaternion using the sandwich product
+    /// v' = q * v * q⁻¹.
+    static func rotateVector(
+        _ v: (x: Double, y: Double, z: Double),
+        by q: Quat
+    ) -> (x: Double, y: Double, z: Double) {
+        let vQuat = Quat(x: v.x, y: v.y, z: v.z, w: 0)
+        let rotated = quatMultiply(quatMultiply(q, vQuat), quatConjugate(q))
+        return (rotated.x, rotated.y, rotated.z)
+    }
+
     /// Extracts roll (radians) from a quaternion using the same ZYX Euler
     /// angle convention as CoreMotion.
     static func quaternionToRoll(_ q: Quat) -> Double {
@@ -371,19 +382,35 @@ enum LevelMath {
         return asin(max(-1.0, min(1.0, sinp)))
     }
 
-    /// Computes roll and pitch (in degrees) of the *relative* attitude between
-    /// the current quaternion and a stored calibration quaternion.
+    /// Computes roll and pitch (in degrees) of the *relative tilt* between
+    /// the current orientation and a stored calibration orientation.
     ///
-    /// The relative rotation is `current * inverse(calibration)`, which gives
-    /// the attitude relative to the calibration reference. Roll and pitch are
-    /// extracted from this relative quaternion using CoreMotion's ZYX convention.
+    /// Uses surface-normal comparison to remain invariant to in-plane (yaw)
+    /// rotations. The device's surface normal (body Z axis) is transformed to
+    /// world frame for both orientations. The calibration normal is then
+    /// expressed in the current body frame: if the phone is still on the same
+    /// calibration surface, this vector equals [0, 0, 1] regardless of any
+    /// in-plane rotation that occurred after calibrating.
+    ///
+    /// Roll and pitch are extracted from the body-frame calibration normal
+    /// using atan2, matching CoreMotion's sign conventions (positive roll =
+    /// right side down, positive pitch = top tilts away from user).
     static func relativeAttitudeDegrees(
         current: Quat,
         calibration: Quat
     ) -> (rollDeg: Double, pitchDeg: Double) {
-        let relative = quatMultiply(current, quatConjugate(calibration))
-        let rollDeg = quaternionToRoll(relative) * 180.0 / .pi
-        let pitchDeg = quaternionToPitch(relative) * 180.0 / .pi
+        let up = (x: 0.0, y: 0.0, z: 1.0)
+
+        // Calibration surface normal in world frame
+        let nCalWorld = rotateVector(up, by: calibration)
+
+        // Express calibration normal in the current body frame.
+        // On the same surface as calibration → [0,0,1] → roll/pitch = 0.
+        let nCalBody = rotateVector(nCalWorld, by: quatConjugate(current))
+
+        let rollDeg = atan2(nCalBody.y, nCalBody.z) * 180.0 / .pi
+        let pitchDeg = atan2(-nCalBody.x, nCalBody.z) * 180.0 / .pi
+
         return (rollDeg, pitchDeg)
     }
 }

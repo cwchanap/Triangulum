@@ -207,25 +207,25 @@ import UIKit
         #expect(adjustedPitch == 0.0)
     }
 
-    /// With quaternion-based calibration, calibrating in one orientation and
-    /// rotating to another on the same reference surface should produce ~zero.
-    /// This test simulates the scenario using quaternions: calibrate in portrait
-    /// at (5°, -3°), then construct a quaternion representing a 90° CW device
-    /// rotation plus the same tilt. The relative attitude should read ~(0, 0).
+    /// Calibrating on a tilted surface and then performing an in-plane (body-frame)
+    /// rotation should preserve the calibrated zero, because the surface normal
+    /// hasn't changed. This test uses body-frame yaw via quaternion composition
+    /// (Q_cal * Rz_body(90°)), which represents the real physical scenario of
+    /// rotating the phone on a table.
     @Test func quaternionCalibrationZeroesAcrossOrientations() {
         // Calibration quaternion: portrait with roll=5°, pitch=-3°
         let calRollRad = 5.0 * .pi / 180.0
         let calPitchRad = -3.0 * .pi / 180.0
         let calQ = eulerToQuat(roll: calRollRad, pitch: calPitchRad, yaw: 0.0)
 
-        // After rotating 90° CW (yaw = -π/2 in device frame) on the same surface,
-        // the device's total orientation is: calibration tilt + 90° yaw rotation.
-        let yaw90 = -Double.pi / 2.0
-        let currentQ = eulerToQuat(roll: calRollRad, pitch: calPitchRad, yaw: yaw90)
+        // Body-frame 90° CW rotation (in-plane on the surface):
+        // Q_cur = Q_cal * Rz_body(-90°)
+        let yaw90 = eulerToQuat(roll: 0.0, pitch: 0.0, yaw: -Double.pi / 2.0)
+        let currentQ = LevelMath.quatMultiply(calQ, yaw90)
 
         let result = LevelMath.relativeAttitudeDegrees(current: currentQ, calibration: calQ)
 
-        // Relative roll/pitch should be ~0 — the surface hasn't changed, only yaw.
+        // Relative roll/pitch should be ~0 — the surface hasn't changed, only in-plane rotation.
         #expect(abs(result.rollDeg) < 0.01)
         #expect(abs(result.pitchDeg) < 0.01)
     }
@@ -421,6 +421,34 @@ import UIKit
         #expect(!LevelMath.isLevel(roll: adjustedFromNil, pitch: 0.0, threshold: 2.0))
     }
 
+    // MARK: - rotateVector
+
+    @Test func rotateVectorIdentityLeavesVectorUnchanged() {
+        let v = (x: 1.0, y: 2.0, z: 3.0)
+        let result = LevelMath.rotateVector(v, by: .identity)
+        #expect(abs(result.x - 1.0) < 1e-12)
+        #expect(abs(result.y - 2.0) < 1e-12)
+        #expect(abs(result.z - 3.0) < 1e-12)
+    }
+
+    @Test func rotateVectorZAxisByRollTiltY() {
+        // 90° roll: Z axis rotates to -Y direction
+        let q = eulerToQuat(roll: .pi / 2.0, pitch: 0.0, yaw: 0.0)
+        let result = LevelMath.rotateVector((x: 0, y: 0, z: 1), by: q)
+        #expect(abs(result.x) < 1e-12)
+        #expect(abs(result.y - (-1.0)) < 1e-12)
+        #expect(abs(result.z) < 1e-12)
+    }
+
+    @Test func rotateVectorZAxisByPitchTiltX() {
+        // 90° pitch: Z axis rotates to +X direction
+        let q = eulerToQuat(roll: 0.0, pitch: .pi / 2.0, yaw: 0.0)
+        let result = LevelMath.rotateVector((x: 0, y: 0, z: 1), by: q)
+        #expect(abs(result.x - 1.0) < 1e-12)
+        #expect(abs(result.y) < 1e-12)
+        #expect(abs(result.z) < 1e-12)
+    }
+
     // MARK: - Quaternion math
 
     @Test func quatIdentityMultiplicationIsIdentity() {
@@ -494,18 +522,52 @@ import UIKit
     }
 
     @Test func quaternionCalibrationSurvivesNinetyDegreeYawRotation() {
-        // Calibrate at roll=8°, pitch=3°, yaw=0. Then device rotates 90° CW (yaw=-π/2)
-        // on the same surface. The total orientation is the original tilt + 90° yaw.
-        // Relative roll/pitch should still be ~0.
+        // Calibrate at roll=8°, pitch=3°, yaw=0. Then device rotates 90° CW
+        // in-plane (body-frame rotation on the same surface).
         let rollRad = 8.0 * .pi / 180.0
         let pitchRad = 3.0 * .pi / 180.0
 
         let calQ = eulerToQuat(roll: rollRad, pitch: pitchRad, yaw: 0.0)
-        let curQ = eulerToQuat(roll: rollRad, pitch: pitchRad, yaw: -.pi / 2.0)
+        // Body-frame 90° rotation: Q_cur = Q_cal * Rz_body(-90°)
+        let yaw90 = eulerToQuat(roll: 0.0, pitch: 0.0, yaw: -.pi / 2.0)
+        let curQ = LevelMath.quatMultiply(calQ, yaw90)
 
         let result = LevelMath.relativeAttitudeDegrees(current: curQ, calibration: calQ)
         #expect(abs(result.rollDeg) < 0.1)
         #expect(abs(result.pitchDeg) < 0.1)
+    }
+
+    /// Reviewer's scenario: calibrate at 20°/10°, then 90° in-plane rotation.
+    /// The old implementation read ~(-29°, 11°) instead of (0°, 0°).
+    @Test func calibrationPreservesZeroOnLargeTiltWithNinetyDegreeInPlaneRotation() {
+        let calQ = eulerToQuat(
+            roll: 20.0 * .pi / 180.0,
+            pitch: 10.0 * .pi / 180.0,
+            yaw: 0.0
+        )
+        let yaw90 = eulerToQuat(roll: 0.0, pitch: 0.0, yaw: -.pi / 2.0)
+        let curQ = LevelMath.quatMultiply(calQ, yaw90)
+
+        let result = LevelMath.relativeAttitudeDegrees(current: curQ, calibration: calQ)
+        #expect(abs(result.rollDeg) < 0.1)
+        #expect(abs(result.pitchDeg) < 0.1)
+    }
+
+    /// Calibrated at one tilt, device tilted differently: should show the delta.
+    @Test func calibratedTiltChangeDetectedAfterBodyFrameYaw() {
+        // Calibrate at roll=5°, pitch=0°
+        let calQ = eulerToQuat(roll: 5.0 * .pi / 180.0, pitch: 0.0, yaw: 0.0)
+        // Rotate 45° in-plane, then tilt an extra 3° in roll
+        let yaw45 = eulerToQuat(roll: 0.0, pitch: 0.0, yaw: .pi / 4.0)
+        let extraRoll = eulerToQuat(roll: 3.0 * .pi / 180.0, pitch: 0.0, yaw: 0.0)
+        let curQ = LevelMath.quatMultiply(LevelMath.quatMultiply(calQ, yaw45), extraRoll)
+
+        let result = LevelMath.relativeAttitudeDegrees(current: curQ, calibration: calQ)
+        // The extra 3° roll appears in the body-frame tilt, but it's been rotated
+        // by 45° in-plane so the roll/pitch split depends on the yaw angle.
+        // The total tilt magnitude should be ~3°.
+        let tiltMag = sqrt(result.rollDeg * result.rollDeg + result.pitchDeg * result.pitchDeg)
+        #expect(abs(tiltMag - 3.0) < 0.2)
     }
 
 }
