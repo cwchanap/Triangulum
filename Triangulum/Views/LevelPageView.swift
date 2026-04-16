@@ -4,8 +4,22 @@ import UIKit
 struct LevelPageView: View {
     @ObservedObject var barometerManager: BarometerManager
 
-    @AppStorage("levelCalibrationRoll") private var calibrationRoll: Double = 0.0
-    @AppStorage("levelCalibrationPitch") private var calibrationPitch: Double = 0.0
+    /// Calibration quaternion stored as four separate @AppStorage entries.
+    /// Default is the identity quaternion (no calibration offset).
+    @AppStorage("levelCalibQX") private var calibQX: Double = 0.0
+    @AppStorage("levelCalibQY") private var calibQY: Double = 0.0
+    @AppStorage("levelCalibQZ") private var calibQZ: Double = 0.0
+    @AppStorage("levelCalibQW") private var calibQW: Double = 1.0
+
+    /// Whether a non-identity calibration has been stored.
+    private var isCalibrated: Bool {
+        calibQX != 0.0 || calibQY != 0.0 || calibQZ != 0.0 || calibQW != 1.0
+    }
+
+    /// The stored calibration quaternion.
+    private var calibrationQuat: LevelMath.Quat {
+        LevelMath.Quat(x: calibQX, y: calibQY, z: calibQZ, w: calibQW)
+    }
 
     private let thresholdDeg = 2.0
     @State private var hapticGenerator = UIImpactFeedbackGenerator(style: .medium)
@@ -128,26 +142,49 @@ struct LevelPageView: View {
         return attitude.pitch * 180.0 / .pi
     }
 
-    /// Raw roll/pitch remapped to screen-space (no calibration applied).
-    private var rawScreenAttitude: (screenRoll: Double, screenPitch: Double) {
-        LevelMath.remapForOrientation(
-            roll: rawRollDeg,
-            pitch: rawPitchDeg,
-            orientation: UIDevice.current.orientation,
-            interfaceOrientation: interfaceOrientation
+    /// Roll/pitch in degrees relative to the calibration reference, computed
+    /// via quaternion-based relative attitude. Falls back to raw device-frame
+    /// values when no calibration is stored (identity quaternion).
+    private var relativeAttitudeDeg: (rollDeg: Double, pitchDeg: Double) {
+        guard let attitude = barometerManager.attitude else { return (0.0, 0.0) }
+        guard isCalibrated else {
+            return (rawRollDeg, rawPitchDeg)
+        }
+        let currentQ = LevelMath.Quat(
+            x: attitude.quaternion.x,
+            y: attitude.quaternion.y,
+            z: attitude.quaternion.z,
+            w: attitude.quaternion.w
+        )
+        return LevelMath.relativeAttitudeDegrees(
+            current: currentQ,
+            calibration: calibrationQuat
         )
     }
 
     /// Screen-space roll/pitch after orientation remap and calibration.
-    /// Calibration offsets are stored in screen-space (remapped at calibration
-    /// time) so that subtraction happens in the same coordinate basis as the
-    /// displayed values.
+    /// Calibration is applied in the device-fixed quaternion frame first,
+    /// then the result is remapped for the current screen orientation.
     private var screenRoll: Double {
-        LevelMath.adjusted(raw: rawScreenAttitude.screenRoll, calibration: calibrationRoll)
+        let relative = relativeAttitudeDeg
+        let screen = LevelMath.remapForOrientation(
+            roll: relative.rollDeg,
+            pitch: relative.pitchDeg,
+            orientation: UIDevice.current.orientation,
+            interfaceOrientation: interfaceOrientation
+        )
+        return screen.screenRoll
     }
 
     private var screenPitch: Double {
-        LevelMath.adjusted(raw: rawScreenAttitude.screenPitch, calibration: calibrationPitch)
+        let relative = relativeAttitudeDeg
+        let screen = LevelMath.remapForOrientation(
+            roll: relative.rollDeg,
+            pitch: relative.pitchDeg,
+            orientation: UIDevice.current.orientation,
+            interfaceOrientation: interfaceOrientation
+        )
+        return screen.screenPitch
     }
 
     private var isLevel: Bool {
@@ -160,18 +197,11 @@ struct LevelPageView: View {
 
     private func calibrate() {
         guard let attitude = barometerManager.attitude else { return }
-        let rawRoll = attitude.roll * 180.0 / .pi
-        let rawPitch = attitude.pitch * 180.0 / .pi
-        // Store calibration in screen-space so it shares the same coordinate
-        // basis as the displayed values regardless of device orientation.
-        let screen = LevelMath.remapForOrientation(
-            roll: rawRoll,
-            pitch: rawPitch,
-            orientation: UIDevice.current.orientation,
-            interfaceOrientation: interfaceOrientation
-        )
-        calibrationRoll = screen.screenRoll
-        calibrationPitch = screen.screenPitch
+        let q = attitude.quaternion
+        calibQX = q.x
+        calibQY = q.y
+        calibQZ = q.z
+        calibQW = q.w
     }
 }
 
@@ -295,6 +325,66 @@ enum LevelMath {
                 return orientation
             }
         }
+    }
+
+    // MARK: - Quaternion-based calibration
+
+    /// Lightweight quaternion representation for calibration storage.
+    /// Uses (x, y, z, w) convention matching CMQuaternion.
+    struct Quat: Equatable {
+        var x: Double
+        var y: Double
+        var z: Double
+        var w: Double
+
+        static let identity = Quat(x: 0, y: 0, z: 0, w: 1)
+    }
+
+    /// Hamilton product of two quaternions: q1 * q2.
+    static func quatMultiply(_ q1: Quat, _ q2: Quat) -> Quat {
+        Quat(
+            x: q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y,
+            y: q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x,
+            z: q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w,
+            w: q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z
+        )
+    }
+
+    /// Conjugate (inverse for unit quaternions).
+    static func quatConjugate(_ q: Quat) -> Quat {
+        Quat(x: -q.x, y: -q.y, z: -q.z, w: q.w)
+    }
+
+    /// Extracts roll (radians) from a quaternion using the same ZYX Euler
+    /// angle convention as CoreMotion.
+    static func quaternionToRoll(_ q: Quat) -> Double {
+        let sinrCosp = 2.0 * (q.w * q.x + q.y * q.z)
+        let cosrCosp = 1.0 - 2.0 * (q.x * q.x + q.y * q.y)
+        return atan2(sinrCosp, cosrCosp)
+    }
+
+    /// Extracts pitch (radians) from a quaternion using the same ZYX Euler
+    /// angle convention as CoreMotion.
+    static func quaternionToPitch(_ q: Quat) -> Double {
+        let sinp = 2.0 * (q.w * q.y - q.z * q.x)
+        // Clamp to [-1, 1] to avoid NaN from asin due to floating-point drift
+        return asin(max(-1.0, min(1.0, sinp)))
+    }
+
+    /// Computes roll and pitch (in degrees) of the *relative* attitude between
+    /// the current quaternion and a stored calibration quaternion.
+    ///
+    /// The relative rotation is `current * inverse(calibration)`, which gives
+    /// the attitude relative to the calibration reference. Roll and pitch are
+    /// extracted from this relative quaternion using CoreMotion's ZYX convention.
+    static func relativeAttitudeDegrees(
+        current: Quat,
+        calibration: Quat
+    ) -> (rollDeg: Double, pitchDeg: Double) {
+        let relative = quatMultiply(current, quatConjugate(calibration))
+        let rollDeg = quaternionToRoll(relative) * 180.0 / .pi
+        let pitchDeg = quaternionToPitch(relative) * 180.0 / .pi
+        return (rollDeg, pitchDeg)
     }
 }
 

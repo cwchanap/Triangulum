@@ -207,34 +207,27 @@ import UIKit
         #expect(adjustedPitch == 0.0)
     }
 
-    /// Verifies that calibrating in one orientation and displaying in another
-    /// produces a meaningful (non-zero) screen-space offset. This is the expected
-    /// behaviour for a spirit level: rotating on a tilted surface changes the reading.
-    @Test func screenSpaceCalibrationAcrossOrientationsIsNonZero() {
-        let rawRoll = 5.0, rawPitch = -3.0
+    /// With quaternion-based calibration, calibrating in one orientation and
+    /// rotating to another on the same reference surface should produce ~zero.
+    /// This test simulates the scenario using quaternions: calibrate in portrait
+    /// at (5°, -3°), then construct a quaternion representing a 90° CW device
+    /// rotation plus the same tilt. The relative attitude should read ~(0, 0).
+    @Test func quaternionCalibrationZeroesAcrossOrientations() {
+        // Calibration quaternion: portrait with roll=5°, pitch=-3°
+        let calRollRad = 5.0 * .pi / 180.0
+        let calPitchRad = -3.0 * .pi / 180.0
+        let calQ = eulerToQuat(roll: calRollRad, pitch: calPitchRad, yaw: 0.0)
 
-        // Calibrate in portrait
-        let calScreen = LevelMath.remapForOrientation(
-            roll: rawRoll, pitch: rawPitch, orientation: .portrait
-        )
+        // After rotating 90° CW (yaw = -π/2 in device frame) on the same surface,
+        // the device's total orientation is: calibration tilt + 90° yaw rotation.
+        let yaw90 = -Double.pi / 2.0
+        let currentQ = eulerToQuat(roll: calRollRad, pitch: calPitchRad, yaw: yaw90)
 
-        // Display in landscape-left (same raw device-frame values)
-        let displayScreen = LevelMath.remapForOrientation(
-            roll: rawRoll, pitch: rawPitch, orientation: .landscapeLeft
-        )
-        let adjustedRoll = LevelMath.adjusted(
-            raw: displayScreen.screenRoll, calibration: calScreen.screenRoll
-        )
-        let adjustedPitch = LevelMath.adjusted(
-            raw: displayScreen.screenPitch, calibration: calScreen.screenPitch
-        )
+        let result = LevelMath.relativeAttitudeDegrees(current: currentQ, calibration: calQ)
 
-        // The device has rotated on the same surface, so screen-space tilt changes.
-        // This is physically correct for a 2D bubble level.
-        // portrait screen: (5, -3), landscape-left screen: (-3, 5)
-        // adjusted: (-3 - 5, 5 - (-3)) = (-8, 8)
-        #expect(adjustedRoll == -8.0)
-        #expect(adjustedPitch == 8.0)
+        // Relative roll/pitch should be ~0 — the surface hasn't changed, only yaw.
+        #expect(abs(result.rollDeg) < 0.01)
+        #expect(abs(result.pitchDeg) < 0.01)
     }
 
     /// Verifies that with zero calibration the output equals the raw remapped value.
@@ -428,4 +421,114 @@ import UIKit
         #expect(!LevelMath.isLevel(roll: adjustedFromNil, pitch: 0.0, threshold: 2.0))
     }
 
+    // MARK: - Quaternion math
+
+    @Test func quatIdentityMultiplicationIsIdentity() {
+        let q = LevelMath.Quat(x: 0.3, y: -0.5, z: 0.1, w: 0.8)
+        let result = LevelMath.quatMultiply(q, .identity)
+        #expect(abs(result.x - q.x) < 1e-12)
+        #expect(abs(result.y - q.y) < 1e-12)
+        #expect(abs(result.z - q.z) < 1e-12)
+        #expect(abs(result.w - q.w) < 1e-12)
+    }
+
+    @Test func quatConjugateOfIdentityIsIdentity() {
+        let conj = LevelMath.quatConjugate(.identity)
+        #expect(conj.x == 0.0)
+        #expect(conj.y == 0.0)
+        #expect(conj.z == 0.0)
+        #expect(conj.w == 1.0)
+    }
+
+    @Test func quatSelfConjugateMultiplyIsIdentity() {
+        // Must use a unit quaternion for q * conj(q) = identity
+        var q = LevelMath.Quat(x: 0.3, y: -0.5, z: 0.1, w: 0.8)
+        let norm = sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
+        q.x /= norm; q.y /= norm; q.z /= norm; q.w /= norm
+        let result = LevelMath.quatMultiply(q, LevelMath.quatConjugate(q))
+        #expect(abs(result.x) < 1e-12)
+        #expect(abs(result.y) < 1e-12)
+        #expect(abs(result.z) < 1e-12)
+        #expect(abs(result.w - 1.0) < 1e-12)
+    }
+
+    @Test func relativeAttitudeWithSelfCalibrationIsZero() {
+        // If current == calibration, relative roll/pitch should be zero.
+        let q = eulerToQuat(roll: 0.1, pitch: -0.05, yaw: 0.3)
+        let result = LevelMath.relativeAttitudeDegrees(current: q, calibration: q)
+        #expect(abs(result.rollDeg) < 0.001)
+        #expect(abs(result.pitchDeg) < 0.001)
+    }
+
+    @Test func relativeAttitudeWithIdentityCalibrationMatchesEuler() {
+        // With identity calibration, relative roll/pitch should equal the
+        // quaternion's own roll/pitch extraction.
+        let rollDeg = 10.0
+        let pitchDeg = -5.0
+        let q = eulerToQuat(
+            roll: rollDeg * .pi / 180.0,
+            pitch: pitchDeg * .pi / 180.0,
+            yaw: 0.0
+        )
+        let result = LevelMath.relativeAttitudeDegrees(current: q, calibration: .identity)
+        #expect(abs(result.rollDeg - rollDeg) < 0.01)
+        #expect(abs(result.pitchDeg - pitchDeg) < 0.01)
+    }
+
+    @Test func relativeAttitudeTiltChangeAfterCalibration() {
+        // Calibrate at 5° roll, 0° pitch. Then tilt to 10° roll, 0° pitch.
+        // Relative should show ~5° roll, ~0° pitch.
+        let calQ = eulerToQuat(
+            roll: 5.0 * .pi / 180.0,
+            pitch: 0.0,
+            yaw: 0.0
+        )
+        let curQ = eulerToQuat(
+            roll: 10.0 * .pi / 180.0,
+            pitch: 0.0,
+            yaw: 0.0
+        )
+        let result = LevelMath.relativeAttitudeDegrees(current: curQ, calibration: calQ)
+        #expect(abs(result.rollDeg - 5.0) < 0.1)
+        #expect(abs(result.pitchDeg) < 0.1)
+    }
+
+    @Test func quaternionCalibrationSurvivesNinetyDegreeYawRotation() {
+        // Calibrate at roll=8°, pitch=3°, yaw=0. Then device rotates 90° CW (yaw=-π/2)
+        // on the same surface. The total orientation is the original tilt + 90° yaw.
+        // Relative roll/pitch should still be ~0.
+        let rollRad = 8.0 * .pi / 180.0
+        let pitchRad = 3.0 * .pi / 180.0
+
+        let calQ = eulerToQuat(roll: rollRad, pitch: pitchRad, yaw: 0.0)
+        let curQ = eulerToQuat(roll: rollRad, pitch: pitchRad, yaw: -.pi / 2.0)
+
+        let result = LevelMath.relativeAttitudeDegrees(current: curQ, calibration: calQ)
+        #expect(abs(result.rollDeg) < 0.1)
+        #expect(abs(result.pitchDeg) < 0.1)
+    }
+
+}
+
+// MARK: - Test helper: Euler angles → quaternion (ZYX convention, matches CoreMotion)
+
+/// Converts ZYX Euler angles (roll, pitch, yaw) to a quaternion.
+/// This matches CoreMotion's convention:
+///   roll  = rotation around device X axis
+///   pitch = rotation around device Y axis
+///   yaw   = rotation around device Z axis
+private func eulerToQuat(roll: Double, pitch: Double, yaw: Double) -> LevelMath.Quat {
+    let cr = cos(roll / 2.0)
+    let sr = sin(roll / 2.0)
+    let cp = cos(pitch / 2.0)
+    let sp = sin(pitch / 2.0)
+    let cy = cos(yaw / 2.0)
+    let sy = sin(yaw / 2.0)
+
+    return LevelMath.Quat(
+        x: sr * cp * cy - cr * sp * sy,
+        y: cr * sp * cy + sr * cp * sy,
+        z: cr * cp * sy - sr * sp * cy,
+        w: cr * cp * cy + sr * sp * sy
+    )
 }
