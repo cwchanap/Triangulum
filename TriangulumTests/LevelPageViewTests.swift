@@ -424,8 +424,8 @@ import UIKit
     // MARK: - rotateVector
 
     @Test func rotateVectorIdentityLeavesVectorUnchanged() {
-        let v = (x: 1.0, y: 2.0, z: 3.0)
-        let result = LevelMath.rotateVector(v, by: .identity)
+        let vector = (x: 1.0, y: 2.0, z: 3.0)
+        let result = LevelMath.rotateVector(vector, by: .identity)
         #expect(abs(result.x - 1.0) < 1e-12)
         #expect(abs(result.y - 2.0) < 1e-12)
         #expect(abs(result.z - 3.0) < 1e-12)
@@ -433,8 +433,8 @@ import UIKit
 
     @Test func rotateVectorZAxisByRollTiltY() {
         // 90° roll: Z axis rotates to -Y direction
-        let q = eulerToQuat(roll: .pi / 2.0, pitch: 0.0, yaw: 0.0)
-        let result = LevelMath.rotateVector((x: 0, y: 0, z: 1), by: q)
+        let quaternion = eulerToQuat(roll: .pi / 2.0, pitch: 0.0, yaw: 0.0)
+        let result = LevelMath.rotateVector((x: 0, y: 0, z: 1), by: quaternion)
         #expect(abs(result.x) < 1e-12)
         #expect(abs(result.y - (-1.0)) < 1e-12)
         #expect(abs(result.z) < 1e-12)
@@ -442,8 +442,8 @@ import UIKit
 
     @Test func rotateVectorZAxisByPitchTiltX() {
         // 90° pitch: Z axis rotates to +X direction
-        let q = eulerToQuat(roll: 0.0, pitch: .pi / 2.0, yaw: 0.0)
-        let result = LevelMath.rotateVector((x: 0, y: 0, z: 1), by: q)
+        let quaternion = eulerToQuat(roll: 0.0, pitch: .pi / 2.0, yaw: 0.0)
+        let result = LevelMath.rotateVector((x: 0, y: 0, z: 1), by: quaternion)
         #expect(abs(result.x - 1.0) < 1e-12)
         #expect(abs(result.y) < 1e-12)
         #expect(abs(result.z) < 1e-12)
@@ -452,12 +452,12 @@ import UIKit
     // MARK: - Quaternion math
 
     @Test func quatIdentityMultiplicationIsIdentity() {
-        let q = LevelMath.Quat(x: 0.3, y: -0.5, z: 0.1, w: 0.8)
-        let result = LevelMath.quatMultiply(q, .identity)
-        #expect(abs(result.x - q.x) < 1e-12)
-        #expect(abs(result.y - q.y) < 1e-12)
-        #expect(abs(result.z - q.z) < 1e-12)
-        #expect(abs(result.w - q.w) < 1e-12)
+        let quaternion = LevelMath.Quat(x: 0.3, y: -0.5, z: 0.1, w: 0.8)
+        let result = LevelMath.quatMultiply(quaternion, .identity)
+        #expect(abs(result.x - quaternion.x) < 1e-12)
+        #expect(abs(result.y - quaternion.y) < 1e-12)
+        #expect(abs(result.z - quaternion.z) < 1e-12)
+        #expect(abs(result.w - quaternion.w) < 1e-12)
     }
 
     @Test func quatConjugateOfIdentityIsIdentity() {
@@ -470,10 +470,18 @@ import UIKit
 
     @Test func quatSelfConjugateMultiplyIsIdentity() {
         // Must use a unit quaternion for q * conj(q) = identity
-        var q = LevelMath.Quat(x: 0.3, y: -0.5, z: 0.1, w: 0.8)
-        let norm = sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
-        q.x /= norm; q.y /= norm; q.z /= norm; q.w /= norm
-        let result = LevelMath.quatMultiply(q, LevelMath.quatConjugate(q))
+        var quaternion = LevelMath.Quat(x: 0.3, y: -0.5, z: 0.1, w: 0.8)
+        let norm = sqrt(
+            quaternion.x * quaternion.x +
+            quaternion.y * quaternion.y +
+            quaternion.z * quaternion.z +
+            quaternion.w * quaternion.w
+        )
+        quaternion.x /= norm
+        quaternion.y /= norm
+        quaternion.z /= norm
+        quaternion.w /= norm
+        let result = LevelMath.quatMultiply(quaternion, LevelMath.quatConjugate(quaternion))
         #expect(abs(result.x) < 1e-12)
         #expect(abs(result.y) < 1e-12)
         #expect(abs(result.z) < 1e-12)
@@ -482,8 +490,8 @@ import UIKit
 
     @Test func relativeAttitudeWithSelfCalibrationIsZero() {
         // If current == calibration, relative roll/pitch should be zero.
-        let q = eulerToQuat(roll: 0.1, pitch: -0.05, yaw: 0.3)
-        let result = LevelMath.relativeAttitudeDegrees(current: q, calibration: q)
+        let quaternion = eulerToQuat(roll: 0.1, pitch: -0.05, yaw: 0.3)
+        let result = LevelMath.relativeAttitudeDegrees(current: quaternion, calibration: quaternion)
         #expect(abs(result.rollDeg) < 0.001)
         #expect(abs(result.pitchDeg) < 0.001)
     }
@@ -493,12 +501,12 @@ import UIKit
         // quaternion's own roll/pitch extraction.
         let rollDeg = 10.0
         let pitchDeg = -5.0
-        let q = eulerToQuat(
+        let quaternion = eulerToQuat(
             roll: rollDeg * .pi / 180.0,
             pitch: pitchDeg * .pi / 180.0,
             yaw: 0.0
         )
-        let result = LevelMath.relativeAttitudeDegrees(current: q, calibration: .identity)
+        let result = LevelMath.relativeAttitudeDegrees(current: quaternion, calibration: .identity)
         #expect(abs(result.rollDeg - rollDeg) < 0.01)
         #expect(abs(result.pitchDeg - pitchDeg) < 0.01)
     }
@@ -580,17 +588,17 @@ import UIKit
 ///   pitch = rotation around device Y axis
 ///   yaw   = rotation around device Z axis
 private func eulerToQuat(roll: Double, pitch: Double, yaw: Double) -> LevelMath.Quat {
-    let cr = cos(roll / 2.0)
-    let sr = sin(roll / 2.0)
-    let cp = cos(pitch / 2.0)
-    let sp = sin(pitch / 2.0)
-    let cy = cos(yaw / 2.0)
-    let sy = sin(yaw / 2.0)
+    let cosineRoll = cos(roll / 2.0)
+    let sineRoll = sin(roll / 2.0)
+    let cosinePitch = cos(pitch / 2.0)
+    let sinePitch = sin(pitch / 2.0)
+    let cosineYaw = cos(yaw / 2.0)
+    let sineYaw = sin(yaw / 2.0)
 
     return LevelMath.Quat(
-        x: sr * cp * cy - cr * sp * sy,
-        y: cr * sp * cy + sr * cp * sy,
-        z: cr * cp * sy - sr * sp * cy,
-        w: cr * cp * cy + sr * sp * sy
+        x: sineRoll * cosinePitch * cosineYaw - cosineRoll * sinePitch * sineYaw,
+        y: cosineRoll * sinePitch * cosineYaw + sineRoll * cosinePitch * sineYaw,
+        z: cosineRoll * cosinePitch * sineYaw - sineRoll * sinePitch * cosineYaw,
+        w: cosineRoll * cosinePitch * cosineYaw + sineRoll * sinePitch * sineYaw
     )
 }

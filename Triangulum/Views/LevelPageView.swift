@@ -197,11 +197,11 @@ struct LevelPageView: View {
 
     private func calibrate() {
         guard let attitude = barometerManager.attitude else { return }
-        let q = attitude.quaternion
-        calibQX = q.x
-        calibQY = q.y
-        calibQZ = q.z
-        calibQW = q.w
+        let quaternion = attitude.quaternion
+        calibQX = quaternion.x
+        calibQY = quaternion.y
+        calibQZ = quaternion.z
+        calibQW = quaternion.w
     }
 }
 
@@ -341,43 +341,43 @@ enum LevelMath {
     }
 
     /// Hamilton product of two quaternions: q1 * q2.
-    static func quatMultiply(_ q1: Quat, _ q2: Quat) -> Quat {
+    static func quatMultiply(_ lhs: Quat, _ rhs: Quat) -> Quat {
         Quat(
-            x: q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y,
-            y: q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x,
-            z: q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w,
-            w: q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z
+            x: lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+            y: lhs.w * rhs.y - lhs.x * rhs.z + lhs.y * rhs.w + lhs.z * rhs.x,
+            z: lhs.w * rhs.z + lhs.x * rhs.y - lhs.y * rhs.x + lhs.z * rhs.w,
+            w: lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z
         )
     }
 
     /// Conjugate (inverse for unit quaternions).
-    static func quatConjugate(_ q: Quat) -> Quat {
-        Quat(x: -q.x, y: -q.y, z: -q.z, w: q.w)
+    static func quatConjugate(_ quaternion: Quat) -> Quat {
+        Quat(x: -quaternion.x, y: -quaternion.y, z: -quaternion.z, w: quaternion.w)
     }
 
     /// Rotates a 3D vector by a unit quaternion using the sandwich product
     /// v' = q * v * q⁻¹.
     static func rotateVector(
-        _ v: (x: Double, y: Double, z: Double),
-        by q: Quat
+        _ vector: (x: Double, y: Double, z: Double),
+        by quaternion: Quat
     ) -> (x: Double, y: Double, z: Double) {
-        let vQuat = Quat(x: v.x, y: v.y, z: v.z, w: 0)
-        let rotated = quatMultiply(quatMultiply(q, vQuat), quatConjugate(q))
+        let vectorQuat = Quat(x: vector.x, y: vector.y, z: vector.z, w: 0)
+        let rotated = quatMultiply(quatMultiply(quaternion, vectorQuat), quatConjugate(quaternion))
         return (rotated.x, rotated.y, rotated.z)
     }
 
     /// Extracts roll (radians) from a quaternion using the same ZYX Euler
     /// angle convention as CoreMotion.
-    static func quaternionToRoll(_ q: Quat) -> Double {
-        let sinrCosp = 2.0 * (q.w * q.x + q.y * q.z)
-        let cosrCosp = 1.0 - 2.0 * (q.x * q.x + q.y * q.y)
+    static func quaternionToRoll(_ quaternion: Quat) -> Double {
+        let sinrCosp = 2.0 * (quaternion.w * quaternion.x + quaternion.y * quaternion.z)
+        let cosrCosp = 1.0 - 2.0 * (quaternion.x * quaternion.x + quaternion.y * quaternion.y)
         return atan2(sinrCosp, cosrCosp)
     }
 
     /// Extracts pitch (radians) from a quaternion using the same ZYX Euler
     /// angle convention as CoreMotion.
-    static func quaternionToPitch(_ q: Quat) -> Double {
-        let sinp = 2.0 * (q.w * q.y - q.z * q.x)
+    static func quaternionToPitch(_ quaternion: Quat) -> Double {
+        let sinp = 2.0 * (quaternion.w * quaternion.y - quaternion.z * quaternion.x)
         // Clamp to [-1, 1] to avoid NaN from asin due to floating-point drift
         return asin(max(-1.0, min(1.0, sinp)))
     }
@@ -399,10 +399,10 @@ enum LevelMath {
         current: Quat,
         calibration: Quat
     ) -> (rollDeg: Double, pitchDeg: Double) {
-        let up = (x: 0.0, y: 0.0, z: 1.0)
+        let upVector = (x: 0.0, y: 0.0, z: 1.0)
 
         // Calibration surface normal in world frame
-        let nCalWorld = rotateVector(up, by: calibration)
+        let nCalWorld = rotateVector(upVector, by: calibration)
 
         // Express calibration normal in the current body frame.
         // On the same surface as calibration → [0,0,1] → roll/pitch = 0.
