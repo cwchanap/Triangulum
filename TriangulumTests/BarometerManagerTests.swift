@@ -140,7 +140,7 @@ struct BarometerManagerTests {
         }
     }
 
-    @Test func testStartBarometerUpdatesDoesNotStartAttitudeWhenUnavailable() {
+    @Test func testStartBarometerUpdatesStartsAttitudeWhenBarometerUnavailableButMotionAvailable() {
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -154,8 +154,10 @@ struct BarometerManagerTests {
 
         #expect(manager.isAvailable == false)
         #expect(manager.isAttitudeAvailable)
-        // Motion stream should NOT start when barometer is unavailable
-        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testStartBarometerUpdatesStartsAttitudeWhenAvailable() {
@@ -172,7 +174,6 @@ struct BarometerManagerTests {
 
         #expect(manager.isAvailable == true)
         #expect(manager.isAttitudeAvailable)
-        // Motion stream should start when barometer IS available
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
 
         manager.stopBarometerUpdates()
@@ -365,9 +366,13 @@ struct BarometerManagerTests {
         // stopDeviceMotionUpdates should have been called to clean up
         #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
 
-        // Now LevelPageView calls startAttitudeUpdates() — this should NOT be a no-op
-        manager.startAttitudeUpdates()
+        let deadline = Date().addingTimeInterval(1.0)
+        while motionManager.startDeviceMotionUpdatesCallCount < 2 && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        }
+
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
+        #expect(manager.motionStreamFailed == true)
     }
 
     @Test func testMotionErrorClearsStaleAttitude() {
@@ -488,16 +493,20 @@ struct BarometerManagerTests {
         #expect(manager.errorMessage.contains("Motion sensor error"))
         #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
 
-        // After error, the .barometer requester should still be registered.
-        // When the Level page appears and calls startAttitudeUpdates(), motion should restart
-        // because .barometer is still in the set and didStartDeviceMotion is false.
-        manager.startAttitudeUpdates()
+        // After error, the .barometer requester should still be registered and should trigger
+        // an automatic restart without needing an explicit Level-page start.
+        #expect(manager.motionStreamFailed == true)
+
+        let deadline = Date().addingTimeInterval(1.0)
+        while motionManager.startDeviceMotionUpdatesCallCount < 2 && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        }
+
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
 
-        // Stopping only the explicit requester should NOT stop motion because
-        // the .barometer requester is still registered (preserved across the error).
+        // Stopping only an explicit requester that was never added should remain a no-op.
         manager.stopAttitudeUpdates()
-        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // only the error-cleanup stop
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testBothRequestersPreservedAfterTransientMotionError() {
@@ -525,7 +534,7 @@ struct BarometerManagerTests {
         // .explicit is already in the set, but didStartDeviceMotion is false so stream restarts).
         manager.startAttitudeUpdates()
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
-        #expect(manager.motionStreamFailed == false)
+        #expect(manager.motionStreamFailed == true)
 
         // Stopping only explicit should NOT stop motion because .barometer is still registered
         manager.stopAttitudeUpdates()

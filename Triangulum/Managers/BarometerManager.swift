@@ -69,14 +69,14 @@ class BarometerManager: ObservableObject {
         guard !didStartBarometerUpdates else { return }
         didStartBarometerUpdates = true
 
+        startAttitudeUpdates(for: .barometer)
+
         guard isAvailable else {
             if !isAttitudeAvailable {
                 errorMessage = "Barometer not available on this device"
             }
             return
         }
-
-        startAttitudeUpdates(for: .barometer)
 
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
@@ -161,9 +161,14 @@ class BarometerManager: ObservableObject {
     private func startAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard isAttitudeAvailable else { return }
         attitudeUpdateRequesters.insert(requester)
-        guard !didStartDeviceMotion else { return } // Already running
 
-        motionStreamFailed = false
+        startDeviceMotionUpdatesIfNeeded()
+    }
+
+    private func startDeviceMotionUpdatesIfNeeded() {
+        guard isAttitudeAvailable else { return }
+        guard !attitudeUpdateRequesters.isEmpty else { return }
+        guard !didStartDeviceMotion else { return } // Already running
 
         motionManager.deviceMotionUpdateInterval = 0.1
         didStartDeviceMotion = true
@@ -191,6 +196,9 @@ class BarometerManager: ObservableObject {
                 // .explicit) are preserved across transient errors. A subsequent call to
                 // startAttitudeUpdates(for:) will detect that motion is not running and
                 // restart the stream without needing to re-insert requesters.
+                DispatchQueue.main.async { [weak self] in
+                    self?.startDeviceMotionUpdatesIfNeeded()
+                }
                 return
             }
 
@@ -198,6 +206,10 @@ class BarometerManager: ObservableObject {
                 Logger.sensor.warning("BarometerManager: Received nil motion data without error")
                 return
             }
+            if self.errorMessage.hasPrefix("Motion sensor error:") {
+                self.errorMessage = ""
+            }
+            self.motionStreamFailed = false
             self.attitude = motion.attitude
         }
     }
@@ -209,7 +221,14 @@ class BarometerManager: ObservableObject {
     private func stopAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard attitudeUpdateRequesters.remove(requester) != nil else { return }
         guard attitudeUpdateRequesters.isEmpty else { return }
-        guard didStartDeviceMotion else { return }
+        if errorMessage.hasPrefix("Motion sensor error:") {
+            errorMessage = ""
+        }
+        motionStreamFailed = false
+        guard didStartDeviceMotion else {
+            attitude = nil
+            return
+        }
         motionManager.stopDeviceMotionUpdates()
         didStartDeviceMotion = false
         attitude = nil
