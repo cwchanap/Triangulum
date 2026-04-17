@@ -409,7 +409,7 @@ enum LevelMath {
         let nCalBody = rotateVector(nCalWorld, by: quatConjugate(current))
 
         let rollDeg = atan2(nCalBody.y, nCalBody.z) * 180.0 / .pi
-        let pitchDeg = atan2(-nCalBody.x, nCalBody.z) * 180.0 / .pi
+        let pitchDeg = atan2(-nCalBody.x, hypot(nCalBody.y, nCalBody.z)) * 180.0 / .pi
 
         return (rollDeg, pitchDeg)
     }
