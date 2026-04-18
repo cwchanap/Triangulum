@@ -11,11 +11,6 @@ struct LevelPageView: View {
     @AppStorage("levelCalibQZ") private var calibQZ: Double = 0.0
     @AppStorage("levelCalibQW") private var calibQW: Double = 1.0
 
-    /// Whether a non-identity calibration has been stored.
-    private var isCalibrated: Bool {
-        calibQX != 0.0 || calibQY != 0.0 || calibQZ != 0.0 || calibQW != 1.0
-    }
-
     /// The stored calibration quaternion.
     private var calibrationQuat: LevelMath.Quat {
         LevelMath.Quat(x: calibQX, y: calibQY, z: calibQZ, w: calibQW)
@@ -132,24 +127,13 @@ struct LevelPageView: View {
         )
     }
 
-    private var rawRollDeg: Double {
-        guard let attitude = barometerManager.attitude else { return 0.0 }
-        return attitude.roll * 180.0 / .pi
-    }
-
-    private var rawPitchDeg: Double {
-        guard let attitude = barometerManager.attitude else { return 0.0 }
-        return attitude.pitch * 180.0 / .pi
-    }
-
-    /// Roll/pitch in degrees relative to the calibration reference, computed
-    /// via quaternion-based relative attitude. Falls back to raw device-frame
-    /// values when no calibration is stored (identity quaternion).
+    /// Roll/pitch in degrees relative to the calibration reference, always
+    /// computed via quaternion-based surface-normal comparison. When no
+    /// calibration has been stored, the identity quaternion is used as the
+    /// reference, which avoids the gimbal-lock edge cases of raw Euler angles
+    /// (e.g. phone face-down reporting ~180° roll/pitch).
     private var relativeAttitudeDeg: (rollDeg: Double, pitchDeg: Double) {
         guard let attitude = barometerManager.attitude else { return (0.0, 0.0) }
-        guard isCalibrated else {
-            return (rawRollDeg, rawPitchDeg)
-        }
         let currentQ = LevelMath.Quat(
             x: attitude.quaternion.x,
             y: attitude.quaternion.y,

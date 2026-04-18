@@ -22,7 +22,35 @@ jobs:
           set -o pipefail
           SIMULATORS_JSON="${RUNNER_TEMP}/simulators.json"
           xcrun simctl list devices available -j > "$SIMULATORS_JSON"
-          SIMULATOR_UDID=$(python3 -c "import json,sys; data=json.load(sys.stdin); runtimes=data.get('devices',{}); ios_devices=[d for key, devices in runtimes.items() if ('iOS' in key or 'SimRuntime.iOS' in key) for d in devices if d.get('isAvailable')]; iphones=[d for d in ios_devices if 'iPhone' in d.get('name','')]; pick=(iphones or ios_devices); print(pick[0]['udid'] if pick else '')" < "$SIMULATORS_JSON")
+          SIMULATOR_UDID=$(python3 -c "
+import json, sys, re
+data = json.load(sys.stdin)
+runtimes = data.get('devices', {})
+MIN_VER = (18, 5)
+
+def parse_runtime_ver(key):
+    # e.g. 'com.apple.CoreSimulator.SimRuntime.iOS-18-5' → (18, 5)
+    m = re.search(r'iOS-(\d+)-(\d+)', key)
+    return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
+candidates = []
+for key, devices in runtimes.items():
+    if 'iOS' not in key and 'SimRuntime.iOS' not in key:
+        continue
+    ver = parse_runtime_ver(key)
+    if ver < MIN_VER:
+        continue
+    for d in devices:
+        if not d.get('isAvailable'):
+            continue
+        if 'iPhone' in d.get('name', ''):
+            candidates.append((ver, d['udid'], d['name']))
+
+# Prefer newest runtime, then first iPhone on that runtime
+candidates.sort(key=lambda c: c[0], reverse=True)
+if candidates:
+    print(candidates[0][1])
+" < "$SIMULATORS_JSON")
           if [ -z "$SIMULATOR_UDID" ]; then
             echo "No available iOS simulators detected."
             xcrun simctl list devices available

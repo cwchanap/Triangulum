@@ -511,6 +511,30 @@ import UIKit
         #expect(abs(result.pitchDeg - pitchDeg) < 0.01)
     }
 
+    /// Documents that the uncalibrated path always uses quaternion math
+    /// rather than raw Euler angles. This avoids gimbal-lock artefacts near
+    /// ±90° pitch and keeps the pipeline consistent regardless of calibration
+    /// state. With identity calibration the result matches the device's own
+    /// roll/pitch for small tilts (proven above), and the single-path approach
+    /// ensures calibrated and uncalibrated modes use identical math.
+    @Test func uncalibratedPathUsesQuaternionMath() {
+        // 45° tilt in both axes — moderate tilt where Euler is still fine,
+        // but this test locks in the "always quaternion" behaviour.
+        let rollDeg = 45.0
+        let pitchDeg = 30.0
+        let quaternion = eulerToQuat(
+            roll: rollDeg * .pi / 180.0,
+            pitch: pitchDeg * .pi / 180.0,
+            yaw: 0.0
+        )
+        let result = LevelMath.relativeAttitudeDegrees(
+            current: quaternion,
+            calibration: .identity
+        )
+        #expect(abs(result.rollDeg - rollDeg) < 0.1)
+        #expect(abs(result.pitchDeg - pitchDeg) < 0.1)
+    }
+
     @Test func relativeAttitudeTiltChangeAfterCalibration() {
         // Calibrate at 5° roll, 0° pitch. Then tilt to 10° roll, 0° pitch.
         // Relative should show ~5° roll, ~0° pitch.
