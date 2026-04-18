@@ -117,17 +117,13 @@ struct LocationManagerTests {
         #expect(manager.errorMessage.contains("Location error"))
     }
 
-    @Test func testAuthorizationStatusChange() async {
+    @Test func testAuthorizationStatusChange() {
         let manager = LocationManager(skipAvailabilityCheck: true)
 
-        // Wait for initial async availability check to complete
-        try? await Task.sleep(for: .milliseconds(100))
-
+        // With skipAvailabilityCheck: true, checkAvailability() is never called,
+        // so authorizationStatus is set synchronously by the delegate method.
         manager.locationManager(CLLocationManager(), didChangeAuthorization: .denied)
-        try? await Task.sleep(for: .milliseconds(100))
 
-        // checkAvailability() can asynchronously re-sync status with the system status,
-        // so validate using the shared transition assertion.
         assertAuthorizationStatus(manager, expected: .denied)
     }
 
