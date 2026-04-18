@@ -28,6 +28,8 @@ class BarometerManager: ObservableObject {
     private var didStartBarometerUpdates = false
     private var didStartDeviceMotion = false
     private var attitudeUpdateRequesters = Set<AttitudeUpdateRequester>()
+    private var motionRetryCount = 0
+    private static let maxMotionRetries = 5
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -69,14 +71,17 @@ class BarometerManager: ObservableObject {
         guard !didStartBarometerUpdates else { return }
         didStartBarometerUpdates = true
 
-        startAttitudeUpdates(for: .barometer)
-
         guard isAvailable else {
             if !isAttitudeAvailable {
                 errorMessage = "Barometer not available on this device"
             }
             return
         }
+
+        // Only start attitude updates when the barometer is actually available,
+        // so devices without a barometer don't run unnecessary motion sensing.
+        // The Level page and explicit callers use startAttitudeUpdates() separately.
+        startAttitudeUpdates(for: .barometer)
 
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
@@ -196,8 +201,14 @@ class BarometerManager: ObservableObject {
                 // .explicit) are preserved across transient errors. A subsequent call to
                 // startAttitudeUpdates(for:) will detect that motion is not running and
                 // restart the stream without needing to re-insert requesters.
-                DispatchQueue.main.async { [weak self] in
-                    self?.startDeviceMotionUpdatesIfNeeded()
+                self.motionRetryCount += 1
+                if self.motionRetryCount <= Self.maxMotionRetries {
+                    let delayMs = min(pow(2.0, Double(self.motionRetryCount - 1)) * 500, 8000)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(delayMs))) { [weak self] in
+                        self?.startDeviceMotionUpdatesIfNeeded()
+                    }
+                } else {
+                    Logger.sensor.warning("BarometerManager: Motion stream failed \(Self.maxMotionRetries) times, giving up auto-retry")
                 }
                 return
             }
@@ -210,6 +221,7 @@ class BarometerManager: ObservableObject {
                 self.errorMessage = ""
             }
             self.motionStreamFailed = false
+            self.motionRetryCount = 0
             self.attitude = motion.attitude
         }
     }
@@ -225,6 +237,7 @@ class BarometerManager: ObservableObject {
             errorMessage = ""
         }
         motionStreamFailed = false
+        motionRetryCount = 0
         guard didStartDeviceMotion else {
             attitude = nil
             return
