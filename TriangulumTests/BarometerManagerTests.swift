@@ -11,6 +11,42 @@ import CoreMotion
 import SwiftData
 @testable import Triangulum
 
+private class MockAttitude: CMAttitude {
+    private let _roll: Double
+    private let _pitch: Double
+    private let _yaw: Double
+
+    init(roll: Double, pitch: Double, yaw: Double) {
+        _roll = roll
+        _pitch = pitch
+        _yaw = yaw
+        super.init()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var roll: Double { _roll }
+    override var pitch: Double { _pitch }
+    override var yaw: Double { _yaw }
+}
+
+private class MockDeviceMotion: CMDeviceMotion {
+    private let _attitude: CMAttitude
+
+    init(attitude: CMAttitude) {
+        _attitude = attitude
+        super.init()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var attitude: CMAttitude { _attitude }
+}
+
 private final class MockMotionManager: CMMotionManager, @unchecked Sendable {
     var mockIsDeviceMotionAvailable = false
     var startDeviceMotionUpdatesCallCount = 0
@@ -390,17 +426,17 @@ struct BarometerManagerTests {
 
         manager.startAttitudeUpdates()
 
-        // Simulate a successful motion update to set attitude.
-        // We can't create a real CMDeviceMotion on the simulator, so verify
-        // the clearing behavior through the motionStreamFailed flag instead.
-        // The attitude clearing is tested indirectly: after an error, attitude
-        // will be nil regardless of its prior state.
+        // First set a non-nil attitude via a successful motion callback.
+        let mockAttitude = MockAttitude(roll: 0.1, pitch: 0.2, yaw: 0.3)
+        let mockMotion = MockDeviceMotion(attitude: mockAttitude)
+        motionManager.simulateMotion(mockMotion)
+        #expect(manager.attitude != nil)
 
-        // Simulate an error
+        // Simulate an error — the stale attitude must be cleared so the
+        // Level page doesn't render frozen orientation data.
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
         motionManager.simulateError(error)
 
-        // Attitude should be nil (cleared from any prior state)
         #expect(manager.attitude == nil)
         #expect(manager.motionStreamFailed == true)
     }
@@ -550,24 +586,27 @@ struct BarometerManagerTests {
 
         let startCountBeforeSuccess = motionManager.startDeviceMotionUpdatesCallCount
 
-        // Simulate successful motion data to reset the retry counter
-        // (Can't create real CMDeviceMotion, so we test indirectly:
-        // after a successful callback, retryCount resets to 0)
-        // Since we can't call simulateMotion without a real CMDeviceMotion,
-        // verify the contract: stop+restart resets via stopAttitudeUpdates
-        manager.stopAttitudeUpdates()
-        manager.startAttitudeUpdates()
+        // Simulate a successful motion callback to reset the retry counter
+        // through the success handler path (line 224: motionRetryCount = 0).
+        let mockAttitude = MockAttitude(roll: 0.1, pitch: 0.2, yaw: 0.3)
+        let mockMotion = MockDeviceMotion(attitude: mockAttitude)
+        motionManager.simulateMotion(mockMotion)
 
-        // After stop and restart, retry count is reset.
-        // Simulating one more error should trigger a retry (not give up).
-        motionManager.simulateError(error)
-        let deadline = Date().addingTimeInterval(1.0)
-        while motionManager.startDeviceMotionUpdatesCallCount < startCountBeforeSuccess + 1 && Date() < deadline {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        // Now inject 4 more errors. If the success handler did NOT reset
+        // motionRetryCount to 0, the next error would be attempt 5+ and
+        // would exceed maxMotionRetries, preventing retries. Instead, each
+        // error should still trigger a retry because the counter was reset.
+        for _ in 0..<4 {
+            motionManager.simulateError(error)
+            let deadline = Date().addingTimeInterval(9.0)
+            while motionManager.startDeviceMotionUpdatesCallCount < motionManager.stopDeviceMotionUpdatesCallCount + 1 && Date() < deadline {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            }
         }
 
-        // Should have retried (not given up), proving the counter was reset
-        #expect(motionManager.startDeviceMotionUpdatesCallCount > startCountBeforeSuccess)
+        // All 4 errors after the success should have triggered retries,
+        // proving the success handler reset the counter.
+        #expect(motionManager.startDeviceMotionUpdatesCallCount >= startCountBeforeSuccess + 4)
     }
 
     @Test func testBarometerRequesterPreservedAfterTransientMotionError() {
