@@ -505,10 +505,28 @@ struct BarometerManagerTests {
         #expect(manager.motionStreamFailed == true)
         #expect(manager.errorMessage.contains("Motion sensor error"))
 
-        // Pressure update clears errorMessage but should NOT clear motionStreamFailed
+        // Pressure update should NOT clear motion error message or motionStreamFailed
+        manager.handlePressureUpdate(currentPressure: 1013.25)
+        #expect(manager.errorMessage.contains("Motion sensor error"))
+        #expect(manager.motionStreamFailed == true)
+    }
+
+    @Test func testPressureUpdateClearsNonMotionError() {
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { false }
+        )
+
+        // Set a non-motion error message
+        manager.errorMessage = "Error reading barometer: timeout"
+
+        // Pressure update should clear non-motion errors
         manager.handlePressureUpdate(currentPressure: 1013.25)
         #expect(manager.errorMessage == "")
-        #expect(manager.motionStreamFailed == true)
     }
 
     @Test func testMotionRetryStopsAfterMaxRetries() {
