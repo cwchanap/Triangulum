@@ -92,8 +92,8 @@ import UIKit
     // MARK: - motionStreamFailed flag handling
 
     @Test func displayStateShowsErrorWhenMotionStreamFailedEvenWithoutErrorMessage() {
-        // After a motion error, a subsequent pressure update clears errorMessage.
-        // The motionStreamFailed flag ensures we still show an error, not loading.
+        // Safety net: if errorMessage is empty but motionStreamFailed is true
+        // (e.g. external state manipulation), still show error rather than loading.
         let state = LevelPageDisplayState.resolve(
             isAttitudeAvailable: true,
             hasAttitude: false,
