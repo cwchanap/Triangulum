@@ -112,9 +112,7 @@ class BarometerManager: ObservableObject {
         guard locationManager.hasValidLocation else {
             pressure = currentPressure
             seaLevelPressure = nil
-            if !errorMessage.hasPrefix("Motion sensor error:") {
-                errorMessage = ""
-            }
+            errorMessage = ""
             return
         }
 
@@ -126,9 +124,7 @@ class BarometerManager: ObservableObject {
 
         pressure = currentPressure
         seaLevelPressure = seaLevel
-        if !errorMessage.hasPrefix("Motion sensor error:") {
-            errorMessage = ""
-        }
+        errorMessage = ""
 
         // Record to history for trend analysis and graphs
         // historyManager is @MainActor, so we need to hop to main actor context

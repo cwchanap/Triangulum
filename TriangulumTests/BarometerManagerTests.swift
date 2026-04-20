@@ -487,7 +487,7 @@ struct BarometerManagerTests {
         #expect(manager.motionStreamFailed == false)
     }
 
-    @Test func testMotionStreamFailedNotClearedByPressureUpdate() {
+    @Test func testMotionStreamFailedPreservedButErrorMessageClearedByPressureUpdate() {
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -499,15 +499,18 @@ struct BarometerManagerTests {
 
         manager.startAttitudeUpdates()
 
-        // Simulate error → sets flag
+        // Simulate error → sets flag and error message
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
         motionManager.simulateError(error)
         #expect(manager.motionStreamFailed == true)
         #expect(manager.errorMessage.contains("Motion sensor error"))
 
-        // Pressure update should NOT clear motion error message or motionStreamFailed
+        // Pressure update should clear errorMessage so BarometerView can display
+        // live pressure data even when motion stream has failed. The
+        // motionStreamFailed flag persists so LevelPageView can still detect
+        // the motion failure independently.
         manager.handlePressureUpdate(currentPressure: 1013.25)
-        #expect(manager.errorMessage.contains("Motion sensor error"))
+        #expect(manager.errorMessage == "")
         #expect(manager.motionStreamFailed == true)
     }
 
