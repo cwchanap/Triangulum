@@ -71,17 +71,19 @@ class BarometerManager: ObservableObject {
         guard !didStartBarometerUpdates else { return }
         didStartBarometerUpdates = true
 
+        // Register the .barometer requester for attitude updates regardless of
+        // barometer availability. On barometer-less devices with motion hardware
+        // (e.g. iPad), this ensures SensorSnapshot.capture can still read
+        // roll/pitch/yaw from the main screen without requiring a visit to the
+        // Level page first. startAttitudeUpdates(for:) guards on isAttitudeAvailable.
+        startAttitudeUpdates(for: .barometer)
+
         guard isAvailable else {
             if !isAttitudeAvailable {
                 errorMessage = "Barometer not available on this device"
             }
             return
         }
-
-        // Only start attitude updates when the barometer is actually available,
-        // so devices without a barometer don't run unnecessary motion sensing.
-        // The Level page and explicit callers use startAttitudeUpdates() separately.
-        startAttitudeUpdates(for: .barometer)
 
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
@@ -166,6 +168,11 @@ class BarometerManager: ObservableObject {
     private func startAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard isAttitudeAvailable else { return }
         attitudeUpdateRequesters.insert(requester)
+        // Reset the retry budget when a requester joins so that reopening
+        // the Level page after an exhausted retry cycle gets a fresh budget.
+        // Auto-retries from the error handler call startDeviceMotionUpdatesIfNeeded()
+        // directly, so they continue incrementing without resetting.
+        motionRetryCount = 0
 
         startDeviceMotionUpdatesIfNeeded()
     }
