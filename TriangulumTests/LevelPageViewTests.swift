@@ -585,6 +585,57 @@ import UIKit
         #expect(abs(result.pitchDeg) < 0.1)
     }
 
+    // MARK: - Face-down surface equivalence
+
+    /// With identity calibration (flat face-up), placing the phone face-down on
+    /// the same flat surface should read as level. Without the normal-flip fix,
+    /// this would report ~180° roll.
+    @Test func faceDownOnFlatSurfaceIsLevel() {
+        // Identity calibration (phone face-up, flat)
+        let calQ = LevelMath.Quat.identity
+
+        // Face-down: 180° rotation around device X axis (roll = π)
+        let faceDownQ = eulerToQuat(roll: .pi, pitch: 0.0, yaw: 0.0)
+
+        let result = LevelMath.relativeAttitudeDegrees(current: faceDownQ, calibration: calQ)
+        #expect(abs(result.rollDeg) < 0.1)
+        #expect(abs(result.pitchDeg) < 0.1)
+    }
+
+    /// Calibrate face-up on a tilted surface (5° roll), then flip face-down on
+    /// the same surface. Should still read ~0° (same plane).
+    @Test func faceDownOnTiltedSurfaceMatchesCalibration() {
+        let calQ = eulerToQuat(roll: 5.0 * .pi / 180.0, pitch: 0.0, yaw: 0.0)
+
+        // Face-down on the same tilted surface: calibrate orientation + flip
+        let flipQ = eulerToQuat(roll: .pi, pitch: 0.0, yaw: 0.0)
+        let faceDownQ = LevelMath.quatMultiply(calQ, flipQ)
+
+        let result = LevelMath.relativeAttitudeDegrees(current: faceDownQ, calibration: calQ)
+        #expect(abs(result.rollDeg) < 0.1)
+        #expect(abs(result.pitchDeg) < 0.1)
+    }
+
+    /// Calibrate face-up flat, then place face-down on a surface tilted 10° in
+    /// roll. Should show ~10° tilt (the delta between surfaces).
+    @Test func faceDownOnDifferentSurfaceShowsDelta() {
+        let calQ = LevelMath.Quat.identity
+
+        // Face-down on a surface tilted 10° from horizontal
+        // (the surface itself is tilted, so the phone's orientation in world frame
+        //  is a 10° roll followed by a 180° flip)
+        let tiltQ = eulerToQuat(roll: 10.0 * .pi / 180.0, pitch: 0.0, yaw: 0.0)
+        let flipQ = eulerToQuat(roll: .pi, pitch: 0.0, yaw: 0.0)
+        let faceDownTiltedQ = LevelMath.quatMultiply(tiltQ, flipQ)
+
+        let result = LevelMath.relativeAttitudeDegrees(
+            current: faceDownTiltedQ,
+            calibration: calQ
+        )
+        #expect(abs(result.rollDeg - 10.0) < 0.2)
+        #expect(abs(result.pitchDeg) < 0.2)
+    }
+
     /// Calibrated at one tilt, device tilted differently: should show the delta.
     @Test func calibratedTiltChangeDetectedAfterBodyFrameYaw() {
         // Calibrate at roll=5°, pitch=0°

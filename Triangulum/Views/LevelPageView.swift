@@ -390,7 +390,15 @@ enum LevelMath {
 
         // Express calibration normal in the current body frame.
         // On the same surface as calibration → [0,0,1] → roll/pitch = 0.
-        let nCalBody = rotateVector(nCalWorld, by: quatConjugate(current))
+        var nCalBody = rotateVector(nCalWorld, by: quatConjugate(current))
+
+        // A surface has two equivalent normals (screen-up vs screen-down).
+        // If the calibration normal points away from the screen (z < 0 in body
+        // frame), negate it so that placing the phone face-down on the same
+        // surface still reads as level.
+        if nCalBody.z < 0 {
+            nCalBody = (-nCalBody.x, -nCalBody.y, -nCalBody.z)
+        }
 
         let rollDeg = atan2(nCalBody.y, nCalBody.z) * 180.0 / .pi
         let pitchDeg = atan2(-nCalBody.x, hypot(nCalBody.y, nCalBody.z)) * 180.0 / .pi
