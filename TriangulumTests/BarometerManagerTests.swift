@@ -176,7 +176,10 @@ struct BarometerManagerTests {
         }
     }
 
-    @Test func testStartBarometerUpdatesSkipsAttitudeWhenBarometerUnavailable() {
+    @Test func testStartBarometerUpdatesStartsAttitudeWhenBarometerUnavailable() {
+        // On barometer-less devices with motion hardware (e.g. iPad),
+        // startBarometerUpdates should still register the .barometer requester
+        // so that SensorSnapshot.capture can read attitude data.
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -190,13 +193,13 @@ struct BarometerManagerTests {
 
         #expect(manager.isAvailable == false)
         #expect(manager.isAttitudeAvailable)
-        // Attitude updates should NOT start when barometer is unavailable,
-        // even if motion hardware is present.
-        #expect(motionManager.startDeviceMotionUpdatesCallCount == 0)
+        // Attitude updates SHOULD start even when barometer is unavailable,
+        // so snapshots taken from the main screen capture roll/pitch/yaw.
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
 
-        // stopBarometerUpdates should be a safe no-op since no motion was started
+        // stopBarometerUpdates should tear down the motion stream
         manager.stopBarometerUpdates()
-        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 0)
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
     }
 
     @Test func testStartBarometerUpdatesStartsAttitudeWhenAvailable() {
@@ -697,6 +700,56 @@ struct BarometerManagerTests {
         // Stopping only explicit should NOT stop motion because .barometer is still registered
         manager.stopAttitudeUpdates()
         #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // only the error-cleanup stop
+    }
+
+    @Test func testRetryBudgetResetsOnNewRequester() {
+        // After exhausting maxMotionRetries with .barometer registered,
+        // a new explicit requester (Level page opening) should get a fresh retry budget.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { true }
+        )
+
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+
+        // Exhaust all 5 retries with only .barometer registered
+        for attempt in 1...5 {
+            motionManager.simulateError(error)
+            let maxDelayMs = min(pow(2.0, Double(attempt - 1)) * 500, 8000)
+            let deadline = Date().addingTimeInterval(maxDelayMs / 1000.0 + 0.5)
+            while motionManager.startDeviceMotionUpdatesCallCount < attempt + 1 && Date() < deadline {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            }
+        }
+
+        // After exhausting retries, one more error should NOT auto-retry
+        motionManager.simulateError(error)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        let startCountAfterExhaustion = motionManager.startDeviceMotionUpdatesCallCount
+
+        // Now a new requester joins (Level page opens) — retry budget should reset
+        manager.startAttitudeUpdates()
+
+        // Motion should restart because didStartDeviceMotion was reset by error handler
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == startCountAfterExhaustion + 1)
+
+        // A transient error should now trigger auto-retry (fresh budget)
+        motionManager.simulateError(error)
+
+        let deadline = Date().addingTimeInterval(1.5)
+        while motionManager.startDeviceMotionUpdatesCallCount < startCountAfterExhaustion + 2 && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        }
+
+        // Should have auto-retried, proving the retry budget was reset
+        #expect(motionManager.startDeviceMotionUpdatesCallCount >= startCountAfterExhaustion + 2)
     }
 
     @Test func testStopBarometerUpdatesAllowsRestart() {
