@@ -393,7 +393,8 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { true }
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
         )
 
         // First call: barometer starts attitude updates
@@ -408,11 +409,7 @@ struct BarometerManagerTests {
         // stopDeviceMotionUpdates should have been called to clean up
         #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
 
-        let deadline = Date().addingTimeInterval(1.0)
-        while motionManager.startDeviceMotionUpdatesCallCount < 2 && Date() < deadline {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-        }
-
+        // With immediate scheduler, retry fires synchronously
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
         #expect(manager.motionStreamFailed == true)
     }
@@ -542,7 +539,8 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { false },
+            scheduleDelayed: { _, block in block() }
         )
 
         manager.startAttitudeUpdates()
@@ -550,25 +548,14 @@ struct BarometerManagerTests {
 
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
-        // Simulate enough errors to exceed maxMotionRetries (5)
-        // Each error triggers an async retry with increasing delay.
-        // Retry 1: 500ms, Retry 2: 1000ms, Retry 3: 2000ms, Retry 4: 4000ms, Retry 5: 8000ms
-        // Total time needed for all retries: ~15.5s
-        // For the test, we simulate all errors synchronously (each immediately after the
-        // previous restart) and spin the run loop to drain the delayed blocks.
+        // Simulate enough errors to exceed maxMotionRetries (5).
+        // With immediate scheduler, each error triggers a synchronous retry.
         for attempt in 1...5 {
             motionManager.simulateError(error)
             #expect(motionManager.stopDeviceMotionUpdatesCallCount == attempt)
 
-            // Drain pending async blocks including the delayed retry
-            let maxDelayMs = min(pow(2.0, Double(attempt - 1)) * 500, 8000)
-            let deadline = Date().addingTimeInterval(maxDelayMs / 1000.0 + 0.5)
-            while motionManager.startDeviceMotionUpdatesCallCount < attempt + 1 && Date() < deadline {
-                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-            }
-
+            // Should have retried immediately
             if attempt < 5 {
-                // Should have retried
                 #expect(motionManager.startDeviceMotionUpdatesCallCount == attempt + 1)
             }
         }
@@ -577,9 +564,6 @@ struct BarometerManagerTests {
 
         // One more error should NOT trigger another retry (exceeded max)
         motionManager.simulateError(error)
-
-        // Give time for any pending dispatch (should be none)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
 
         #expect(motionManager.startDeviceMotionUpdatesCallCount == startCountAfterRetries)
     }
@@ -591,7 +575,8 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { false }
+            barometerAvailability: { false },
+            scheduleDelayed: { _, block in block() }
         )
 
         manager.startAttitudeUpdates()
@@ -599,13 +584,9 @@ struct BarometerManagerTests {
 
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
-        // Simulate 4 errors (one less than max)
+        // Simulate 4 errors (one less than max) — retries fire immediately
         for _ in 0..<4 {
             motionManager.simulateError(error)
-            let deadline = Date().addingTimeInterval(9.0)
-            while motionManager.startDeviceMotionUpdatesCallCount < motionManager.stopDeviceMotionUpdatesCallCount + 1 && Date() < deadline {
-                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-            }
         }
 
         let startCountBeforeSuccess = motionManager.startDeviceMotionUpdatesCallCount
@@ -622,10 +603,6 @@ struct BarometerManagerTests {
         // error should still trigger a retry because the counter was reset.
         for _ in 0..<4 {
             motionManager.simulateError(error)
-            let deadline = Date().addingTimeInterval(9.0)
-            while motionManager.startDeviceMotionUpdatesCallCount < motionManager.stopDeviceMotionUpdatesCallCount + 1 && Date() < deadline {
-                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-            }
         }
 
         // All 4 errors after the success should have triggered retries,
@@ -640,7 +617,8 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { true }
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
         )
 
         // startBarometerUpdates registers .barometer requester and starts motion
@@ -658,11 +636,7 @@ struct BarometerManagerTests {
         // an automatic restart without needing an explicit Level-page start.
         #expect(manager.motionStreamFailed == true)
 
-        let deadline = Date().addingTimeInterval(1.0)
-        while motionManager.startDeviceMotionUpdatesCallCount < 2 && Date() < deadline {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-        }
-
+        // With immediate scheduler, retry fires synchronously
         #expect(motionManager.startDeviceMotionUpdatesCallCount == 2)
 
         // Stopping only an explicit requester that was never added should remain a no-op.
@@ -711,7 +685,8 @@ struct BarometerManagerTests {
         let manager = BarometerManager(
             locationManager: locationManager,
             motionManager: motionManager,
-            barometerAvailability: { true }
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
         )
 
         manager.startBarometerUpdates()
@@ -719,19 +694,13 @@ struct BarometerManagerTests {
 
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
-        // Exhaust all 5 retries with only .barometer registered
+        // Exhaust all 5 retries with only .barometer registered — retries fire immediately
         for attempt in 1...5 {
             motionManager.simulateError(error)
-            let maxDelayMs = min(pow(2.0, Double(attempt - 1)) * 500, 8000)
-            let deadline = Date().addingTimeInterval(maxDelayMs / 1000.0 + 0.5)
-            while motionManager.startDeviceMotionUpdatesCallCount < attempt + 1 && Date() < deadline {
-                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-            }
         }
 
         // After exhausting retries, one more error should NOT auto-retry
         motionManager.simulateError(error)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         let startCountAfterExhaustion = motionManager.startDeviceMotionUpdatesCallCount
 
         // Now a new requester joins (Level page opens) — retry budget should reset
@@ -740,13 +709,8 @@ struct BarometerManagerTests {
         // Motion should restart because didStartDeviceMotion was reset by error handler
         #expect(motionManager.startDeviceMotionUpdatesCallCount == startCountAfterExhaustion + 1)
 
-        // A transient error should now trigger auto-retry (fresh budget)
+        // A transient error should now trigger auto-retry (fresh budget) — fires immediately
         motionManager.simulateError(error)
-
-        let deadline = Date().addingTimeInterval(1.5)
-        while motionManager.startDeviceMotionUpdatesCallCount < startCountAfterExhaustion + 2 && Date() < deadline {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-        }
 
         // Should have auto-retried, proving the retry budget was reset
         #expect(motionManager.startDeviceMotionUpdatesCallCount >= startCountAfterExhaustion + 2)

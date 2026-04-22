@@ -9,6 +9,7 @@ class BarometerManager: ObservableObject {
     private let motionManager: CMMotionManager
     private let locationManager: LocationManager
     private let barometerAvailability: () -> Bool
+    private let scheduleDelayed: (TimeInterval, @escaping () -> Void) -> Void
 
     private enum AttitudeUpdateRequester: Hashable {
         case barometer
@@ -39,11 +40,15 @@ class BarometerManager: ObservableObject {
     init(
         locationManager: LocationManager,
         motionManager: CMMotionManager = MotionService.shared,
-        barometerAvailability: @escaping () -> Bool = CMAltimeter.isRelativeAltitudeAvailable
+        barometerAvailability: @escaping () -> Bool = CMAltimeter.isRelativeAltitudeAvailable,
+        scheduleDelayed: @escaping (TimeInterval, @escaping () -> Void) -> Void = { delay, block in
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: block)
+        }
     ) {
         self.locationManager = locationManager
         self.motionManager = motionManager
         self.barometerAvailability = barometerAvailability
+        self.scheduleDelayed = scheduleDelayed
         checkAvailability()
     }
 
@@ -211,7 +216,7 @@ class BarometerManager: ObservableObject {
                 self.motionRetryCount += 1
                 if self.motionRetryCount <= Self.maxMotionRetries {
                     let delayMs = min(pow(2.0, Double(self.motionRetryCount - 1)) * 500, 8000)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(delayMs))) { [weak self] in
+                    self.scheduleDelayed(delayMs / 1000.0) { [weak self] in
                         self?.startDeviceMotionUpdatesIfNeeded()
                     }
                 } else {
