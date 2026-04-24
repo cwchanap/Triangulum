@@ -23,10 +23,19 @@ jobs:
           SIMULATORS_JSON="${RUNNER_TEMP}/simulators.json"
           xcrun simctl list devices available -j > "$SIMULATORS_JSON"
           SIMULATOR_UDID=$(python3 -c "
-          import json, sys, re
+          import json, sys, re, os
           data = json.load(sys.stdin)
           runtimes = data.get('devices', {})
-          MIN_VER = (18, 5)
+
+          # MIN_VER is configurable via SIM_MIN_VER env var (format: 'major.minor')
+          # Falls back to (18, 5) if not set or unparseable.
+          _default_ver = (18, 5)
+          _env = os.environ.get('SIM_MIN_VER', '').strip()
+          if _env:
+              _parts = _env.split('.')
+              MIN_VER = (int(_parts[0]), int(_parts[1])) if len(_parts) >= 2 and _parts[0].isdigit() and _parts[1].isdigit() else _default_ver
+          else:
+              MIN_VER = _default_ver
 
           def parse_runtime_ver(key):
               # e.g. 'com.apple.CoreSimulator.SimRuntime.iOS-18-5' → (18, 5)
@@ -53,6 +62,12 @@ jobs:
           pick.sort(key=lambda c: c[0], reverse=True)
           if pick:
               print(pick[0][1])
+          else:
+              # Diagnostic output when no simulator matches
+              parsed_runtimes = sorted(set(parse_runtime_ver(k) for k in runtimes if 'iOS' in k or 'SimRuntime.iOS' in k))
+              print(f'DEBUG: MIN_VER={MIN_VER}', file=sys.stderr)
+              print(f'DEBUG: parsed iOS runtimes: {parsed_runtimes}', file=sys.stderr)
+              print(f'DEBUG: iphone_candidates={len(iphone_candidates)}, all_candidates={len(all_candidates)}', file=sys.stderr)
           " < "$SIMULATORS_JSON")
           if [ -z "$SIMULATOR_UDID" ]; then
             echo "No available iOS simulators detected."

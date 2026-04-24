@@ -85,6 +85,7 @@ private final class MockMotionManager: CMMotionManager, @unchecked Sendable {
     }
 }
 
+@MainActor
 @Suite(.serialized)
 struct BarometerManagerTests {
 
@@ -696,7 +697,7 @@ struct BarometerManagerTests {
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
         // Exhaust all 5 retries with only .barometer registered — retries fire immediately
-        for attempt in 1...5 {
+        for _ in 1...5 {
             motionManager.simulateError(error)
         }
 

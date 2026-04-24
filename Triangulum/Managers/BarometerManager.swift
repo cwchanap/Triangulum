@@ -4,6 +4,7 @@ import SwiftData
 import Combine
 import os
 
+@MainActor
 class BarometerManager: ObservableObject {
     private let altimeter = CMAltimeter()
     private let motionManager: CMMotionManager
@@ -170,14 +171,24 @@ class BarometerManager: ObservableObject {
         startAttitudeUpdates(for: .explicit)
     }
 
+    private func clearMotionErrorMessageIfPresent() {
+        if errorMessage.hasPrefix("Motion sensor error:") {
+            errorMessage = ""
+        }
+    }
+
     private func startAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard isAttitudeAvailable else { return }
-        attitudeUpdateRequesters.insert(requester)
-        // Reset the retry budget when a requester joins so that reopening
-        // the Level page after an exhausted retry cycle gets a fresh budget.
+        let (inserted, _) = attitudeUpdateRequesters.insert(requester)
+        // Reset the retry budget only when a new requester joins so that
+        // reopening the Level page after an exhausted retry cycle gets a
+        // fresh budget, but repeated registrations from the same requester
+        // don't needlessly replenish retries.
         // Auto-retries from the error handler call startDeviceMotionUpdatesIfNeeded()
         // directly, so they continue incrementing without resetting.
-        motionRetryCount = 0
+        if inserted {
+            motionRetryCount = 0
+        }
 
         startDeviceMotionUpdatesIfNeeded()
     }
@@ -229,9 +240,7 @@ class BarometerManager: ObservableObject {
                 Logger.sensor.warning("BarometerManager: Received nil motion data without error")
                 return
             }
-            if self.errorMessage.hasPrefix("Motion sensor error:") {
-                self.errorMessage = ""
-            }
+            self.clearMotionErrorMessageIfPresent()
             self.motionStreamFailed = false
             self.motionRetryCount = 0
             self.attitude = motion.attitude
@@ -245,9 +254,7 @@ class BarometerManager: ObservableObject {
     private func stopAttitudeUpdates(for requester: AttitudeUpdateRequester) {
         guard attitudeUpdateRequesters.remove(requester) != nil else { return }
         guard attitudeUpdateRequesters.isEmpty else { return }
-        if errorMessage.hasPrefix("Motion sensor error:") {
-            errorMessage = ""
-        }
+        clearMotionErrorMessageIfPresent()
         motionStreamFailed = false
         motionRetryCount = 0
         guard didStartDeviceMotion else {
