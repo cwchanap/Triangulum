@@ -5,12 +5,6 @@ struct BubbleLevelView: View {
     let pitchDeg: Double      // calibrated, degrees; positive = top tilts away from user
     let thresholdDeg: Double  // bubble turns green within this radius
 
-    init(rollDeg: Double, pitchDeg: Double, thresholdDeg: Double) {
-        self.rollDeg = rollDeg
-        self.pitchDeg = pitchDeg
-        self.thresholdDeg = thresholdDeg
-    }
-
     var body: some View {
         Canvas { context, size in
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -83,7 +77,7 @@ struct BubbleLevelView: View {
             }
 
             let isLevel = LevelMath.isLevel(roll: rollDeg, pitch: pitchDeg, threshold: clampedThresholdDeg)
-            let bubbleColor: Color = isLevel ? .green : .prussianAccent
+            let bubbleColor: Color = isLevel ? .prussianGreen : .prussianAccent
             let bubbleRect = CGRect(
                 x: bubbleX - bubbleRadius, y: bubbleY - bubbleRadius,
                 width: bubbleRadius * 2, height: bubbleRadius * 2
