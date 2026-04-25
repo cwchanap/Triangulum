@@ -42,6 +42,10 @@ class BarometerManager: ObservableObject {
     private static let maxMotionRetries = 5
     private var altimeterRetryCount = 0
     private static let maxAltimeterRetries = 5
+    /// Monotonically increasing generation counter. Incremented on each
+    /// startBarometerUpdates() call so stale delayed-retry closures from a
+    /// previous session can detect they are no longer current.
+    private var altimeterSessionGeneration = 0
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -87,6 +91,7 @@ class BarometerManager: ObservableObject {
 
     func startBarometerUpdates() {
         guard !didStartBarometerUpdates else { return }
+        altimeterSessionGeneration += 1
         didStartBarometerUpdates = true
 
         // Register the .barometer requester for attitude updates regardless of
@@ -124,8 +129,9 @@ class BarometerManager: ObservableObject {
                     // stopBarometerUpdates() cleared the running state while the backoff
                     // timer was still pending.
                     let delayMs = min(pow(2.0, Double(self.altimeterRetryCount - 1)) * 500, 8000)
+                    let generation = self.altimeterSessionGeneration
                     self.scheduleDelayed(delayMs / 1000.0) { [weak self] in
-                        guard let self, self.didStartBarometerUpdates else { return }
+                        guard let self, self.didStartBarometerUpdates, self.altimeterSessionGeneration == generation else { return }
                         self.startAltimeterStream()
                     }
                 } else {

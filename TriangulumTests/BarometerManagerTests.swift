@@ -1012,6 +1012,47 @@ struct BarometerManagerTests {
         #expect(altimeter.startCallCount == startCountBeforeStop)
     }
 
+    @Test func testStaleAltimeterRetryBlockedAfterStopRestartCycle() {
+        // Race condition: altimeter error schedules retry → stop → restart new
+        // session → old retry fires. The stale retry must NOT start a second
+        // altimeter stream into the new session (generation token guard).
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let altimeter = MockAltimeter()
+
+        // Capture the delayed closure instead of executing it immediately.
+        var capturedRetry: (() -> Void)?
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            altimeter: altimeter,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in capturedRetry = block }
+        )
+
+        // Session 1: start barometer, simulate error → captured retry
+        manager.startBarometerUpdates()
+        #expect(altimeter.startCallCount == 1)
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+        altimeter.simulateError(error)
+        #expect(capturedRetry != nil)
+
+        // Stop session 1
+        manager.stopBarometerUpdates()
+
+        // Session 2: restart barometer — new generation token
+        manager.startBarometerUpdates()
+        let startCountAfterRestart = altimeter.startCallCount
+        #expect(startCountAfterRestart >= 2) // at least initial + restart
+
+        // Fire the stale retry from session 1 — it must be blocked by the
+        // generation token mismatch and NOT add another startAltimeterStream call.
+        capturedRetry?()
+        #expect(altimeter.startCallCount == startCountAfterRestart)
+    }
+
     @Test func testStopBarometerUpdatesAfterLatchResetIsNoOp() {
         // Simulates the scenario from Comment 2: after an altimeter error,
         // didStartBarometerUpdates is false and .barometer requester is removed.
