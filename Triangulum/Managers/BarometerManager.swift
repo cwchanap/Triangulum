@@ -4,9 +4,17 @@ import SwiftData
 import Combine
 import os
 
+// Protocol to allow mocking CMAltimeter in tests
+protocol AltimeterProviding: AnyObject {
+    func startRelativeAltitudeUpdates(to queue: OperationQueue, withHandler handler: @escaping (CMAltitudeData?, Error?) -> Void)
+    func stopRelativeAltitudeUpdates()
+}
+
+extension CMAltimeter: AltimeterProviding {}
+
 @MainActor
 class BarometerManager: ObservableObject {
-    private let altimeter = CMAltimeter()
+    private let altimeter: AltimeterProviding
     private let motionManager: CMMotionManager
     private let locationManager: LocationManager
     private let barometerAvailability: () -> Bool
@@ -32,6 +40,8 @@ class BarometerManager: ObservableObject {
     private var attitudeUpdateRequesters = Set<AttitudeUpdateRequester>()
     private var motionRetryCount = 0
     private static let maxMotionRetries = 5
+    private var altimeterRetryCount = 0
+    private static let maxAltimeterRetries = 5
 
     // History manager for trend analysis and graphs
     // Initialized lazily on main actor via configureHistory()
@@ -41,6 +51,7 @@ class BarometerManager: ObservableObject {
     init(
         locationManager: LocationManager,
         motionManager: CMMotionManager = MotionService.shared,
+        altimeter: AltimeterProviding = CMAltimeter(),
         barometerAvailability: @escaping () -> Bool = CMAltimeter.isRelativeAltitudeAvailable,
         scheduleDelayed: @escaping (TimeInterval, @escaping () -> Void) -> Void = { delay, block in
             DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: block)
@@ -48,6 +59,7 @@ class BarometerManager: ObservableObject {
     ) {
         self.locationManager = locationManager
         self.motionManager = motionManager
+        self.altimeter = altimeter
         self.barometerAvailability = barometerAvailability
         self.scheduleDelayed = scheduleDelayed
         checkAvailability()
@@ -91,18 +103,36 @@ class BarometerManager: ObservableObject {
             return
         }
 
+        startAltimeterStream()
+    }
+
+    /// Starts (or restarts) the CMAltimeter callback stream.
+    /// Extracted from startBarometerUpdates() so the retry path can re-invoke
+    /// it without going through the guard/didStartBarometerUpdates latch.
+    private func startAltimeterStream() {
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
             guard let self = self else { return }
 
             if let error = error {
                 self.errorMessage = "Error reading barometer: \(error.localizedDescription)"
-                // Reset latch so a future startBarometerUpdates() call can retry.
-                // Stop first to avoid duplicate altimeter callback streams.
+                // Stop the current stream before retrying or giving up.
                 self.altimeter.stopRelativeAltitudeUpdates()
-                self.didStartBarometerUpdates = false
-                // Remove the .barometer requester so stopBarometerUpdates() can
-                // still tear down the motion stream from ContentView.onDisappear.
-                self.stopAttitudeUpdates(for: .barometer)
+                self.altimeterRetryCount += 1
+                if self.altimeterRetryCount <= Self.maxAltimeterRetries {
+                    // Retry with exponential backoff — mirrors the motion stream pattern.
+                    let delayMs = min(pow(2.0, Double(self.altimeterRetryCount - 1)) * 500, 8000)
+                    self.scheduleDelayed(delayMs / 1000.0) { [weak self] in
+                        self?.startAltimeterStream()
+                    }
+                } else {
+                    Logger.sensor.warning("BarometerManager: Altimeter stream failed \(Self.maxAltimeterRetries) times, giving up auto-retry")
+                    // Reset latch so a future startBarometerUpdates() call can retry.
+                    self.didStartBarometerUpdates = false
+                    self.altimeterRetryCount = 0
+                    // Remove the .barometer requester so stopBarometerUpdates() can
+                    // still tear down the motion stream from ContentView.onDisappear.
+                    self.stopAttitudeUpdates(for: .barometer)
+                }
                 return
             }
 
@@ -111,6 +141,8 @@ class BarometerManager: ObservableObject {
                 return
             }
 
+            // Reset retry budget on successful data delivery.
+            self.altimeterRetryCount = 0
             let currentPressure = data.pressure.doubleValue
             self.handlePressureUpdate(currentPressure: currentPressure)
         }
@@ -164,6 +196,7 @@ class BarometerManager: ObservableObject {
         guard didStartBarometerUpdates else { return }
         altimeter.stopRelativeAltitudeUpdates()
         didStartBarometerUpdates = false
+        altimeterRetryCount = 0
         stopAttitudeUpdates(for: .barometer)
     }
 
