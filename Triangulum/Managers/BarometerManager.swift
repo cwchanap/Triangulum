@@ -120,9 +120,13 @@ class BarometerManager: ObservableObject {
                 self.altimeterRetryCount += 1
                 if self.altimeterRetryCount <= Self.maxAltimeterRetries {
                     // Retry with exponential backoff — mirrors the motion stream pattern.
+                    // Guard on didStartBarometerUpdates so a pending retry is a no-op if
+                    // stopBarometerUpdates() cleared the running state while the backoff
+                    // timer was still pending.
                     let delayMs = min(pow(2.0, Double(self.altimeterRetryCount - 1)) * 500, 8000)
                     self.scheduleDelayed(delayMs / 1000.0) { [weak self] in
-                        self?.startAltimeterStream()
+                        guard let self, self.didStartBarometerUpdates else { return }
+                        self.startAltimeterStream()
                     }
                 } else {
                     Logger.sensor.warning("BarometerManager: Altimeter stream failed \(Self.maxAltimeterRetries) times, giving up auto-retry")
