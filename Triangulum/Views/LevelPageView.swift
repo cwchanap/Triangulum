@@ -292,22 +292,27 @@ enum LevelMath {
         _ orientation: UIDeviceOrientation,
         interfaceOrientation: UIInterfaceOrientation?
     ) -> UIDeviceOrientation {
-        switch interfaceOrientation {
-        case .portrait:
-            return .portrait
-        case .portraitUpsideDown:
-            return .portraitUpsideDown
-        case .landscapeLeft:
-            return .landscapeRight
-        case .landscapeRight:
-            return .landscapeLeft
-        default:
-            switch orientation {
-            case .faceUp, .faceDown, .unknown:
-                return .portrait
-            default:
-                return orientation
+        // When the device reports a concrete physical orientation, use it
+        // directly.  This ensures the level tracks actual physical tilt even
+        // when the UI orientation disagrees (rotation lock, iPad split view).
+        switch orientation {
+        case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
+            return orientation
+        case .faceUp, .faceDown, .unknown:
+            // Device orientation is ambiguous; fall back to the UI orientation
+            // so the axes still align with how the content is laid out on screen.
+            if let io = interfaceOrientation {
+                switch io {
+                case .portrait:           return .portrait
+                case .portraitUpsideDown: return .portraitUpsideDown
+                case .landscapeLeft:      return .landscapeRight
+                case .landscapeRight:     return .landscapeLeft
+                default:                  return .portrait
+                }
             }
+            return .portrait
+        @unknown default:
+            return .portrait
         }
     }
 

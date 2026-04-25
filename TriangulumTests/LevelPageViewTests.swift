@@ -310,15 +310,33 @@ import UIKit
         #expect(result.screenPitch == -3.0)
     }
 
-    @Test func remapUsesInterfaceOrientationOverDeviceOrientation() {
+    /// With rotation lock enabled the UI stays portrait while the device is
+    /// physically landscape.  The remap must follow the physical orientation so
+    /// the bubble drifts in the direction the user expects.
+    @Test func remapPrefersPhysicalDeviceOrientationOverUI() {
+        // Device physically landscape-left, UI locked to portrait
         let result = LevelMath.remapForOrientation(
             roll: 5.0,
             pitch: -3.0,
             orientation: .landscapeLeft,
             interfaceOrientation: .portrait
         )
-        #expect(result.screenRoll == 5.0)
-        #expect(result.screenPitch == -3.0)
+        // Should use landscape-left mapping, NOT portrait
+        #expect(result.screenRoll == -3.0)
+        #expect(result.screenPitch == 5.0)
+    }
+
+    /// Rotation-lock scenario: device physically landscape-right, UI portrait.
+    @Test func remapPrefersPhysicalLandscapeRightOverUIPortrait() {
+        let result = LevelMath.remapForOrientation(
+            roll: 5.0,
+            pitch: -3.0,
+            orientation: .landscapeRight,
+            interfaceOrientation: .portrait
+        )
+        // Should use landscape-right mapping, NOT portrait
+        #expect(result.screenRoll == 3.0)
+        #expect(result.screenPitch == -5.0)
     }
 
     @Test func remapFaceUpUsesLandscapeFallback() {
