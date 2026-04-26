@@ -5,6 +5,7 @@
 //  Created by Chan Wai Chan on 7/8/2025.
 //
 // swiftlint:disable file_length
+// swiftlint:disable type_body_length
 
 import Testing
 import Foundation

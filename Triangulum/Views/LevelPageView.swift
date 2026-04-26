@@ -301,8 +301,8 @@ enum LevelMath {
         case .faceUp, .faceDown, .unknown:
             // Device orientation is ambiguous; fall back to the UI orientation
             // so the axes still align with how the content is laid out on screen.
-            if let io = interfaceOrientation {
-                switch io {
+            if let uiOrientation = interfaceOrientation {
+                switch uiOrientation {
                 case .portrait:           return .portrait
                 case .portraitUpsideDown: return .portraitUpsideDown
                 case .landscapeLeft:      return .landscapeRight
