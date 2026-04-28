@@ -275,7 +275,7 @@ enum LevelMath {
             orientation,
             interfaceOrientation: interfaceOrientation
         ) {
-        case .portrait, .unknown, .faceUp, .faceDown:
+        case .portrait:
             return (roll, pitch)
         case .portraitUpsideDown:
             return (-roll, -pitch)
