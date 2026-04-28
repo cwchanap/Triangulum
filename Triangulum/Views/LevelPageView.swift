@@ -106,10 +106,12 @@ struct LevelPageView: View {
         }
         .onAppear {
             hapticGenerator.prepare()
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
             barometerManager.startAttitudeUpdates()
         }
         .onDisappear {
             barometerManager.stopAttitudeUpdates()
+            UIDevice.current.endGeneratingDeviceOrientationNotifications()
         }
         .onChange(of: isLevel) { _, nowLevel in
             if nowLevel { hapticGenerator.impactOccurred() }
@@ -230,10 +232,6 @@ enum LevelPageDisplayState: Equatable {
 }
 
 enum LevelMath {
-    static func adjusted(raw: Double, calibration: Double) -> Double {
-        raw - calibration
-    }
-
     static func clampedThreshold(_ threshold: Double) -> Double {
         max(threshold, 0)
     }
@@ -353,22 +351,6 @@ enum LevelMath {
         let vectorQuat = Quat(x: vector.x, y: vector.y, z: vector.z, w: 0)
         let rotated = quatMultiply(quatMultiply(quaternion, vectorQuat), quatConjugate(quaternion))
         return (rotated.x, rotated.y, rotated.z)
-    }
-
-    /// Extracts roll (radians) from a quaternion using the same ZYX Euler
-    /// angle convention as CoreMotion.
-    static func quaternionToRoll(_ quaternion: Quat) -> Double {
-        let sinrCosp = 2.0 * (quaternion.w * quaternion.x + quaternion.y * quaternion.z)
-        let cosrCosp = 1.0 - 2.0 * (quaternion.x * quaternion.x + quaternion.y * quaternion.y)
-        return atan2(sinrCosp, cosrCosp)
-    }
-
-    /// Extracts pitch (radians) from a quaternion using the same ZYX Euler
-    /// angle convention as CoreMotion.
-    static func quaternionToPitch(_ quaternion: Quat) -> Double {
-        let sinp = 2.0 * (quaternion.w * quaternion.y - quaternion.z * quaternion.x)
-        // Clamp to [-1, 1] to avoid NaN from asin due to floating-point drift
-        return asin(max(-1.0, min(1.0, sinp)))
     }
 
     /// Computes roll and pitch (in degrees) of the *relative tilt* between
