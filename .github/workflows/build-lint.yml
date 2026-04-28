@@ -19,10 +19,20 @@ jobs:
 
       - name: Build
         run: |
-          set -o pipefail
           BUILD_DESTINATION="generic/platform=iOS"
           if command -v xcpretty >/dev/null 2>&1; then
+            set +e
             xcodebuild -project Triangulum.xcodeproj -scheme Triangulum -configuration Debug -destination "$BUILD_DESTINATION" CODE_SIGNING_ALLOWED=NO build | xcpretty
+            PIPE_RESULTS=("${PIPESTATUS[@]}")
+            BUILD_RESULT=${PIPE_RESULTS[0]}
+            FORMATTER_RESULT=${PIPE_RESULTS[1]}
+            set -e
+            if [ $BUILD_RESULT -eq 0 ] && [ "$FORMATTER_RESULT" -ne 0 ] 2>/dev/null; then
+              echo "::warning::xcpretty exited with code $FORMATTER_RESULT"
+            fi
+            if [ $BUILD_RESULT -ne 0 ]; then
+              exit $BUILD_RESULT
+            fi
           else
             echo "xcpretty not found; using raw xcodebuild output"
             xcodebuild -project Triangulum.xcodeproj -scheme Triangulum -configuration Debug -destination "$BUILD_DESTINATION" CODE_SIGNING_ALLOWED=NO build
