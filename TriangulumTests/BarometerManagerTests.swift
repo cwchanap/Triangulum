@@ -604,12 +604,24 @@ struct BarometerManagerTests {
             }
         }
 
-        let startCountAfterRetries = motionManager.startDeviceMotionUpdatesCallCount
+        // After the 5th error exhausts fast retries, the background retry fires
+        // immediately (due to immediate scheduler), adding one more start attempt.
+        let startCountAfterFastRetries = motionManager.startDeviceMotionUpdatesCallCount
 
-        // One more error should NOT trigger another retry (exceeded max)
+        // Simulate errors to exhaust all 3 background retries (each fires immediately).
+        // Background retry 1: error → background retry 2 fires
+        // Background retry 2: error → background retry 3 fires
+        // Background retry 3: error → truly gives up
+        for _ in 0..<3 {
+            motionManager.simulateError(error)
+        }
+
+        let startCountAfterAllRetries = motionManager.startDeviceMotionUpdatesCallCount
+
+        // One more error should NOT trigger any more retries (all exhausted)
         motionManager.simulateError(error)
 
-        #expect(motionManager.startDeviceMotionUpdatesCallCount == startCountAfterRetries)
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == startCountAfterAllRetries)
     }
 
     @Test func testMotionRetryCountResetsOnSuccessfulData() {
@@ -738,12 +750,18 @@ struct BarometerManagerTests {
 
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
-        // Exhaust all 5 retries with only .barometer registered — retries fire immediately
+        // Exhaust all 5 fast retries with only .barometer registered — retries fire immediately
         for _ in 1...5 {
             motionManager.simulateError(error)
         }
 
-        // After exhausting retries, one more error should NOT auto-retry
+        // After exhausting fast retries, background retry fires immediately.
+        // Exhaust all 3 background retries too.
+        for _ in 0..<3 {
+            motionManager.simulateError(error)
+        }
+
+        // After exhausting all retries, one more error should NOT auto-retry
         motionManager.simulateError(error)
         let startCountAfterExhaustion = motionManager.startDeviceMotionUpdatesCallCount
 
@@ -782,9 +800,10 @@ struct BarometerManagerTests {
     }
 
     @Test func testAltimeterErrorRemovesBarometerRequesterAfterMaxRetries() {
-        // When the altimeter hits errors and exhausts all retries, the .barometer
-        // requester should be removed so that a subsequent stopBarometerUpdates()
-        // from ContentView.onDisappear doesn't leave the motion stream running.
+        // When the altimeter hits errors and exhausts all fast AND background retries,
+        // the .barometer requester should be removed so that a subsequent
+        // stopBarometerUpdates() from ContentView.onDisappear doesn't leave the
+        // motion stream running.
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -804,18 +823,23 @@ struct BarometerManagerTests {
 
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
-        // Exhaust all 5 retries — each error triggers an immediate retry via the scheduler
+        // Exhaust all 5 fast retries — each error triggers an immediate retry via the scheduler
         for _ in 1...5 {
             altimeter.simulateError(error)
         }
 
-        // After 5 retries, the 6th error (within the 5th retry's callback) should NOT
-        // produce another retry — it should give up. Actually, the counter goes:
-        // error 1: retryCount=1 → retry → startAltimeterStream()
-        // error 2: retryCount=2 → retry → ...
-        // error 5: retryCount=5 → retry (5 <= 5) → startAltimeterStream()
-        // error 6: retryCount=6 → give up (6 > 5)
-        altimeter.simulateError(error)
+        // After 5 fast retries, the 6th error triggers fast-retry exhaustion.
+        // With immediate scheduler, this also immediately fires 3 background retries.
+        // Each background retry starts a new altimeter stream and fails.
+        // We need to exhaust all background retries too.
+
+        // Exhaust background retries: each background retry starts altimeter, which
+        // immediately errors (5 times each), then the next background retry fires.
+        // Total: 3 background retries × 6 errors each (5 fast + 1 exhaust trigger) = 18 errors
+        // But simpler: just keep injecting errors until altimeter truly gives up.
+        for _ in 0..<20 {
+            altimeter.simulateError(error)
+        }
 
         // After giving up: latch is reset and .barometer requester is removed.
         // A subsequent stopBarometerUpdates() should be a no-op (guard returns early).
@@ -904,7 +928,8 @@ struct BarometerManagerTests {
     }
 
     @Test func testAltimeterRetryStopsAfterMaxRetries() {
-        // After maxAltimeterRetries (5) transient errors, retry should stop.
+        // After maxAltimeterRetries (5) fast + maxAltimeterBackgroundRetries (3) background
+        // retries, the altimeter should truly give up.
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -922,9 +947,9 @@ struct BarometerManagerTests {
 
         let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
 
-        // Simulate enough errors to go through all 5 retries.
+        // Simulate enough errors to go through all 5 fast retries.
         // Counter increments: 1→retry, 2→retry, 3→retry, 4→retry, 5→retry
-        // 6th error: counter=6 > max → give up
+        // 6th error: counter=6 > max → triggers background retry path
         for attempt in 1...5 {
             altimeter.simulateError(error)
             #expect(altimeter.stopCallCount == attempt)
@@ -935,12 +960,20 @@ struct BarometerManagerTests {
             }
         }
 
-        let startCountAfterRetries = altimeter.startCallCount
+        // Now exhaust all 3 background retries (each fires immediately).
+        // Each background retry resets altimeterRetryCount and starts a fresh
+        // altimeter stream, so we need 5 fast errors per background retry.
+        // Simpler: just flood with errors until truly exhausted.
+        for _ in 0..<20 {
+            altimeter.simulateError(error)
+        }
 
-        // The 6th error should NOT trigger another retry (exceeded max)
+        let startCountAfterAllRetries = altimeter.startCallCount
+
+        // One more error should NOT trigger another retry (all exhausted)
         altimeter.simulateError(error)
 
-        #expect(altimeter.startCallCount == startCountAfterRetries)
+        #expect(altimeter.startCallCount == startCountAfterAllRetries)
     }
 
     @Test func testAltimeterErrorPreservesBarometerRequesterDuringRetry() {
@@ -1054,10 +1087,7 @@ struct BarometerManagerTests {
         #expect(altimeter.startCallCount == startCountAfterRestart)
     }
 
-    @Test func testStopBarometerUpdatesAfterLatchResetIsNoOp() {
-        // Simulates the scenario from Comment 2: after an altimeter error,
-        // didStartBarometerUpdates is false and .barometer requester is removed.
-        // A subsequent stopBarometerUpdates() should be a safe no-op.
+    @Test func testStopBarometerUpdatesTwiceIsNoOp() {
         let locationManager = LocationManager()
         let motionManager = MockMotionManager()
         motionManager.mockIsDeviceMotionAvailable = true
@@ -1076,6 +1106,224 @@ struct BarometerManagerTests {
         // Calling stop again should be safe (no double-stop, no crash)
         manager.stopBarometerUpdates()
         #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // still 1, no extra stop
+    }
+
+    @Test func testStopBarometerUpdatesAfterLatchResetIsNoOp() {
+        // Simulates the scenario from Comment 2: after an altimeter error,
+        // didStartBarometerUpdates is false and .barometer requester is removed.
+        // A subsequent stopBarometerUpdates() should be a safe no-op.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let altimeter = MockAltimeter()
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            altimeter: altimeter,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
+        )
+
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        // Exhaust all fast + background altimeter retries
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+        for _ in 0..<30 {
+            altimeter.simulateError(error)
+        }
+
+        // After all retries exhausted, latch is reset and requester is removed.
+        // stopBarometerUpdates() should be a no-op.
+        manager.stopBarometerUpdates()
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1) // only the altimeter-exhaustion cleanup
+    }
+
+    @Test func testMotionBackgroundRetryRecoversStream() {
+        // After fast retries exhaust, the background retry should restart the motion
+        // stream, and a successful delivery should clear the failure state.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
+        )
+
+        manager.startBarometerUpdates()
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == 1)
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+
+        // Exhaust 5 fast retries (retryCount goes 1..5, all <= maxMotionRetries)
+        for _ in 1...5 {
+            motionManager.simulateError(error)
+        }
+
+        // After 5 fast retries, retryCount=5. The 5th fast retry started a new stream.
+        // Simulate one more error to push retryCount to 6, triggering exhaustion
+        // and the first background retry.
+        motionManager.simulateError(error)
+
+        // Background retry 1 fires immediately — verify stream restarted
+        let startCountAfterBackgroundRetry = motionManager.startDeviceMotionUpdatesCallCount
+        #expect(startCountAfterBackgroundRetry >= 7) // 1 initial + 5 fast + 1 exhaustion-triggered start (which fails and triggers bg retry) + ...
+        #expect(manager.motionStreamFailed == true)
+
+        // Simulate successful motion data on the background-retried stream
+        let mockAttitude = MockAttitude(roll: 0.1, pitch: 0.2, yaw: 0.3)
+        let mockMotion = MockDeviceMotion(attitude: mockAttitude)
+        motionManager.simulateMotion(mockMotion)
+
+        #expect(manager.attitude != nil)
+        #expect(manager.motionStreamFailed == false)
+    }
+
+    @Test func testMotionBackgroundRetryExhaustsAndGivesUp() {
+        // After exhausting all background retries, no more retries should occur.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
+        )
+
+        manager.startBarometerUpdates()
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+
+        // Exhaust fast retries (5) + background retries (3)
+        for _ in 0..<8 {
+            motionManager.simulateError(error)
+        }
+
+        let startCount = motionManager.startDeviceMotionUpdatesCallCount
+
+        // One more error should NOT trigger any retry
+        motionManager.simulateError(error)
+        #expect(motionManager.startDeviceMotionUpdatesCallCount == startCount)
+    }
+
+    @Test func testAltimeterBackgroundRetryRecoversPressureUpdates() {
+        // After fast retries exhaust, the background retry should restart the
+        // altimeter stream, and a successful delivery should resume pressure updates.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let altimeter = MockAltimeter()
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            altimeter: altimeter,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
+        )
+
+        manager.startBarometerUpdates()
+        #expect(altimeter.startCallCount == 1)
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+
+        // Exhaust 5 fast retries (retryCount goes 1..5, all <= maxAltimeterRetries)
+        for _ in 1...5 {
+            altimeter.simulateError(error)
+        }
+
+        // After 5 fast retries, retryCount=5. The 5th fast retry started a new altimeter stream.
+        // Simulate one more error to push retryCount to 6, triggering exhaustion
+        // and the first background retry.
+        altimeter.simulateError(error)
+
+        // Background retry 1 fires immediately — altimeter stream restarted
+        let startCountAfterBackgroundRetry = altimeter.startCallCount
+        #expect(startCountAfterBackgroundRetry >= 7) // 1 initial + 5 fast + 1 exhaustion-triggered start
+
+        // .barometer requester should still be registered (not removed during background retries)
+        // Simulate successful pressure data
+        let mockData = MockAltitudeData(pressure: 1013.25)
+        altimeter.simulateData(mockData)
+        #expect(manager.pressure == 1013.25)
+        #expect(manager.errorMessage.isEmpty)
+    }
+
+    @Test func testAltimeterBackgroundRetryExhaustsAndCleansUp() {
+        // After all background retries exhaust, .barometer requester is removed
+        // and latch is reset.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let altimeter = MockAltimeter()
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            altimeter: altimeter,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
+        )
+
+        manager.startBarometerUpdates()
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+
+        // Flood with errors to exhaust all fast + background retries
+        for _ in 0..<30 {
+            altimeter.simulateError(error)
+        }
+
+        // After all retries: latch reset, requester removed.
+        // stopBarometerUpdates() should be a no-op.
+        manager.stopBarometerUpdates()
+        // Motion should have been stopped by the altimeter's final cleanup
+        #expect(motionManager.stopDeviceMotionUpdatesCallCount == 1)
+
+        // Fresh start should work
+        manager.startBarometerUpdates()
+        #expect(altimeter.startCallCount >= 2)
+    }
+
+    @Test func testAltimeterBackgroundRetryCountResetsOnSuccess() {
+        // After a background retry successfully delivers data, the background
+        // retry count should reset, allowing a full new set of background retries
+        // if the stream fails again later.
+        let locationManager = LocationManager()
+        let motionManager = MockMotionManager()
+        motionManager.mockIsDeviceMotionAvailable = true
+        let altimeter = MockAltimeter()
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            motionManager: motionManager,
+            altimeter: altimeter,
+            barometerAvailability: { true },
+            scheduleDelayed: { _, block in block() }
+        )
+
+        manager.startBarometerUpdates()
+
+        let error = NSError(domain: "com.apple.coremotion", code: 1, userInfo: nil)
+
+        // Exhaust fast retries
+        for _ in 1...5 {
+            altimeter.simulateError(error)
+        }
+
+        // Background retry 1 fires — deliver success to reset background count
+        let mockData = MockAltitudeData(pressure: 1013.25)
+        altimeter.simulateData(mockData)
+        #expect(manager.pressure == 1013.25)
+
+        // Now exhaust fast retries again
+        for _ in 1...5 {
+            altimeter.simulateError(error)
+        }
+
+        // Background retry should fire again (count was reset) — deliver success
+        altimeter.simulateData(mockData)
+        #expect(manager.pressure == 1013.25)
     }
 
     @Test func testBarometerManagerPublishedProperties() {

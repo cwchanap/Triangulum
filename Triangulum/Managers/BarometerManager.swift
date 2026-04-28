@@ -40,8 +40,15 @@ class BarometerManager: ObservableObject {
     private var attitudeUpdateRequesters = Set<AttitudeUpdateRequester>()
     private var motionRetryCount = 0
     private static let maxMotionRetries = 5
+    private var motionBackgroundRetryCount = 0
+    private static let maxMotionBackgroundRetries = 3
+    private static let motionBackgroundRetryDelay: TimeInterval = 30.0
+
     private var altimeterRetryCount = 0
     private static let maxAltimeterRetries = 5
+    private var altimeterBackgroundRetryCount = 0
+    private static let maxAltimeterBackgroundRetries = 3
+    private static let altimeterBackgroundRetryDelay: TimeInterval = 30.0
     /// Monotonically increasing generation counter. Incremented on each
     /// startBarometerUpdates() call so stale delayed-retry closures from a
     /// previous session can detect they are no longer current.
@@ -135,13 +142,30 @@ class BarometerManager: ObservableObject {
                         self.startAltimeterStream()
                     }
                 } else {
-                    Logger.sensor.warning("BarometerManager: Altimeter stream failed \(Self.maxAltimeterRetries) times, giving up auto-retry")
-                    // Reset latch so a future startBarometerUpdates() call can retry.
-                    self.didStartBarometerUpdates = false
+                    Logger.sensor.warning("BarometerManager: Altimeter stream failed \(Self.maxAltimeterRetries) times, giving up fast auto-retry")
+                    // Schedule a slow background retry so pressure updates can
+                    // recover without requiring the user to leave and re-enter
+                    // the screen. Keep didStartBarometerUpdates set and the
+                    // .barometer requester registered so the manager state stays
+                    // consistent and stopBarometerUpdates() still works.
                     self.altimeterRetryCount = 0
-                    // Remove the .barometer requester so stopBarometerUpdates() can
-                    // still tear down the motion stream from ContentView.onDisappear.
-                    self.stopAttitudeUpdates(for: .barometer)
+                    if self.altimeterBackgroundRetryCount < Self.maxAltimeterBackgroundRetries {
+                        self.altimeterBackgroundRetryCount += 1
+                        let generation = self.altimeterSessionGeneration
+                        Logger.sensor.info("BarometerManager: Scheduling altimeter background retry \(self.altimeterBackgroundRetryCount)/\(Self.maxAltimeterBackgroundRetries)")
+                        self.scheduleDelayed(Self.altimeterBackgroundRetryDelay) { [weak self] in
+                            guard let self, self.didStartBarometerUpdates, self.altimeterSessionGeneration == generation else { return }
+                            self.startAltimeterStream()
+                        }
+                    } else {
+                        Logger.sensor.warning("BarometerManager: Altimeter stream exhausted all background retries")
+                        // Truly give up — reset latch so a future startBarometerUpdates()
+                        // call can retry. Remove the .barometer requester so
+                        // stopBarometerUpdates() from onDisappear is a clean no-op.
+                        self.didStartBarometerUpdates = false
+                        self.altimeterBackgroundRetryCount = 0
+                        self.stopAttitudeUpdates(for: .barometer)
+                    }
                 }
                 return
             }
@@ -153,6 +177,7 @@ class BarometerManager: ObservableObject {
 
             // Reset retry budget on successful data delivery.
             self.altimeterRetryCount = 0
+            self.altimeterBackgroundRetryCount = 0
             let currentPressure = data.pressure.doubleValue
             self.handlePressureUpdate(currentPressure: currentPressure)
         }
@@ -207,6 +232,7 @@ class BarometerManager: ObservableObject {
         altimeter.stopRelativeAltitudeUpdates()
         didStartBarometerUpdates = false
         altimeterRetryCount = 0
+        altimeterBackgroundRetryCount = 0
         stopAttitudeUpdates(for: .barometer)
     }
 
@@ -231,6 +257,7 @@ class BarometerManager: ObservableObject {
         // directly, so they continue incrementing without resetting.
         if inserted {
             motionRetryCount = 0
+            motionBackgroundRetryCount = 0
         }
 
         startDeviceMotionUpdatesIfNeeded()
@@ -274,7 +301,19 @@ class BarometerManager: ObservableObject {
                         self?.startDeviceMotionUpdatesIfNeeded()
                     }
                 } else {
-                    Logger.sensor.warning("BarometerManager: Motion stream failed \(Self.maxMotionRetries) times, giving up auto-retry")
+                    Logger.sensor.warning("BarometerManager: Motion stream failed \(Self.maxMotionRetries) times, giving up fast auto-retry")
+                    // Schedule a slow background retry so the stream can recover
+                    // without requiring user intervention (e.g. opening Level page).
+                    if self.motionBackgroundRetryCount < Self.maxMotionBackgroundRetries {
+                        self.motionBackgroundRetryCount += 1
+                        Logger.sensor.info("BarometerManager: Scheduling motion background retry \(self.motionBackgroundRetryCount)/\(Self.maxMotionBackgroundRetries)")
+                        self.scheduleDelayed(Self.motionBackgroundRetryDelay) { [weak self] in
+                            guard let self else { return }
+                            self.startDeviceMotionUpdatesIfNeeded()
+                        }
+                    } else {
+                        Logger.sensor.warning("BarometerManager: Motion stream exhausted all background retries")
+                    }
                 }
                 return
             }
@@ -286,6 +325,7 @@ class BarometerManager: ObservableObject {
             self.clearMotionErrorMessageIfPresent()
             self.motionStreamFailed = false
             self.motionRetryCount = 0
+            self.motionBackgroundRetryCount = 0
             self.attitude = motion.attitude
         }
     }
@@ -300,6 +340,7 @@ class BarometerManager: ObservableObject {
         clearMotionErrorMessageIfPresent()
         motionStreamFailed = false
         motionRetryCount = 0
+        motionBackgroundRetryCount = 0
         guard didStartDeviceMotion else {
             attitude = nil
             return
