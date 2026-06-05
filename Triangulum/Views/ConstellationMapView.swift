@@ -15,16 +15,11 @@ struct ConstellationMapView: View {
     @AppStorage("skyShowConstellationLabels") private var skyShowConstellationLabels = true
     @AppStorage("skyCatalog") private var skyCatalog = "bright" // bright | extended
     @AppStorage("skyShowLargeCompass") private var skyShowLargeCompass = false
-    @AppStorage("skySnapNorth") private var skySnapNorth = true
-    @State private var zoom: CGFloat = 1.0
+    @State private var camera = ConstellationCameraState()
     @GestureState private var pinch: CGFloat = 1.0
-    @State private var pan: CGSize = .zero
     @GestureState private var drag: CGSize = .zero
     @State private var largeCompassOffset: CGSize = .zero
     @GestureState private var largeCompassDrag: CGSize = .zero
-
-    private let minZoom: CGFloat = 1.0
-    private let maxZoom: CGFloat = 3.0
 
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
@@ -33,25 +28,31 @@ struct ConstellationMapView: View {
             header
             GeometryReader { _ in
                 TimelineView(.animation) { timeline in
-                    let currentZoom = max(min(zoom * pinch, maxZoom), minZoom)
-                    let currentPan = CGSize(width: pan.width + drag.width, height: pan.height + drag.height)
+                    let currentZoom = max(min(camera.zoom * pinch, 3.0), 1.0)
+                    let currentPan = CGSize(width: camera.pan.width + drag.width, height: camera.pan.height + drag.height)
+                    let effectiveHeading = camera.effectiveHeading(liveHeading: locationManager.heading)
                     let magnify = MagnificationGesture()
+                        .onChanged { _ in
+                            camera.beginExploring(currentHeading: locationManager.heading)
+                        }
                         .updating($pinch) { value, state, _ in
                             state = value
                         }
                         .onEnded { value in
-                            zoom = clampZoom(zoom * value)
+                            camera.applyZoomMultiplier(value, currentHeading: locationManager.heading)
                         }
                     let panGesture = DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                        .onChanged { _ in
+                            camera.beginExploring(currentHeading: locationManager.heading)
+                        }
                         .updating($drag) { value, state, _ in
                             state = value.translation
                         }
                         .onEnded { value in
-                            pan.width += value.translation.width
-                            pan.height += value.translation.height
+                            camera.applyPan(value.translation, currentHeading: locationManager.heading)
                         }
                     let doubleTap = TapGesture(count: 2)
-                        .onEnded { withAnimation(.easeInOut) { zoom = 1.0; pan = .zero } }
+                        .onEnded { withAnimation(.easeInOut) { camera.recenter() } }
 
                     ZStack(alignment: .topTrailing) {
                         Canvas { context, size in
@@ -60,12 +61,18 @@ struct ConstellationMapView: View {
                                 size: size,
                                 current: timeline.date,
                                 zoom: currentZoom,
-                                pan: currentPan
+                                pan: currentPan,
+                                effectiveHeading: effectiveHeading
                             )
                         }
                         .gesture(magnify)
                         .simultaneousGesture(panGesture)
                         .gesture(doubleTap)
+
+                        orientationStatus(heading: effectiveHeading, isExploring: camera.isExploring)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding([.top, .leading], 12)
+                            .allowsHitTesting(false)
 
                         // Small compass pinned top-right (non-interactive)
                         CompassView(
@@ -86,7 +93,7 @@ struct ConstellationMapView: View {
                                     largeCompassOffset.width += value.translation.width
                                     largeCompassOffset.height += value.translation.height
                                 }
-                            CompassView(heading: skySnapNorth ? 0 : locationManager.heading, redMode: nightVisionMode)
+                            CompassView(heading: effectiveHeading, redMode: nightVisionMode)
                                 .frame(width: 120, height: 120)
                                 .padding(12)
                                 .background(
@@ -199,14 +206,14 @@ struct ConstellationMapView: View {
             Spacer(minLength: 8)
             // Compact zoom controls (icon-only)
             HStack(spacing: 14) {
-                Button { withAnimation(.easeInOut) { zoom = clampZoom(zoom / 1.15) } } label: {
+                Button { withAnimation(.easeInOut) { camera.applyZoomMultiplier(1.0 / 1.15, currentHeading: locationManager.heading) } } label: {
                     Image(systemName: "minus.circle").foregroundColor(nightVisionMode ? .red : .white)
                 }
-                Button { withAnimation(.easeInOut) { zoom = clampZoom(zoom * 1.15) } } label: {
+                Button { withAnimation(.easeInOut) { camera.applyZoomMultiplier(1.15, currentHeading: locationManager.heading) } } label: {
                     Image(systemName: "plus.circle").foregroundColor(nightVisionMode ? .red : .white)
                 }
-                Button { withAnimation(.easeInOut) { zoom = 1.0; pan = .zero } } label: {
-                    Image(systemName: "arrow.counterclockwise.circle").foregroundColor(nightVisionMode ? .red : .white)
+                Button { withAnimation(.easeInOut) { camera.recenter() } } label: {
+                    Image(systemName: "location.north.circle").foregroundColor(nightVisionMode ? .red : .white)
                 }
             }
             Menu {
@@ -216,7 +223,6 @@ struct ConstellationMapView: View {
                 Toggle("Satellites", isOn: $skyShowSatellites)
                 Toggle("Planets", isOn: $skyShowPlanets)
                 Toggle("Large Compass", isOn: $skyShowLargeCompass)
-                Toggle("Snap North", isOn: $skySnapNorth)
                 Picker("Catalog", selection: $skyCatalog) {
                     Text("Bright").tag("bright")
                     Text("Extended").tag("extended")
@@ -234,9 +240,27 @@ struct ConstellationMapView: View {
         .background(nightVisionMode ? Color.red.opacity(0.08) : Color.white.opacity(0.85))
     }
 
+    private func orientationStatus(heading: Double, isExploring: Bool) -> some View {
+        let label = isExploring ? "Exploring" : "Live Heading"
+        return Text("\(label) \(Int(heading.rounded()))°")
+            .font(.caption2.weight(.semibold))
+            .foregroundColor(nightVisionMode ? .red : .white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(nightVisionMode ? Color.black : Color.black.opacity(0.55))
+            .clipShape(Capsule())
+    }
+
     // MARK: - Drawing
 
-    private func drawSky(context: inout GraphicsContext, size: CGSize, current: Date, zoom: CGFloat, pan: CGSize) {
+    private func drawSky(
+        context: inout GraphicsContext,
+        size: CGSize,
+        current: Date,
+        zoom: CGFloat,
+        pan: CGSize,
+        effectiveHeading: Double
+    ) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let radius = min(size.width, size.height) * 0.48
 
@@ -273,7 +297,15 @@ struct ConstellationMapView: View {
             drawMilkyWay(context: &layer, center: center, radius: radius, observer: observer, nightFactor: effectiveNight, current: current)
 
             // Sun and Moon markers
-            drawSunAndMoon(context: &layer, center: center, radius: radius, observer: observer, current: current)
+            drawSunAndMoon(
+                context: &layer,
+                center: center,
+                radius: radius,
+                observer: observer,
+                current: current,
+                effectiveHeading: effectiveHeading,
+                pan: pan
+            )
 
             // Planets
             if skyShowPlanets {
@@ -283,8 +315,8 @@ struct ConstellationMapView: View {
                     config: PlanetRenderer.DrawConfig(
                         center: center,
                         radius: radius,
-                        heading: locationManager.heading,
-                        snapNorth: skySnapNorth,
+                        heading: effectiveHeading,
+                        snapNorth: false,
                         panOffset: pan,
                         current: current,
                         observer: observer,
@@ -298,13 +330,13 @@ struct ConstellationMapView: View {
             if skyShowSatellites {
                 SatelliteRenderer.draw(
                     context: &layer, satellites: satelliteManager.satellites, center: center,
-                    radius: radius, heading: locationManager.heading, snapNorth: skySnapNorth,
+                    radius: radius, heading: effectiveHeading, snapNorth: false,
                     panOffset: pan, current: current, nightVisionMode: nightVisionMode,
                     pointOnDome: pointOnDome)
             }
 
             let fg = nightVisionMode ? Color.red : Color.white
-            let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
+            let headingRad = effectiveHeading * .pi / 180.0
             let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0) // ~90° per radius
             let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
 
@@ -490,8 +522,6 @@ struct ConstellationMapView: View {
         return s - floor(s)
     }
 
-    private func clampZoom(_ z: CGFloat) -> CGFloat { max(minZoom, min(maxZoom, z)) }
-
     // MARK: - Milky Way rendering
     private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double, current: Date) {
         guard nightFactor > 0.02 else { return }
@@ -553,16 +583,25 @@ struct ConstellationMapView: View {
         }
     }
 
-    private func drawSunAndMoon(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, current: Date) {
+    private func drawSunAndMoon(
+        context: inout GraphicsContext,
+        center: CGPoint,
+        radius: CGFloat,
+        observer: Observer,
+        current: Date,
+        effectiveHeading: Double,
+        pan: CGSize
+    ) {
         let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
+        let headingRad = effectiveHeading * .pi / 180.0
+        let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0)
+        let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
+
         // Sun
         let sunEq = Astronomer.sunEquatorial(date: current)
         let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if true {
             let az = sunAltAz.azDeg * .pi / 180.0
-            let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
-            let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0)
-            let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
             let adjAlt = max(-90.0, min(90.0, sunAltAz.altDeg + altOffsetDeg))
             let p = pointOnDome(center: center, radius: radius, azimuthRad: az - headingRad + azOffsetRad, altitudeDeg: adjAlt)
             let s: CGFloat = 8
@@ -578,9 +617,6 @@ struct ConstellationMapView: View {
         let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
         if true {
             let azMoon = moonAltAz.azDeg * .pi / 180.0
-            let headingRad = (skySnapNorth ? 0.0 : locationManager.heading) * .pi / 180.0
-            let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0)
-            let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
             let adjAlt = max(-90.0, min(90.0, moonAltAz.altDeg + altOffsetDeg))
             let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon - headingRad + azOffsetRad, altitudeDeg: adjAlt)
 
