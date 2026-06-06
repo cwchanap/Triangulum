@@ -17,8 +17,10 @@ struct ConstellationCameraState: Equatable {
     }
 
     mutating func applyZoomMultiplier(_ multiplier: CGFloat, currentHeading: Double) {
+        let targetZoom = clampedZoom(zoom * multiplier)
+        guard targetZoom != zoom else { return }
         beginExploring(currentHeading: currentHeading)
-        zoom = clampedZoom(zoom * multiplier)
+        zoom = targetZoom
     }
 
     mutating func applyPan(_ translation: CGSize, currentHeading: Double) {
