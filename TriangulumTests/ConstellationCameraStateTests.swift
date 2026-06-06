@@ -44,6 +44,28 @@ struct ConstellationCameraStateTests {
         #expect(state.zoom == ConstellationCameraState.minZoom)
     }
 
+    @Test func noOpZoomAtBoundDoesNotStartExploration() {
+        var state = ConstellationCameraState()
+
+        // Zoom-out at minZoom clamps back to minZoom: must not freeze heading.
+        state.applyZoomMultiplier(1.0 / 1.15, currentHeading: 42.0)
+
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
+        #expect(state.zoom == ConstellationCameraState.minZoom)
+        #expect(state.effectiveHeading(liveHeading: 128.0) == 128.0)
+
+        // Same guard applies at the upper bound.
+        state.applyZoomMultiplier(10.0, currentHeading: 7.0)
+        #expect(state.zoom == ConstellationCameraState.maxZoom)
+        #expect(state.frozenHeading == 7.0)
+
+        state.applyZoomMultiplier(1.15, currentHeading: 99.0)
+
+        #expect(state.zoom == ConstellationCameraState.maxZoom)
+        #expect(state.frozenHeading == 7.0)
+    }
+
     @Test func panAccumulatesAndStartsExploration() {
         var state = ConstellationCameraState()
 
