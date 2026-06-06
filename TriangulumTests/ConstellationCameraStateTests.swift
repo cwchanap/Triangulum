@@ -37,11 +37,14 @@ struct ConstellationCameraStateTests {
         #expect(state.isExploring)
         #expect(state.frozenHeading == 91.0)
         #expect(state.zoom == ConstellationCameraState.maxZoom)
+        // Rendered heading must ignore the live compass once exploring.
+        #expect(state.effectiveHeading(liveHeading: 200.0) == 91.0)
 
         state.applyZoomMultiplier(0.01, currentHeading: 180.0)
 
         #expect(state.frozenHeading == 91.0)
         #expect(state.zoom == ConstellationCameraState.minZoom)
+        #expect(state.effectiveHeading(liveHeading: 180.0) == 91.0)
     }
 
     @Test func noOpZoomAtBoundDoesNotStartExploration() {
@@ -75,11 +78,61 @@ struct ConstellationCameraStateTests {
         #expect(state.isExploring)
         #expect(state.frozenHeading == 270.0)
         #expect(state.pan == CGSize(width: 8.0, height: 12.0))
+        // Live heading must be ignored once a real pan froze it.
+        #expect(state.effectiveHeading(liveHeading: 12.0) == 270.0)
     }
 
+    // MARK: - Regression: incidental gestures must not strand the user in "exploring"
+
+    @Test func subThresholdPanDoesNotFreezeHeading() {
+        var state = ConstellationCameraState()
+
+        // A sub-threshold drag (stray 0.5pt touch) is a no-op: no pan, no freeze.
+        state.applyPan(CGSize(width: 0.5, height: 0.0), currentHeading: 42.0)
+
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
+        #expect(state.pan == .zero)
+        #expect(state.effectiveHeading(liveHeading: 128.0) == 128.0)
+
+        // Exactly at threshold still counts as intentional movement.
+        let t = ConstellationCameraState.panMoveThreshold
+        state.applyPan(CGSize(width: t, height: 0.0), currentHeading: 60.0)
+        #expect(state.isExploring)
+        #expect(state.frozenHeading == 60.0)
+    }
+
+    @Test func noOpPinchDoesNotFreezeHeading() {
+        var state = ConstellationCameraState()
+
+        // A pinch that resolves to a 1.0 multiplier (no net zoom) must not freeze.
+        state.applyZoomMultiplier(1.0, currentHeading: 42.0)
+
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
+        #expect(state.zoom == ConstellationCameraState.minZoom)
+        #expect(state.effectiveHeading(liveHeading: 128.0) == 128.0)
+    }
+
+    // MARK: - Bounds & rendering
+
     @Test func zoomBoundsAreConsistentWithInitialZoom() {
+        // Bounds must give a usable range — equal bounds would permanently freeze zoom.
         #expect(ConstellationCameraState.minZoom >= 0.0)
-        #expect(ConstellationCameraState.maxZoom >= ConstellationCameraState.minZoom)
+        #expect(ConstellationCameraState.maxZoom > ConstellationCameraState.minZoom)
         #expect(ConstellationCameraState().zoom == ConstellationCameraState.minZoom)
+    }
+
+    @Test func renderedZoomClampsLivePinchToBounds() {
+        var state = ConstellationCameraState()
+
+        // Committed zoom sits at min; a wild live pinch value still renders in-bounds.
+        #expect(state.renderedZoom(livePinch: 0.1) == ConstellationCameraState.minZoom)
+
+        state.applyZoomMultiplier(2.0, currentHeading: 10.0)
+        // 2.0 * 99 clamps to maxZoom, not beyond.
+        #expect(state.renderedZoom(livePinch: 99.0) == ConstellationCameraState.maxZoom)
+        // Normal in-flight pinch renders the product.
+        #expect(state.renderedZoom(livePinch: 1.5) == 3.0)
     }
 }
