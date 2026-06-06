@@ -62,6 +62,15 @@ struct ConstellationMapView: View {
                         .gesture(magnify)
                         .simultaneousGesture(panGesture)
                         .gesture(doubleTap)
+                        // Freeze the live heading the instant an in-flight gesture
+                        // becomes meaningful (not only when it ends), so rotating the
+                        // device mid-drag/mid-pinch no longer spins the sky.
+                        .onChange(of: pinch) { _, livePinch in
+                            camera.beginExploringIfNeeded(livePinch: livePinch, currentHeading: locationManager.heading)
+                        }
+                        .onChange(of: drag) { _, translation in
+                            camera.beginExploringIfNeeded(translation: translation, currentHeading: locationManager.heading)
+                        }
 
                         orientationStatus(heading: effectiveHeading, isExploring: camera.isExploring)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -288,7 +297,7 @@ struct ConstellationMapView: View {
             drawBackgroundStars(context: &layer, center: center, radius: radius, nightFactor: effectiveNight, current: current)
 
             // Milky Way soft band along galactic plane
-            drawMilkyWay(context: &layer, center: center, radius: radius, observer: observer, nightFactor: effectiveNight, current: current)
+            drawMilkyWay(context: &layer, center: center, radius: radius, observer: observer, nightFactor: effectiveNight, current: current, effectiveHeading: effectiveHeading, pan: pan)
 
             // Sun and Moon markers
             drawSunAndMoon(
@@ -517,9 +526,14 @@ struct ConstellationMapView: View {
     }
 
     // MARK: - Milky Way rendering
-    private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double, current: Date) {
+    private func drawMilkyWay(context: inout GraphicsContext, center: CGPoint, radius: CGFloat, observer: Observer, nightFactor: Double, current: Date, effectiveHeading: Double, pan: CGSize) {
         guard nightFactor > 0.02 else { return }
         let lstHours = Astronomer.localSiderealTime(date: current, longitude: observer.lon)
+        // Apply the same heading/pan transform as stars, planets and cardinals so
+        // the band rotates with the sky instead of staying north-up.
+        let headingRad = effectiveHeading * .pi / 180.0
+        let azOffsetRad = Double(pan.width) / Double(radius) * (Double.pi / 2.0) // ~90° per radius
+        let altOffsetDeg = -Double(pan.height) / Double(radius) * 90.0
 
         // Draw multiple belts at galactic latitude offsets to create a soft band
         let latitudes = [-10.0, -6.0, -3.0, 0.0, 3.0, 6.0, 10.0]
@@ -531,9 +545,10 @@ struct ConstellationMapView: View {
             for l in stride(from: 0.0, through: 360.0, by: 3.0) {
                 let eq = Astronomer.galacticToEquatorial(lDeg: l, bDeg: b)
                 let altaz = Astronomer.altAz(eq: Equatorial(raHours: eq.raHours, decDeg: eq.decDeg), lstHours: lstHours, latDeg: observer.lat)
-                if altaz.altDeg > 0 {
+                let adjAlt = max(-90.0, min(90.0, altaz.altDeg + altOffsetDeg))
+                if adjAlt > 0 {
                     let az = altaz.azDeg * .pi / 180.0
-                    let p = pointOnDome(center: center, radius: radius, azimuthRad: az, altitudeDeg: altaz.altDeg)
+                    let p = pointOnDome(center: center, radius: radius, azimuthRad: az - headingRad + azOffsetRad, altitudeDeg: adjAlt)
                     if !started {
                         path.move(to: p)
                         started = true

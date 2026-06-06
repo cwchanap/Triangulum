@@ -114,6 +114,78 @@ struct ConstellationCameraStateTests {
         #expect(state.effectiveHeading(liveHeading: 128.0) == 128.0)
     }
 
+    // MARK: - Live gesture freeze (exploration begins mid-gesture, before commit)
+
+    @Test func livePinchFreezesHeadingWhenMeaningful() {
+        var state = ConstellationCameraState()
+
+        // Sub-threshold pinch (jitter) must not freeze.
+        state.beginExploringIfNeeded(livePinch: 1.0 + ConstellationCameraState.pinchMoveThreshold / 2.0, currentHeading: 42.0)
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
+
+        // Crossing the threshold freezes at the heading active when it became meaningful.
+        state.beginExploringIfNeeded(livePinch: 1.0 + ConstellationCameraState.pinchMoveThreshold, currentHeading: 91.0)
+        #expect(state.isExploring)
+        #expect(state.frozenHeading == 91.0)
+
+        // Subsequent live changes keep the first frozen heading (idempotent).
+        state.beginExploringIfNeeded(livePinch: 2.5, currentHeading: 200.0)
+        #expect(state.frozenHeading == 91.0)
+    }
+
+    @Test func livePinchInwardAlsoFreezes() {
+        var state = ConstellationCameraState()
+
+        // Pinching in (livePinch < 1.0) is equally meaningful.
+        state.beginExploringIfNeeded(livePinch: 1.0 - ConstellationCameraState.pinchMoveThreshold, currentHeading: 55.0)
+
+        #expect(state.isExploring)
+        #expect(state.frozenHeading == 55.0)
+    }
+
+    @Test func livePinchResetToOneDoesNotFreeze() {
+        var state = ConstellationCameraState()
+
+        // A gesture resolving back to 1.0 before any meaningful move must not freeze.
+        // This mirrors the @GestureState reset when the gesture ends at neutral.
+        state.beginExploringIfNeeded(livePinch: 1.0, currentHeading: 42.0)
+
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
+    }
+
+    @Test func livePanFreezesHeadingWhenMeaningful() {
+        var state = ConstellationCameraState()
+
+        // Sub-threshold drag must not freeze.
+        state.beginExploringIfNeeded(translation: CGSize(width: ConstellationCameraState.panMoveThreshold / 2.0, height: 0), currentHeading: 42.0)
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
+
+        // At/above threshold freezes.
+        state.beginExploringIfNeeded(translation: CGSize(width: ConstellationCameraState.panMoveThreshold, height: 0), currentHeading: 270.0)
+        #expect(state.isExploring)
+        #expect(state.frozenHeading == 270.0)
+
+        // Idempotent: first frozen heading wins.
+        state.beginExploringIfNeeded(translation: CGSize(width: 50, height: 50), currentHeading: 12.0)
+        #expect(state.frozenHeading == 270.0)
+    }
+
+    @Test func liveFreezePersistsAcrossGestureCommit() {
+        var state = ConstellationCameraState()
+
+        // Live freeze fires first during the gesture...
+        state.beginExploringIfNeeded(translation: CGSize(width: 30, height: 0), currentHeading: 180.0)
+        #expect(state.frozenHeading == 180.0)
+
+        // ...then the gesture commits; the heading must not change.
+        state.applyPan(CGSize(width: 30, height: 0), currentHeading: 5.0)
+        #expect(state.frozenHeading == 180.0)
+        #expect(state.effectiveHeading(liveHeading: 5.0) == 180.0)
+    }
+
     // MARK: - Bounds & rendering
 
     @Test func zoomBoundsAreConsistentWithInitialZoom() {
