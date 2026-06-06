@@ -41,6 +41,9 @@ struct ConstellationCameraState: Equatable {
     /// stops following the compass mid-gesture. Sub-threshold jitter is ignored.
     mutating func beginExploringIfNeeded(livePinch: CGFloat, currentHeading: Double) {
         guard abs(livePinch - 1.0) >= Self.pinchMoveThreshold else { return }
+        // A pinch the clamp turns into a no-op (already at a zoom bound) must not
+        // strand the map in Exploring — mirrors applyZoomMultiplier's guard.
+        guard renderedZoom(livePinch: livePinch) != zoom else { return }
         beginExploring(currentHeading: currentHeading)
     }
 

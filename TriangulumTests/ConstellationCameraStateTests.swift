@@ -134,14 +134,22 @@ struct ConstellationCameraStateTests {
         #expect(state.frozenHeading == 91.0)
     }
 
-    @Test func livePinchInwardAlsoFreezes() {
+    @Test func clampedLivePinchAtBoundDoesNotFreeze() {
         var state = ConstellationCameraState()
 
-        // Pinching in (livePinch < 1.0) is equally meaningful.
-        state.beginExploringIfNeeded(livePinch: 1.0 - ConstellationCameraState.pinchMoveThreshold, currentHeading: 55.0)
+        // At minZoom an inward live pinch clamps back to minZoom — a visual
+        // no-op — so it must not strand the map in Exploring mid-gesture.
+        let inward = 1.0 - ConstellationCameraState.pinchMoveThreshold * 2.0
+        #expect(inward < 1.0)
+        state.beginExploringIfNeeded(livePinch: inward, currentHeading: 55.0)
+        #expect(!state.isExploring)
+        #expect(state.frozenHeading == nil)
 
+        // A meaningful outward pinch at minZoom still renders a real change, so
+        // it freezes as expected.
+        state.beginExploringIfNeeded(livePinch: 1.0 + ConstellationCameraState.pinchMoveThreshold, currentHeading: 91.0)
         #expect(state.isExploring)
-        #expect(state.frozenHeading == 55.0)
+        #expect(state.frozenHeading == 91.0)
     }
 
     @Test func livePinchResetToOneDoesNotFreeze() {
