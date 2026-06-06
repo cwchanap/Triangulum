@@ -24,7 +24,7 @@ struct ConstellationCameraStateTests {
 
         #expect(!state.isExploring)
         #expect(state.frozenHeading == nil)
-        #expect(state.zoom == 1.0)
+        #expect(state.zoom == ConstellationCameraState.minZoom)
         #expect(state.pan == .zero)
         #expect(state.effectiveHeading(liveHeading: 128.0) == 128.0)
     }
@@ -36,12 +36,12 @@ struct ConstellationCameraStateTests {
 
         #expect(state.isExploring)
         #expect(state.frozenHeading == 91.0)
-        #expect(state.zoom == 3.0)
+        #expect(state.zoom == ConstellationCameraState.maxZoom)
 
         state.applyZoomMultiplier(0.01, currentHeading: 180.0)
 
         #expect(state.frozenHeading == 91.0)
-        #expect(state.zoom == 1.0)
+        #expect(state.zoom == ConstellationCameraState.minZoom)
     }
 
     @Test func panAccumulatesAndStartsExploration() {
@@ -53,5 +53,11 @@ struct ConstellationCameraStateTests {
         #expect(state.isExploring)
         #expect(state.frozenHeading == 270.0)
         #expect(state.pan == CGSize(width: 8.0, height: 12.0))
+    }
+
+    @Test func zoomBoundsAreConsistentWithInitialZoom() {
+        #expect(ConstellationCameraState.minZoom >= 0.0)
+        #expect(ConstellationCameraState.maxZoom >= ConstellationCameraState.minZoom)
+        #expect(ConstellationCameraState().zoom == ConstellationCameraState.minZoom)
     }
 }

@@ -2,8 +2,8 @@ import CoreGraphics
 import Foundation
 
 struct ConstellationCameraState: Equatable {
-    private let minZoom: CGFloat = 1.0
-    private let maxZoom: CGFloat = 3.0
+    static let minZoom: CGFloat = 1.0
+    static let maxZoom: CGFloat = 3.0
 
     var zoom: CGFloat = 1.0
     var pan: CGSize = .zero
@@ -28,7 +28,7 @@ struct ConstellationCameraState: Equatable {
     }
 
     mutating func recenter() {
-        zoom = 1.0
+        zoom = Self.minZoom
         pan = .zero
         isExploring = false
         frozenHeading = nil
@@ -39,6 +39,6 @@ struct ConstellationCameraState: Equatable {
     }
 
     private func clampedZoom(_ value: CGFloat) -> CGFloat {
-        max(minZoom, min(maxZoom, value))
+        max(Self.minZoom, min(Self.maxZoom, value))
     }
 }

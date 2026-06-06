@@ -91,7 +91,15 @@ struct ConstellationCameraStateTests {
 Run:
 
 ```bash
-xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'id=BD6DDA67-1A24-4848-8760-BE7F5BB71F10' -only-testing:TriangulumTests/ConstellationCameraStateTests
+# Use any available simulator. To list destinations:
+#   xcodebuild -showdestinations -project Triangulum.xcodeproj -scheme Triangulum
+# Or substitute a specific simulator UDID via:
+#   xcrun simctl list devices available | grep "iPhone"
+xcodebuild test \
+  -project Triangulum.xcodeproj \
+  -scheme Triangulum \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+  -only-testing:TriangulumTests/ConstellationCameraStateTests
 ```
 
 Expected: FAIL because `ConstellationCameraState` does not exist.
@@ -152,7 +160,12 @@ struct ConstellationCameraState: Equatable {
 Run:
 
 ```bash
-xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'id=BD6DDA67-1A24-4848-8760-BE7F5BB71F10' -only-testing:TriangulumTests/ConstellationCameraStateTests
+# See Step 2 for destination selection guidance.
+xcodebuild test \
+  -project Triangulum.xcodeproj \
+  -scheme Triangulum \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+  -only-testing:TriangulumTests/ConstellationCameraStateTests
 ```
 
 Expected: PASS for `ConstellationCameraStateTests`.
@@ -332,7 +345,12 @@ Expected: BUILD SUCCEEDED.
 Run:
 
 ```bash
-xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'id=BD6DDA67-1A24-4848-8760-BE7F5BB71F10' -only-testing:TriangulumTests/ConstellationCameraStateTests
+# See Task 1 Step 2 for destination selection guidance.
+xcodebuild test \
+  -project Triangulum.xcodeproj \
+  -scheme Triangulum \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+  -only-testing:TriangulumTests/ConstellationCameraStateTests
 ```
 
 Expected: PASS.
@@ -354,7 +372,12 @@ git commit -m "Pause constellation heading during exploration"
 - [ ] **Step 1: Run focused tests**
 
 ```bash
-xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination 'id=BD6DDA67-1A24-4848-8760-BE7F5BB71F10' -only-testing:TriangulumTests/ConstellationCameraStateTests
+# See Task 1 Step 2 for destination selection guidance.
+xcodebuild test \
+  -project Triangulum.xcodeproj \
+  -scheme Triangulum \
+  -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+  -only-testing:TriangulumTests/ConstellationCameraStateTests
 ```
 
 Expected: PASS.

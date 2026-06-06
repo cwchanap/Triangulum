@@ -25,6 +25,8 @@ Footer controls remain compact and icon-based:
 - Zoom in increases zoom within the existing bounds.
 - Recenter/reorient resets pan and zoom and resumes live heading-follow.
 
+A double-tap anywhere on the map view triggers the same recenter/reorient behavior as the footer button and resumes live heading-follow. The double-tap gesture is wired in `ConstellationMapView` alongside the footer recenter control, so users have both an on-map and a footer-driven recovery path.
+
 Remove the existing `Snap North` toggle from the constellation map menu. The redesigned default is heading-follow with temporary pause during manual exploration, so the primary constellation UX no longer presents north-up and heading-follow as competing modes.
 
 ## Architecture
@@ -35,6 +37,8 @@ Add explicit camera/orientation state to `ConstellationMapView`:
 - `pan`: existing persistent pan offset.
 - `isExploring`: true after a user pan or zoom begins.
 - `frozenHeading`: heading captured when exploration begins.
+
+Encapsulation: `ConstellationMapView` owns an instance of `ConstellationCameraState` (e.g. `@State private var camera = ConstellationCameraState()`). The `ConstellationCameraState` struct encapsulates the camera properties (`zoom`, `pan`, `isExploring`, `frozenHeading`) and the transition methods (`beginExploring`, `applyPan`, `applyZoomMultiplier`, `recenter`, `effectiveHeading`). The view holds the struct instance and drives it through gesture/keyboard handlers; the struct owns the state machine.
 
 The drawing pipeline receives an effective heading:
 
@@ -52,7 +56,7 @@ The recenter helper resets camera state and clears exploration:
 
 ## Data Flow
 
-`ConstellationMapView` remains the owner of camera state. No new model or persistence is needed.
+`ConstellationMapView` owns an instance of `ConstellationCameraState` (the view holds the struct; the struct holds the camera state). No new model or persistence is needed.
 
 The effective heading is passed consistently to:
 

@@ -28,7 +28,7 @@ struct ConstellationMapView: View {
             header
             GeometryReader { _ in
                 TimelineView(.animation) { timeline in
-                    let currentZoom = max(min(camera.zoom * pinch, 3.0), 1.0)
+                    let currentZoom = max(min(camera.zoom * pinch, ConstellationCameraState.maxZoom), ConstellationCameraState.minZoom)
                     let currentPan = CGSize(width: camera.pan.width + drag.width, height: camera.pan.height + drag.height)
                     let effectiveHeading = camera.effectiveHeading(liveHeading: locationManager.heading)
                     let magnify = MagnificationGesture()
@@ -600,71 +600,66 @@ struct ConstellationMapView: View {
         // Sun
         let sunEq = Astronomer.sunEquatorial(date: current)
         let sunAltAz = Astronomer.altAz(eq: Equatorial(raHours: sunEq.raHours, decDeg: sunEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
-        if true {
-            let az = sunAltAz.azDeg * .pi / 180.0
-            let adjAlt = max(-90.0, min(90.0, sunAltAz.altDeg + altOffsetDeg))
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: az - headingRad + azOffsetRad, altitudeDeg: adjAlt)
-            let s: CGFloat = 8
-            let rect = CGRect(x: p.x - s/2, y: p.y - s/2, width: s, height: s)
-            let color = nightVisionMode ? Color.red : Color.yellow
-            context.fill(Path(ellipseIn: rect), with: .color(color))
-            let label = Text("Sun").font(.system(size: 8)).foregroundColor(color)
-            context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
-        }
+        let azSun = sunAltAz.azDeg * .pi / 180.0
+        let sunAdjAlt = max(-90.0, min(90.0, sunAltAz.altDeg + altOffsetDeg))
+        let sunPoint = pointOnDome(center: center, radius: radius, azimuthRad: azSun - headingRad + azOffsetRad, altitudeDeg: sunAdjAlt)
+        let sunSize: CGFloat = 8
+        let sunRect = CGRect(x: sunPoint.x - sunSize/2, y: sunPoint.y - sunSize/2, width: sunSize, height: sunSize)
+        let sunColor = nightVisionMode ? Color.red : Color.yellow
+        context.fill(Path(ellipseIn: sunRect), with: .color(sunColor))
+        let sunLabel = Text("Sun").font(.system(size: 8)).foregroundColor(sunColor)
+        context.draw(context.resolve(sunLabel), at: CGPoint(x: sunPoint.x + 8, y: sunPoint.y - 8), anchor: .topLeading)
 
         // Moon
         let moonEq = Astronomer.moonEquatorial(date: current)
         let moonAltAz = Astronomer.altAz(eq: Equatorial(raHours: moonEq.raHours, decDeg: moonEq.decDeg), lstHours: lstHours, latDeg: observer.lat)
-        if true {
-            let azMoon = moonAltAz.azDeg * .pi / 180.0
-            let adjAlt = max(-90.0, min(90.0, moonAltAz.altDeg + altOffsetDeg))
-            let p = pointOnDome(center: center, radius: radius, azimuthRad: azMoon - headingRad + azOffsetRad, altitudeDeg: adjAlt)
+        let azMoon = moonAltAz.azDeg * .pi / 180.0
+        let moonAdjAlt = max(-90.0, min(90.0, moonAltAz.altDeg + altOffsetDeg))
+        let moonPoint = pointOnDome(center: center, radius: radius, azimuthRad: azMoon - headingRad + azOffsetRad, altitudeDeg: moonAdjAlt)
 
-            // Phase and orientation
-            let k = Astronomer.illuminationFraction(sunEq: sunEq, moonEq: moonEq)
-            let azSun = sunAltAz.azDeg * .pi / 180.0
-            // Canvas vector for azimuth a is (sin a, -cos a)
-            let vx = sin(azSun)
-            let vy = -cos(azSun)
-            let theta = atan2(vy, vx)
+        // Phase and orientation
+        let k = Astronomer.illuminationFraction(sunEq: sunEq, moonEq: moonEq)
+        // Canvas vector for azimuth a is (sin a, -cos a)
+        let vx = sin(azSun)
+        let vy = -cos(azSun)
+        let theta = atan2(vy, vx)
 
-            // Draw moon with crescent/gibbous shading
-            let color = nightVisionMode ? Color.red : Color.white
-            let s: CGFloat = 10
-            let r = s / 2
-            let baseRect = CGRect(x: -r, y: -r, width: s, height: s)
+        // Draw moon with crescent/gibbous shading
+        let moonColor = nightVisionMode ? Color.red : Color.white
+        let moonSize: CGFloat = 10
+        let moonRadius = moonSize / 2
+        let moonBaseRect = CGRect(x: -moonRadius, y: -moonRadius, width: moonSize, height: moonSize)
 
-            context.drawLayer { layer in
-                layer.translateBy(x: p.x, y: p.y)
-                layer.rotate(by: Angle(radians: theta))
+        context.drawLayer { layer in
+            layer.translateBy(x: moonPoint.x, y: moonPoint.y)
+            layer.rotate(by: Angle(radians: theta))
 
-                // Base: dark outline to enhance legibility
-                layer.stroke(Path(ellipseIn: baseRect), with: .color(color), lineWidth: 1)
+            // Base: dark outline to enhance legibility
+            layer.stroke(Path(ellipseIn: moonBaseRect), with: .color(moonColor), lineWidth: 1)
 
-                if k >= 0.5 {
-                    // Bright gibbous/full: intersection of two discs
-                    let d = 2 * r * (1 - k)
-                    let shifted = baseRect.offsetBy(dx: d, dy: 0)
-                    layer.clip(to: Path(ellipseIn: baseRect))
-                    layer.clip(to: Path(ellipseIn: shifted)) // intersection
-                    layer.fill(Path(ellipseIn: baseRect), with: .color(color))
-                } else {
-                    // Bright crescent: base minus shifted disc (within base)
-                    let d = 2 * r * k
-                    let shifted = baseRect.offsetBy(dx: d, dy: 0)
-                    layer.clip(to: Path(ellipseIn: baseRect))
-                    var crescent = Path()
-                    crescent.addEllipse(in: baseRect)
-                    crescent.addEllipse(in: shifted)
-                    layer.fill(crescent, with: .color(color), style: FillStyle(eoFill: true))
-                }
+            if k >= 0.5 {
+                // Bright gibbous/full: intersection of two discs
+                let d = 2 * moonRadius * (1 - k)
+                let shifted = moonBaseRect.offsetBy(dx: d, dy: 0)
+                layer.clip(to: Path(ellipseIn: moonBaseRect))
+                layer.clip(to: Path(ellipseIn: shifted)) // intersection
+                layer.fill(Path(ellipseIn: moonBaseRect), with: .color(moonColor))
+            } else {
+                // Bright crescent: base minus shifted disc (within base)
+                let d = 2 * moonRadius * k
+                let shifted = moonBaseRect.offsetBy(dx: d, dy: 0)
+                layer.clip(to: Path(ellipseIn: moonBaseRect))
+                var crescent = Path()
+                crescent.addEllipse(in: moonBaseRect)
+                crescent.addEllipse(in: shifted)
+                layer.fill(crescent, with: .color(moonColor), style: FillStyle(eoFill: true))
             }
-
-            // Label with illumination percent
-            let percent = Int((k * 100).rounded())
-            let label = Text("Moon \(percent)%").font(.system(size: 8)).foregroundColor(color)
-            context.draw(context.resolve(label), at: CGPoint(x: p.x + 8, y: p.y - 8), anchor: .topLeading)
         }
+
+        // Label with illumination percent
+        let percent = Int((k * 100).rounded())
+        let moonLabel = Text("Moon \(percent)%").font(.system(size: 8)).foregroundColor(moonColor)
+        context.draw(context.resolve(moonLabel), at: CGPoint(x: moonPoint.x + 8, y: moonPoint.y - 8), anchor: .topLeading)
     }
 
     // Day-night transition factor based on Sun altitude (deg)
