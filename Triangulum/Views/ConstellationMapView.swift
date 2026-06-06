@@ -28,13 +28,10 @@ struct ConstellationMapView: View {
             header
             GeometryReader { _ in
                 TimelineView(.animation) { timeline in
-                    let currentZoom = max(min(camera.zoom * pinch, ConstellationCameraState.maxZoom), ConstellationCameraState.minZoom)
+                    let currentZoom = camera.renderedZoom(livePinch: pinch)
                     let currentPan = CGSize(width: camera.pan.width + drag.width, height: camera.pan.height + drag.height)
                     let effectiveHeading = camera.effectiveHeading(liveHeading: locationManager.heading)
                     let magnify = MagnificationGesture()
-                        .onChanged { _ in
-                            camera.beginExploring(currentHeading: locationManager.heading)
-                        }
                         .updating($pinch) { value, state, _ in
                             state = value
                         }
@@ -42,9 +39,6 @@ struct ConstellationMapView: View {
                             camera.applyZoomMultiplier(value, currentHeading: locationManager.heading)
                         }
                     let panGesture = DragGesture(minimumDistance: 1, coordinateSpace: .local)
-                        .onChanged { _ in
-                            camera.beginExploring(currentHeading: locationManager.heading)
-                        }
                         .updating($drag) { value, state, _ in
                             state = value.translation
                         }
