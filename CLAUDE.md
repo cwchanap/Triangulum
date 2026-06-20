@@ -19,6 +19,24 @@ Triangulum is an iOS app built with SwiftUI that monitors multiple sensor types 
 - **Test in Xcode**: Use Test Navigator or `⌘+U`
 - **List available destinations**: `xcodebuild -showdestinations -project Triangulum.xcodeproj -scheme Triangulum`
 
+### Running Tests (preferred: XcodeBuildMCP, fallback: xcodebuild)
+
+**Always disable parallel testing** — this machine does not have enough resources for concurrent simulator clones, and parallel `xcodebuild test` leaves orphaned clones in `~/Library/Developer/XCTestDevices` that accumulate to tens of GB.
+
+**Preferred — via XcodeBuildMCP** (configured in Devin CLI):
+1. Call `session_show_defaults` first to verify the active project/scheme/simulator.
+2. If defaults are unset, call `session_set_defaults` with `projectPath`, `scheme`, and `simulatorName`.
+3. Run `test_sim` with `extraArgs: ["-parallel-testing-enabled", "NO"]` to disable cloning.
+
+**Fallback — direct xcodebuild** (when XcodeBuildMCP is unavailable):
+```bash
+xcodebuild test \
+  -project Triangulum.xcodeproj \
+  -scheme Triangulum \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -parallel-testing-enabled NO
+```
+
 ### Linting
 - **SwiftLint**: Install with `brew install swiftlint`, run with `swiftlint`
 - CI automatically runs SwiftLint on all pushes and PRs
