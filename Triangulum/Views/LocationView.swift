@@ -5,105 +5,62 @@ struct LocationView: View {
     @ObservedObject var locationManager: LocationManager
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "location")
-                    .font(.title)
-                    .foregroundColor(.prussianAccent)
-                Text("Location")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
-                Spacer()
-
+        VStack(spacing: CelSpace.md) {
+            InstrumentHeader(icon: "location.fill", title: "Location", tint: .celCyan) {
                 NavigationLink(destination: MapView(locationManager: locationManager)) {
                     Image(systemName: "map")
-                        .font(.title3)
-                        .foregroundColor(.prussianAccent)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.celCyan)
                 }
             }
 
             if !locationManager.isAvailable {
-                Text("Location services disabled in system settings")
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: "Location services disabled in system settings", color: .celRed)
             } else if locationManager.authorizationStatus == .denied ||
                         locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
-                    Text("Location access denied")
-                        .foregroundColor(.prussianError)
-                        .font(.caption)
+                    CelInlineMessage(text: "Location access denied", color: .celRed)
                     Button("Grant Permission") {
                         locationManager.requestLocationPermission()
                     }
-                    .font(.caption)
-                    .foregroundColor(.prussianAccent)
+                    .font(.celLabel)
+                    .foregroundStyle(Color.celCyan)
                 }
             } else if locationManager.authorizationStatus == .notDetermined {
                 VStack(spacing: 8) {
-                    Text("Requesting location permission...")
-                        .foregroundColor(.prussianBlueLight)
-                        .font(.caption)
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .tint(.prussianAccent)
+                    ProgressView().tint(.celCyan)
+                    Text("Acquiring fix…").celEyebrow()
                 }
             } else if !locationManager.errorMessage.isEmpty {
-                Text(locationManager.errorMessage)
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: locationManager.errorMessage, color: .celRed)
             } else {
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Latitude")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(locationManager.latitude, specifier: "%.6f")°")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Longitude")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(locationManager.longitude, specifier: "%.6f")°")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                VStack(spacing: CelSpace.md) {
+                    HStack(alignment: .top) {
+                        MetricReadout("Latitude",
+                                      value: String(format: "%.5f°", locationManager.latitude))
+                        MetricReadout("Longitude",
+                                      value: String(format: "%.5f°", locationManager.longitude),
+                                      alignment: .trailing)
                     }
 
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Altitude (above sea level)")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(locationManager.altitude, specifier: "%.2f") m")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Accuracy")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(locationManager.accuracy, specifier: "%.1f") m")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(accuracyColor)
-                        }
+                    HStack(alignment: .top) {
+                        MetricReadout("Altitude",
+                                      value: String(format: "%.1f", locationManager.altitude),
+                                      unit: "m")
+                        MetricReadout("Accuracy",
+                                      value: String(format: "±%.1f", locationManager.accuracy),
+                                      unit: "m", alignment: .trailing, valueColor: accuracyColor)
                     }
 
-                    ProgressView(value: min(max((100 - locationManager.accuracy) / 100.0, 0.0), 1.0))
-                        .progressViewStyle(LinearProgressViewStyle(tint: accuracyColor))
+                    VStack(spacing: 5) {
+                        HStack {
+                            Text("Fix Quality").celEyebrow()
+                            Spacer()
+                            StatusPill(accuracyLabel, color: accuracyColor)
+                        }
+                        LuminousBar(value: min(max((100 - locationManager.accuracy) / 100.0, 0.0), 1.0),
+                                    tint: accuracyColor)
+                    }
                 }
             }
         }
@@ -112,12 +69,18 @@ struct LocationView: View {
 
     private var accuracyColor: Color {
         if locationManager.accuracy < 5.0 {
-            return .prussianSuccess
+            return .celGreen
         } else if locationManager.accuracy < 20.0 {
-            return .prussianAccent
+            return .celCyan
         } else {
-            return .prussianError
+            return .celAmber
         }
+    }
+
+    private var accuracyLabel: String {
+        if locationManager.accuracy < 5.0 { return "Precise" }
+        if locationManager.accuracy < 20.0 { return "Good" }
+        return "Coarse"
     }
 }
 

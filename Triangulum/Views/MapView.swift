@@ -41,11 +41,11 @@ struct MapView: View {
             HStack {
                 Image(systemName: "map")
                     .font(.title)
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Map")
                     .font(.title2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
 
                 if mapProvider == "osm" {
@@ -55,7 +55,7 @@ struct MapView: View {
                     } label: {
                         Image(systemName: isCacheMode ? "externaldrive.fill" : "externaldrive")
                             .font(.title3)
-                            .foregroundColor(isCacheMode ? .prussianAccent : .prussianBlueLight)
+                            .foregroundColor(isCacheMode ? .celCyan : .celTextDim)
                     }
                 }
 
@@ -64,7 +64,7 @@ struct MapView: View {
                 } label: {
                     Image(systemName: isTrackingUser ? "location.fill" : "location")
                         .font(.title3)
-                        .foregroundColor(.prussianAccent)
+                        .foregroundColor(.celCyan)
                 }
             }
             .padding(.horizontal)
@@ -73,7 +73,7 @@ struct MapView: View {
             // Search bar: OSM uses Nominatim, Apple uses MKLocalSearch
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").foregroundColor(.prussianBlueLight)
+                    Image(systemName: "magnifyingglass").foregroundColor(.celTextDim)
                     TextField("Search places", text: $searchText)
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(true)
@@ -85,32 +85,32 @@ struct MapView: View {
                             osmSuggestions = []
                             appleCompleter.results = []
                         } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundColor(.prussianBlueLight)
+                            Image(systemName: "xmark.circle.fill").foregroundColor(.celTextDim)
                         }
                     }
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .background(Color.prussianSoft.opacity(0.4))
+                .background(Color.celSurfaceTop.opacity(0.4))
                 .cornerRadius(10)
 
                 Button(action: performSearch) {
                     if isSearching {
-                        ProgressView().scaleEffect(0.7).tint(.prussianAccent)
+                        ProgressView().scaleEffect(0.7).tint(.celCyan)
                     } else {
                         Text("Search").font(.subheadline).foregroundColor(.white)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(isSearching ? Color.prussianSoft : Color.prussianAccent)
+                .background(isSearching ? Color.celBackgroundBottom : Color.celCyan)
                 .cornerRadius(10)
                 .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 // Limit to visible region toggle (applies to OSM strictly; Apple is a bias)
                 HStack(spacing: 6) {
                     Toggle("", isOn: $limitToView).labelsHidden()
-                    Text("Limit to View").font(.caption2).foregroundColor(.prussianBlueDark)
+                    Text("Limit to View").font(.caption2).foregroundColor(.celText)
                 }
             }
             .padding(.horizontal)
@@ -128,7 +128,7 @@ struct MapView: View {
                                 Text(item.displayName)
                                     .font(.subheadline)
                                     .lineLimit(2)
-                                    .foregroundColor(.prussianBlueDark)
+                                    .foregroundColor(.celText)
                             }
                             .padding(.vertical, 8)
                             .padding(.horizontal)
@@ -137,9 +137,9 @@ struct MapView: View {
                         Divider()
                     }
                 }
-                .background(Color.white)
+                .background(Color.celSurfaceTop)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8).stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.celCyan.opacity(0.2), lineWidth: 1)
                 )
                 .cornerRadius(8)
                 .padding(.horizontal)
@@ -152,9 +152,9 @@ struct MapView: View {
                             selectAppleCompletion(comp)
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(comp.title).font(.subheadline).foregroundColor(.prussianBlueDark)
+                                Text(comp.title).font(.subheadline).foregroundColor(.celText)
                                 if !comp.subtitle.isEmpty {
-                                    Text(comp.subtitle).font(.caption).foregroundColor(.prussianBlueLight)
+                                    Text(comp.subtitle).font(.caption).foregroundColor(.celTextDim)
                                 }
                             }
                             .padding(.vertical, 8)
@@ -164,9 +164,9 @@ struct MapView: View {
                         Divider()
                     }
                 }
-                .background(Color.white)
+                .background(Color.celSurfaceTop)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8).stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8).stroke(Color.celCyan.opacity(0.2), lineWidth: 1)
                 )
                 .cornerRadius(8)
                 .padding(.horizontal)
@@ -179,22 +179,22 @@ struct MapView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Pan map to desired area, then tap 'Cache This Area'")
                                 .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
+                                .foregroundColor(.celTextDim)
                             Text(
                                 "\(cacheManager.getCacheInfo().sizeInMB, specifier: "%.1f") MB cached (\(cacheManager.tilesCount) tiles)"
                             )
                                 .font(.caption2)
-                                .foregroundColor(.prussianBlueLight.opacity(0.8))
+                                .foregroundColor(.celTextDim.opacity(0.8))
                         }
                         Spacer()
                         if cacheManager.isDownloading {
                             VStack(spacing: 2) {
                                 ProgressView(value: cacheManager.downloadProgress)
                                     .frame(width: 60)
-                                    .tint(.prussianAccent)
+                                    .tint(.celCyan)
                                 Text("\(Int(cacheManager.downloadProgress * 100))%")
                                     .font(.caption2)
-                                    .foregroundColor(.prussianBlueDark)
+                                    .foregroundColor(.celText)
                             }
                         }
                     }
@@ -203,9 +203,9 @@ struct MapView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Radius: \(Int(cacheRadius))m")
                                 .font(.caption2)
-                                .foregroundColor(.prussianBlueDark)
+                                .foregroundColor(.celText)
                             Slider(value: $cacheRadius, in: 500...5000, step: 250)
-                                .tint(.prussianAccent)
+                                .tint(.celCyan)
                         }
 
                         Spacer()
@@ -213,7 +213,7 @@ struct MapView: View {
                         VStack(spacing: 4) {
                             Text("Zoom: \(minZoom)-\(maxZoom)")
                                 .font(.caption2)
-                                .foregroundColor(.prussianBlueDark)
+                                .foregroundColor(.celText)
                             HStack(spacing: 8) {
                                 Picker("Min", selection: $minZoom) {
                                     ForEach(8...16, id: \.self) { Text("\($0)").tag($0) }
@@ -231,47 +231,47 @@ struct MapView: View {
                         } label: {
                             Image(systemName: "trash")
                                 .font(.caption)
-                                .foregroundColor(.prussianError)
+                                .foregroundColor(.celRed)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
-                .background(Color.prussianSoft.opacity(0.3))
+                .background(Color.celSurfaceTop.opacity(0.3))
             }
 
             if !locationManager.isAvailable {
                 Text("Location services disabled in system settings")
-                    .foregroundColor(.prussianError)
+                    .foregroundColor(.celRed)
                     .font(.caption)
                     .frame(height: 200)
             } else if locationManager.authorizationStatus == .denied ||
                         locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
                     Text("Location access denied")
-                        .foregroundColor(.prussianError)
+                        .foregroundColor(.celRed)
                         .font(.caption)
                     Button("Grant Permission") {
                         locationManager.requestLocationPermission()
                     }
                     .font(.caption)
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 }
                 .frame(height: 200)
             } else if locationManager.authorizationStatus == .notDetermined {
                 VStack(spacing: 8) {
                     Text("Requesting location permission...")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .font(.caption)
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(.prussianAccent)
+                        .tint(.celCyan)
                 }
                 .frame(height: 200)
             } else if !locationManager.errorMessage.isEmpty {
                 Text(locationManager.errorMessage)
-                    .foregroundColor(.prussianError)
+                    .foregroundColor(.celRed)
                     .font(.caption)
                     .frame(height: 200)
             } else {
@@ -337,7 +337,7 @@ struct MapView: View {
                                                 .padding(.vertical, 12)
                                                 .background(
                                                     LinearGradient(
-                                                        gradient: Gradient(colors: [.prussianAccent, .prussianBlue]),
+                                                        gradient: Gradient(colors: [.celCyan, .celCyan]),
                                                         startPoint: .leading,
                                                         endPoint: .trailing
                                                     )
@@ -392,7 +392,7 @@ struct MapView: View {
                             if userLocation.latitude != 0.0 || userLocation.longitude != 0.0 {
                                 Annotation("Current Location", coordinate: userLocation) {
                                     Circle()
-                                        .fill(Color.prussianAccent)
+                                        .fill(Color.celCyan)
                                         .stroke(Color.white, lineWidth: 2)
                                         .frame(width: 12, height: 12)
                                 }
@@ -402,7 +402,7 @@ struct MapView: View {
                                 Annotation(selectedResultTitle ?? "Result", coordinate: sel) {
                                     Image(systemName: "mappin.circle.fill")
                                         .font(.title2)
-                                        .foregroundColor(.prussianAccent)
+                                        .foregroundColor(.celCyan)
                                         .shadow(radius: 2)
                                 }
                             }
@@ -413,7 +413,7 @@ struct MapView: View {
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.celCyan.opacity(0.2), lineWidth: 1)
                 )
             }
 
@@ -424,13 +424,13 @@ struct MapView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Coordinates")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text(
                             "\(locationManager.latitude, specifier: "%.6f")°, \(locationManager.longitude, specifier: "%.6f")°"
                         )
                             .font(.caption2)
                             .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
                     }
 
                     Spacer()
@@ -438,7 +438,7 @@ struct MapView: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Accuracy")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text("\(locationManager.accuracy, specifier: "%.1f") m")
                             .font(.caption2)
                             .fontWeight(.medium)
@@ -447,19 +447,19 @@ struct MapView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
-                .background(Color.white.opacity(0.9))
+                .background(Color.celSurfaceTop.opacity(0.9))
             }
         }
         .padding()
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color.white, Color.prussianSoft]),
+                gradient: Gradient(colors: [Color.celSurfaceTop, Color.celSurfaceBottom]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         )
         .cornerRadius(12)
-        .shadow(color: Color.prussianBlue.opacity(0.1), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.celCyan.opacity(0.1), radius: 8, x: 0, y: 4)
         .ignoresSafeArea(.all, edges: .bottom)
         .onChange(of: locationManager.latitude) { _, _ in
             updatePosition()
@@ -493,11 +493,11 @@ struct MapView: View {
 
     private var accuracyColor: Color {
         if locationManager.accuracy < 5.0 {
-            return .prussianSuccess
+            return .celCyan
         } else if locationManager.accuracy < 20.0 {
-            return .prussianAccent
+            return .celCyan
         } else {
-            return .prussianError
+            return .celRed
         }
     }
 

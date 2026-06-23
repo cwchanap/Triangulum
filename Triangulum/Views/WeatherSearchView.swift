@@ -27,7 +27,7 @@ struct WeatherSearchView: View {
             .navigationTitle("Weather Search")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
         .onAppear {
@@ -47,8 +47,8 @@ struct WeatherSearchView: View {
             }
         }
         .padding()
-        .background(Color.white)
-        .shadow(color: .prussianBlue.opacity(0.1), radius: 2, x: 0, y: 2)
+        .background(Color.celSurfaceTop)
+        .shadow(color: .celCyan.opacity(0.1), radius: 2, x: 0, y: 2)
     }
 
     private var searchBarContent: some View {
@@ -61,7 +61,7 @@ struct WeatherSearchView: View {
     private var searchTextField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
 
             TextField("Search city (e.g., London, Paris, Tokyo)", text: $searchText)
                 .textInputAutocapitalization(.words)
@@ -75,13 +75,13 @@ struct WeatherSearchView: View {
                     errorMessage = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.prussianSoft.opacity(0.3))
+        .background(Color.celSurfaceTop.opacity(0.3))
         .cornerRadius(10)
     }
 
@@ -98,7 +98,7 @@ struct WeatherSearchView: View {
         }
         .foregroundColor(.white)
         .frame(width: 40, height: 40)
-        .background(isSearching ? Color.prussianBlueLight : Color.prussianAccent)
+        .background(isSearching ? Color.celTextDim : Color.celCyan)
         .cornerRadius(8)
         .disabled(isSearching || searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
@@ -118,7 +118,7 @@ struct WeatherSearchView: View {
                         HStack {
                             Text("Search Results")
                                 .font(.headline)
-                                .foregroundColor(.prussianBlueDark)
+                                .foregroundColor(.celText)
                             Spacer()
                         }
                         .padding(.horizontal)
@@ -140,13 +140,13 @@ struct WeatherSearchView: View {
                         HStack {
                             Text("Recent Searches")
                                 .font(.headline)
-                                .foregroundColor(.prussianBlueDark)
+                                .foregroundColor(.celText)
                             Spacer()
                             Button("Clear All") {
                                 clearHistory()
                             }
                             .font(.caption)
-                            .foregroundColor(.prussianAccent)
+                            .foregroundColor(.celCyan)
                         }
                         .padding(.horizontal)
                         .padding(.top)
@@ -158,16 +158,16 @@ struct WeatherSearchView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "globe.americas.fill")
                             .font(.system(size: 60))
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
 
                         Text("Search Weather Worldwide")
                             .font(.title2)
                             .fontWeight(.semibold)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
 
                         Text("Enter any city name to get current weather conditions from around the world")
                             .font(.body)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                     }
@@ -175,7 +175,7 @@ struct WeatherSearchView: View {
                 }
             }
         }
-        .background(Color.prussianSoft.ignoresSafeArea())
+        .background(StarfieldBackground(showConstellation: false))
     }
 
     // MARK: - Search Functions
@@ -269,7 +269,7 @@ struct WeatherSearchResultCard: View {
                     Text(weather.locationName)
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
 
                 Spacer()
@@ -277,7 +277,7 @@ struct WeatherSearchResultCard: View {
                 Button(action: onSave) {
                     Image(systemName: "bookmark")
                         .font(.title3)
-                        .foregroundColor(.prussianAccent)
+                        .foregroundColor(.celCyan)
                 }
             }
 
@@ -286,11 +286,11 @@ struct WeatherSearchResultCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Temperature")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(String(format: "%.1f°C", weather.temperatureCelsius))
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
 
                 Spacer()
@@ -299,11 +299,11 @@ struct WeatherSearchResultCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("Conditions")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(weather.description.capitalized)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                         .multilineTextAlignment(.trailing)
                 }
             }
@@ -316,9 +316,9 @@ struct WeatherSearchResultCard: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color.celSurfaceTop)
         .cornerRadius(12)
-        .shadow(color: .prussianBlue.opacity(0.1), radius: 4, x: 0, y: 2)
+        .shadow(color: .celCyan.opacity(0.1), radius: 4, x: 0, y: 2)
         .padding(.horizontal)
     }
 }
@@ -334,12 +334,12 @@ struct WeatherHistoryCard: View {
                 Text(city.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 if !city.country.isEmpty {
                     Text(city.country)
                         .font(.caption2)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
             }
 
@@ -348,14 +348,14 @@ struct WeatherHistoryCard: View {
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
-        .background(Color.white)
+        .background(Color.celSurfaceTop)
         .cornerRadius(8)
-        .shadow(color: .prussianBlue.opacity(0.05), radius: 2, x: 0, y: 1)
+        .shadow(color: .celCyan.opacity(0.05), radius: 2, x: 0, y: 1)
         .padding(.horizontal)
         .onTapGesture {
             onTap()
@@ -371,11 +371,11 @@ struct WeatherInfoItem: View {
         VStack(spacing: 2) {
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
         }
     }
 }

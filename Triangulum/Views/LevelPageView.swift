@@ -22,7 +22,7 @@ struct LevelPageView: View {
 
     var body: some View {
         ZStack {
-            Color.prussianSoft.ignoresSafeArea()
+            StarfieldBackground(showConstellation: false)
             VStack(spacing: 24) {
                 Spacer()
 
@@ -39,43 +39,43 @@ struct LevelPageView: View {
                         VStack(spacing: 4) {
                             Text("Roll")
                                 .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
+                                .foregroundColor(.celTextDim)
                             Text("\(screenRoll, specifier: "%.1f")°")
                                 .font(.title3)
                                 .fontWeight(.medium)
-                                .foregroundColor(isLevel ? .prussianGreen : .prussianBlueDark)
+                                .foregroundColor(isLevel ? .celGreen : .celText)
                                 .accessibilityLabel("Roll: \(String(format: "%.1f", screenRoll)) degrees")
                         }
                         VStack(spacing: 4) {
                             Text("Pitch")
                                 .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
+                                .foregroundColor(.celTextDim)
                             Text("\(screenPitch, specifier: "%.1f")°")
                                 .font(.title3)
                                 .fontWeight(.medium)
-                                .foregroundColor(isLevel ? .prussianGreen : .prussianBlueDark)
+                                .foregroundColor(isLevel ? .celGreen : .celText)
                                 .accessibilityLabel("Pitch: \(String(format: "%.1f", screenPitch)) degrees")
                         }
                     }
                 case .loading:
                     ProgressView("Waiting for sensor data…")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 case .unavailable:
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
-                        .foregroundColor(.prussianWarning)
+                        .foregroundColor(.celAmber)
                     Text("Motion sensors not available on this device")
                         .font(.body)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 case .error(let message):
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
-                        .foregroundColor(.prussianError)
+                        .foregroundColor(.celRed)
                     Text(message)
                         .font(.body)
-                        .foregroundColor(.prussianError)
+                        .foregroundColor(.celRed)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
@@ -91,7 +91,7 @@ struct LevelPageView: View {
         .navigationTitle("Level")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+        .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {

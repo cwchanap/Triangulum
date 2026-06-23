@@ -40,7 +40,7 @@ struct SnapshotComparisonView: View {
                 }
                 .padding()
             }
-            .background(Color.prussianSoft.opacity(0.3))
+            .background(Color.celSurfaceTop.opacity(0.3))
             .navigationTitle("Comparison")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -48,7 +48,7 @@ struct SnapshotComparisonView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 }
             }
         }
@@ -60,15 +60,15 @@ struct SnapshotComparisonView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "map")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Locations")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 Text(formattedDistance)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
             }
 
             ComparisonMapView(
@@ -88,19 +88,19 @@ struct SnapshotComparisonView: View {
             HStack(spacing: 16) {
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color.prussianAccent)
+                        .fill(Color.celCyan)
                         .frame(width: 10, height: 10)
                     Text("Snapshot 1")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color.prussianWarning)
+                        .fill(Color.celAmber)
                         .frame(width: 10, height: 10)
                     Text("Snapshot 2")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
                 Spacer()
             }
@@ -115,37 +115,37 @@ struct SnapshotComparisonView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "clock")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Time")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 Text(formattedTimeDifference)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
 
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Snapshot 1")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(snapshot1.timestamp, format: .dateTime.month().day().hour().minute())
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("Snapshot 2")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(snapshot2.timestamp, format: .dateTime.month().day().hour().minute())
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -160,10 +160,10 @@ struct SnapshotComparisonView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "barometer")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Barometer")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
             }
 
@@ -195,10 +195,10 @@ struct SnapshotComparisonView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "location")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Location")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
             }
 
@@ -248,10 +248,10 @@ struct SnapshotComparisonView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "cloud.sun")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Weather")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
             }
 
@@ -277,22 +277,22 @@ struct SnapshotComparisonView: View {
                 HStack {
                     Text("Conditions")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Spacer()
                     Text(weather1.condition)
                         .font(.caption)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                     Text("→")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(weather2.condition)
                         .font(.caption)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
             } else {
                 Text("Weather data not available for one or both snapshots")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .italic()
             }
         }
@@ -306,12 +306,12 @@ struct SnapshotComparisonView: View {
         RoundedRectangle(cornerRadius: 12)
             .fill(
                 LinearGradient(
-                    colors: [Color.white, Color.prussianSoft],
+                    colors: [Color.celSurfaceTop, Color.celSurfaceBottom],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
-            .shadow(color: Color.prussianBlue.opacity(0.1), radius: 4, x: 0, y: 2)
+            .shadow(color: Color.celCyan.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 
     private var formattedDistance: String {
@@ -367,7 +367,7 @@ struct ComparisonRow: View {
             HStack {
                 Text(label)
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                 Spacer()
                 deltaView
             }
@@ -376,17 +376,17 @@ struct ComparisonRow: View {
                 Text(value1)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Image(systemName: "arrow.right")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
 
                 Text(value2)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
@@ -398,7 +398,7 @@ struct ComparisonRow: View {
         if let delta {
             let sign = delta >= 0 ? "+" : ""
             let formattedDelta = String(format: "%@%.\(precision)f %@", sign, delta, unit)
-            let color: Color = delta > 0 ? .prussianSuccess : (delta < 0 ? .prussianWarning : .prussianBlueLight)
+            let color: Color = delta > 0 ? .celCyan : (delta < 0 ? .celAmber : .celTextDim)
 
             Text(formattedDelta)
                 .font(.caption)
@@ -412,10 +412,10 @@ struct ComparisonRow: View {
             Text("--")
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.prussianBlueLight.opacity(0.1))
+                .background(Color.celTextDim.opacity(0.1))
                 .cornerRadius(4)
         }
     }
@@ -489,8 +489,8 @@ struct ComparisonMapView: UIViewRepresentable {
 
             view?.annotation = annotation
             view?.markerTintColor = comparisonAnnotation.isFirst ?
-                UIColor(red: 0.26, green: 0.52, blue: 0.78, alpha: 1.0) :  // prussianAccent
-                UIColor(red: 0.92, green: 0.49, blue: 0.13, alpha: 1.0)   // prussianWarning
+                UIColor(red: 0.26, green: 0.52, blue: 0.78, alpha: 1.0) :  // celCyan
+                UIColor(red: 0.92, green: 0.49, blue: 0.13, alpha: 1.0)   // celAmber
             view?.glyphText = comparisonAnnotation.isFirst ? "1" : "2"
             view?.canShowCallout = true
 
@@ -500,7 +500,7 @@ struct ComparisonMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(red: 0.13, green: 0.35, blue: 0.55, alpha: 0.6)  // prussianBlueLight
+                renderer.strokeColor = UIColor(red: 0.13, green: 0.35, blue: 0.55, alpha: 0.6)  // celTextDim
                 renderer.lineWidth = 2
                 renderer.lineDashPattern = [5, 5]
                 return renderer

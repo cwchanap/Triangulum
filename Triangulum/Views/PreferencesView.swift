@@ -24,127 +24,94 @@ struct PreferencesView: View {
     @State private var showingViewAPIKeyAlert = false
     @State private var apiKeyStatus = "Not Set"
 
+    private let rowBackground = Color.celSurfaceTop.opacity(0.55)
+
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Sensor Widgets")) {
-                    Toggle("Barometer", isOn: $showBarometerWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Location", isOn: $showLocationWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Weather", isOn: $showWeatherWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Satellite Tracker", isOn: $showSatelliteWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Accelerometer", isOn: $showAccelerometerWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Gyroscope", isOn: $showGyroscopeWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Magnetometer", isOn: $showMagnetometerWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
-
-                    Toggle("Map", isOn: $showMapWidget)
-                        .toggleStyle(SwitchToggleStyle(tint: .prussianBlue))
+        List {
+                Section {
+                    widgetToggle("Barometer", "barometer", isOn: $showBarometerWidget)
+                    widgetToggle("Location", "location.fill", isOn: $showLocationWidget)
+                    widgetToggle("Weather", "cloud.sun.fill", isOn: $showWeatherWidget)
+                    widgetToggle("Satellite Tracker", "antenna.radiowaves.left.and.right", isOn: $showSatelliteWidget)
+                    widgetToggle("Accelerometer", "move.3d", isOn: $showAccelerometerWidget)
+                    widgetToggle("Gyroscope", "rotate.3d", isOn: $showGyroscopeWidget)
+                    widgetToggle("Magnetometer", "location.north.line.fill", isOn: $showMagnetometerWidget)
+                    widgetToggle("Map", "map.fill", isOn: $showMapWidget)
+                } header: {
+                    Text("Sensor Array").celEyebrow(.celCyan)
                 }
-                .foregroundColor(.primary)
+                .listRowBackground(rowBackground)
 
-                Section(header: Text("Map")) {
+                Section {
                     Picker("Map Provider", selection: $mapProvider) {
                         Text("Apple Maps").tag("apple")
                         Text("OpenStreetMap").tag("osm")
                     }
                     .pickerStyle(SegmentedPickerStyle())
+                    .foregroundStyle(Color.celText)
 
                     if mapProvider == "osm" {
                         NavigationLink(destination: MapCacheView(locationManager: locationManager)) {
-                            HStack {
-                                Image(systemName: "externaldrive")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                                Text("Cache Management")
-                                    .font(.caption)
-                                Spacer()
+                            Label {
+                                Text("Cache Management").foregroundStyle(Color.celText)
+                            } icon: {
+                                Image(systemName: "externaldrive").foregroundStyle(Color.celCyan)
                             }
                         }
-                        .foregroundColor(.prussianBlueLight)
                     }
+                } header: {
+                    Text("Map Provider").celEyebrow(.celCyan)
                 }
+                .listRowBackground(rowBackground)
 
-                Section(header: Text("Weather Configuration")) {
+                Section {
                     HStack {
-                        Text("API Key Status:")
-                            .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                        Text("API Key").foregroundStyle(Color.celTextDim)
                         Spacer()
-                        Text(apiKeyStatus)
-                            .font(.caption)
-                            .foregroundColor(Config.hasValidAPIKey ? .green : .red)
+                        StatusPill(Config.hasValidAPIKey ? "Active" : "Not Set",
+                                   color: Config.hasValidAPIKey ? .celGreen : .celRed)
                     }
 
-                    Button {
+                    configButton(Config.hasValidAPIKey ? "Update API Key" : "Set API Key",
+                                 icon: "key.fill", tint: .celCyan) {
+                        apiKeyInput = ""
                         showingAPIKeyAlert = true
-                        apiKeyInput = "" // Clear input field
-                    } label: {
-                        HStack {
-                            Image(systemName: "key")
-                                .font(.caption)
-                                .foregroundColor(.prussianAccent)
-                            Text(Config.hasValidAPIKey ? "Update API Key" : "Set API Key")
-                                .font(.caption)
-                                .foregroundColor(.prussianAccent)
-                        }
                     }
 
                     if Config.hasValidAPIKey {
-                        Button {
+                        configButton("View API Key", icon: "eye.fill", tint: .celTextDim) {
                             showingViewAPIKeyAlert = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "eye")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                                Text("View API Key")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                            }
+                        }
+                        configButton("Remove API Key", icon: "trash.fill", tint: .celRed) {
+                            if Config.deleteAPIKey() { updateAPIKeyStatus() }
                         }
                     }
 
-                    if Config.hasValidAPIKey {
-                        Button {
-                            if Config.deleteAPIKey() {
-                                updateAPIKeyStatus()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "trash")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                                Text("Remove API Key")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                    }
-
-                    Text("Get your free API key from openweathermap.org")
-                        .font(.caption2)
-                        .foregroundColor(.prussianBlueLight)
-                        .multilineTextAlignment(.leading)
+                    Text("Get a free key from openweathermap.org")
+                        .font(.celTiny)
+                        .foregroundStyle(Color.celTextFaint)
+                } header: {
+                    Text("Weather Service").celEyebrow(.celCyan)
+                }
+                .listRowBackground(rowBackground)
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .celestialBackground(showConstellation: false)
+            .tint(.celCyan)
+            .navigationTitle("Configuration")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("CONFIGURATION")
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .tracking(2.5)
+                        .foregroundStyle(Color.celText)
                 }
             }
-            .navigationTitle("Preferences")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-        }
         .onAppear {
             updateAPIKeyStatus()
         }
@@ -172,6 +139,31 @@ struct PreferencesView: View {
             Button("Close", role: .cancel) { }
         } message: {
             Text(maskedAPIKey)
+        }
+    }
+
+    private func widgetToggle(_ title: String, _ icon: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Label {
+                Text(title).foregroundStyle(Color.celText)
+            } icon: {
+                Image(systemName: icon)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.celCyan)
+            }
+        }
+        .toggleStyle(SwitchToggleStyle(tint: .celCyan))
+    }
+
+    private func configButton(_ title: String, icon: String, tint: Color,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label {
+                Text(title).foregroundStyle(tint)
+            } icon: {
+                Image(systemName: icon).foregroundStyle(tint)
+            }
+            .font(.system(size: 14))
         }
     }
 

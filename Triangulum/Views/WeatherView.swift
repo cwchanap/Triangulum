@@ -7,51 +7,44 @@ struct WeatherView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "cloud.sun.fill")
-                    .font(.title)
-                    .foregroundColor(.prussianAccent)
-                Text("Weather")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
-                Spacer()
+            InstrumentHeader(icon: "cloud.sun.fill", title: "Weather", tint: .celGold) {
+                HStack(spacing: 14) {
+                    Button {
+                        showingWeatherSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.celCyan)
+                    }
 
-                Button {
-                    showingWeatherSearch = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.title3)
-                        .foregroundColor(.prussianAccent)
+                    Button {
+                        Logger.weather.debug("Manual refresh button pressed")
+                        weatherManager.refreshWeather()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.celCyan)
+                    }
+                    .disabled(weatherManager.isLoading)
                 }
-
-                Button {
-                    Logger.weather.debug("Manual refresh button pressed")
-                    weatherManager.refreshWeather()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.title3)
-                        .foregroundColor(.prussianAccent)
-                }
-                .disabled(weatherManager.isLoading)
             }
 
             if weatherManager.isInitializing {
                 VStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(.prussianAccent)
+                        .tint(.celCyan)
                     Text("Initializing weather service...")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .font(.caption)
                 }
             } else if !weatherManager.isAvailable {
                 VStack(spacing: 8) {
                     Text("Weather service unavailable")
-                        .foregroundColor(.prussianError)
+                        .foregroundColor(.celRed)
                         .font(.caption)
                     Text(weatherManager.errorMessage)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .font(.caption2)
                         .multilineTextAlignment(.center)
                 }
@@ -59,20 +52,20 @@ struct WeatherView: View {
                 VStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                        .tint(.prussianAccent)
+                        .tint(.celCyan)
                     Text("Loading weather data...")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .font(.caption)
                 }
             } else if !weatherManager.errorMessage.isEmpty {
                 VStack(spacing: 8) {
                     Text(weatherManager.errorMessage)
-                        .foregroundColor(.prussianError)
+                        .foregroundColor(.celRed)
                         .font(.caption)
                         .multilineTextAlignment(.center)
                     if weatherManager.errorMessage.contains("API key") {
                         Text("Get a free key from openweathermap.org")
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                             .font(.caption2)
                             .multilineTextAlignment(.center)
                     }
@@ -80,7 +73,7 @@ struct WeatherView: View {
             } else if weatherManager.isAvailable && weatherManager.currentWeather == nil {
                 VStack(spacing: 8) {
                     Text("No weather data")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .font(.caption)
                     Button("Fetch Weather") {
                         Task {
@@ -88,7 +81,7 @@ struct WeatherView: View {
                         }
                     }
                     .font(.caption)
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 }
             } else if let weather = weatherManager.currentWeather {
                 VStack(spacing: 12) {
@@ -97,23 +90,23 @@ struct WeatherView: View {
                         VStack {
                             Image(systemName: weather.systemIconName)
                                 .font(.largeTitle)
-                                .foregroundColor(.prussianAccent)
+                                .foregroundColor(.celCyan)
                             Text(weather.condition)
                                 .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
+                                .foregroundColor(.celTextDim)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(weather.temperatureCelsius, specifier: "%.1f")°C")
                                 .font(.title)
                                 .fontWeight(.bold)
-                                .foregroundColor(.prussianBlueDark)
+                                .foregroundColor(.celText)
                             Text("Feels like \(weather.feelsLikeCelsius, specifier: "%.1f")°C")
                                 .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
+                                .foregroundColor(.celTextDim)
                             Text(weather.description.capitalized)
                                 .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
+                                .foregroundColor(.celTextDim)
                         }
 
                         Spacer()
@@ -125,11 +118,11 @@ struct WeatherView: View {
                             VStack(alignment: .leading) {
                                 Text("Humidity")
                                     .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
+                                    .foregroundColor(.celTextDim)
                                 Text("\(weather.humidity)%")
                                     .font(.title3)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.prussianBlueDark)
+                                    .foregroundColor(.celText)
                             }
 
                             Spacer()
@@ -137,11 +130,11 @@ struct WeatherView: View {
                             VStack(alignment: .trailing) {
                                 Text("Pressure")
                                     .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
+                                    .foregroundColor(.celTextDim)
                                 Text("\(weather.pressure) hPa")
                                     .font(.title3)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.prussianBlueDark)
+                                    .foregroundColor(.celText)
                             }
                         }
 
@@ -150,11 +143,11 @@ struct WeatherView: View {
                                 VStack(alignment: .leading) {
                                     Text("Wind Speed")
                                         .font(.caption)
-                                        .foregroundColor(.prussianBlueLight)
+                                        .foregroundColor(.celTextDim)
                                     Text("\(windSpeed, specifier: "%.1f") m/s")
                                         .font(.title3)
                                         .fontWeight(.medium)
-                                        .foregroundColor(.prussianBlueDark)
+                                        .foregroundColor(.celText)
                                 }
 
                                 Spacer()
@@ -163,11 +156,11 @@ struct WeatherView: View {
                                     VStack(alignment: .trailing) {
                                         Text("Visibility")
                                             .font(.caption)
-                                            .foregroundColor(.prussianBlueLight)
+                                            .foregroundColor(.celTextDim)
                                         Text("\(visibility / 1000) km")
                                             .font(.title3)
                                             .fontWeight(.medium)
-                                            .foregroundColor(.prussianBlueDark)
+                                            .foregroundColor(.celText)
                                     }
                                 }
                             }
@@ -177,11 +170,11 @@ struct WeatherView: View {
                             VStack(alignment: .leading) {
                                 Text("Min")
                                     .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
+                                    .foregroundColor(.celTextDim)
                                 Text("\(weather.tempMinCelsius, specifier: "%.1f")°C")
                                     .font(.callout)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.prussianBlueDark)
+                                    .foregroundColor(.celText)
                             }
 
                             Spacer()
@@ -189,11 +182,11 @@ struct WeatherView: View {
                             VStack(alignment: .trailing) {
                                 Text("Max")
                                     .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
+                                    .foregroundColor(.celTextDim)
                                 Text("\(weather.tempMaxCelsius, specifier: "%.1f")°C")
                                     .font(.callout)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.prussianBlueDark)
+                                    .foregroundColor(.celText)
                             }
                         }
                     }
@@ -202,10 +195,10 @@ struct WeatherView: View {
                     VStack(spacing: 2) {
                         Text(weather.locationName)
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text("Updated: \(weather.timestamp.formatted(date: .omitted, time: .shortened))")
                             .font(.caption2)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                     }
                 }
             }

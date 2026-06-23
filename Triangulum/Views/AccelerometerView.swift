@@ -5,78 +5,33 @@ struct AccelerometerView: View {
     @ObservedObject var accelerometerManager: AccelerometerManager
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "gyroscope")
-                    .font(.title)
-                    .foregroundColor(.prussianAccent)
-                Text("Accelerometer")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
-                Spacer()
-            }
+        VStack(spacing: CelSpace.md) {
+            InstrumentHeader(icon: "move.3d", title: "Accelerometer", tint: .celCyan)
 
             if !accelerometerManager.isAvailable {
-                Text("Accelerometer not available on this device")
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: "Accelerometer not available on this device", color: .celRed)
             } else if !accelerometerManager.errorMessage.isEmpty {
-                Text(accelerometerManager.errorMessage)
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: accelerometerManager.errorMessage, color: .celRed)
             } else {
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("X-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(accelerometerManager.accelerationX, specifier: "%.3f") g")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Y-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(accelerometerManager.accelerationY, specifier: "%.3f") g")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                VStack(spacing: CelSpace.md) {
+                    HStack(alignment: .top) {
+                        MetricReadout("X-Axis",
+                                      value: String(format: "%.3f", accelerometerManager.accelerationX),
+                                      unit: "g")
+                        MetricReadout("Y-Axis",
+                                      value: String(format: "%.3f", accelerometerManager.accelerationY),
+                                      unit: "g", alignment: .trailing)
                     }
-
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Z-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(accelerometerManager.accelerationZ, specifier: "%.3f") g")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Magnitude")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(accelerometerManager.magnitude, specifier: "%.3f") g")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                    HStack(alignment: .top) {
+                        MetricReadout("Z-Axis",
+                                      value: String(format: "%.3f", accelerometerManager.accelerationZ),
+                                      unit: "g")
+                        MetricReadout("Magnitude",
+                                      value: String(format: "%.3f", accelerometerManager.magnitude),
+                                      unit: "g", alignment: .trailing, valueColor: accelerationColor)
                     }
-
-                    ProgressView(value: min(max(accelerometerManager.magnitude / 2.0, 0.0), 1.0))
-                        .progressViewStyle(LinearProgressViewStyle(tint: accelerationColor))
+                    LuminousBar(value: min(max(accelerometerManager.magnitude / 2.0, 0.0), 1.0),
+                                tint: accelerationColor)
                 }
             }
         }
@@ -86,11 +41,11 @@ struct AccelerometerView: View {
     private var accelerationColor: Color {
         let magnitude = accelerometerManager.magnitude
         if magnitude > 1.5 {
-            return .prussianError
+            return .celAmber
         } else if magnitude < 0.5 {
-            return .prussianAccent
+            return .celViolet
         } else {
-            return .prussianSuccess
+            return .celCyan
         }
     }
 }

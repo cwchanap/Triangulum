@@ -37,7 +37,7 @@ struct BarometerDetailView: View {
                 }
                 .padding()
             }
-            .background(Color.prussianSoft.opacity(0.3))
+            .background(Color.celSurfaceTop.opacity(0.3))
             .navigationTitle("Pressure History")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -45,7 +45,7 @@ struct BarometerDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 }
             }
             .onAppear {
@@ -64,10 +64,10 @@ struct BarometerDetailView: View {
             HStack {
                 Image(systemName: "barometer")
                     .font(.title2)
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Current Reading")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
             }
 
@@ -75,11 +75,11 @@ struct BarometerDetailView: View {
                 VStack(alignment: .leading) {
                     Text("Pressure")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text("\(barometerManager.pressure, specifier: "%.2f") kPa")
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
 
                 Spacer()
@@ -87,11 +87,11 @@ struct BarometerDetailView: View {
                 VStack(alignment: .trailing) {
                     Text("Sea Level")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(seaLevelPressureText)
                         .font(.title2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
                 }
             }
 
@@ -121,14 +121,14 @@ struct BarometerDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "gauge.with.dots.needle.bottom.50percent")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Pressure")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 Text("kPa")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
 
             if readings.isEmpty {
@@ -139,7 +139,7 @@ struct BarometerDetailView: View {
                         x: .value("Time", reading.timestamp),
                         y: .value("Pressure", reading.pressure)
                     )
-                    .foregroundStyle(Color.prussianAccent)
+                    .foregroundStyle(Color.celCyan)
                     .interpolationMethod(.catmullRom)
 
                     AreaMark(
@@ -148,7 +148,7 @@ struct BarometerDetailView: View {
                     )
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color.prussianAccent.opacity(0.3), Color.prussianAccent.opacity(0.05)],
+                            colors: [Color.celCyan.opacity(0.3), Color.celCyan.opacity(0.05)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -178,14 +178,14 @@ struct BarometerDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "mountain.2")
-                    .foregroundColor(.prussianSuccess)
+                    .foregroundColor(.celCyan)
                 Text("Altitude")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 Text("meters")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
 
             if readings.isEmpty {
@@ -196,7 +196,7 @@ struct BarometerDetailView: View {
                         x: .value("Time", reading.timestamp),
                         y: .value("Altitude", reading.altitude)
                     )
-                    .foregroundStyle(Color.prussianSuccess)
+                    .foregroundStyle(Color.celCyan)
                     .interpolationMethod(.catmullRom)
 
                     AreaMark(
@@ -205,7 +205,7 @@ struct BarometerDetailView: View {
                     )
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color.prussianSuccess.opacity(0.3), Color.prussianSuccess.opacity(0.05)],
+                            colors: [Color.celCyan.opacity(0.3), Color.celCyan.opacity(0.05)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -237,20 +237,20 @@ struct BarometerDetailView: View {
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "chart.bar.xaxis")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Statistics")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 Text("\(stats.dataPointCount) readings")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
 
             if stats.dataPointCount == 0 {
                 Text("No data available for selected time range")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
             } else {
@@ -260,7 +260,7 @@ struct BarometerDetailView: View {
                         Text("Sea-level Pressure (kPa)")
                             .font(.caption)
                             .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
 
                         StatRow(label: "Min", value: String(format: "%.2f", stats.minPressure))
                         StatRow(label: "Max", value: String(format: "%.2f", stats.maxPressure))
@@ -276,7 +276,7 @@ struct BarometerDetailView: View {
                         Text("Altitude (m)")
                             .font(.caption)
                             .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
 
                         StatRow(label: "Min", value: String(format: "%.1f", stats.minAltitude))
                         StatRow(label: "Max", value: String(format: "%.1f", stats.maxAltitude))
@@ -299,26 +299,26 @@ struct BarometerDetailView: View {
                 // Show error state when data fetch failed
                 Image(systemName: "exclamationmark.triangle")
                     .font(.largeTitle)
-                    .foregroundColor(.prussianWarning)
+                    .foregroundColor(.celAmber)
                 Text("Failed to load data")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                 Text(fetchError.localizedDescription)
                     .font(.caption2)
-                    .foregroundColor(.prussianBlueLight.opacity(0.7))
+                    .foregroundColor(.celTextDim.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             } else {
                 // Show empty state when no data has been collected yet
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.largeTitle)
-                    .foregroundColor(.prussianBlueLight.opacity(0.5))
+                    .foregroundColor(.celTextDim.opacity(0.5))
                 Text("No data available")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                 Text("Data will appear as readings are collected")
                     .font(.caption2)
-                    .foregroundColor(.prussianBlueLight.opacity(0.7))
+                    .foregroundColor(.celTextDim.opacity(0.7))
             }
         }
         .frame(height: 200)
@@ -329,12 +329,12 @@ struct BarometerDetailView: View {
         RoundedRectangle(cornerRadius: 12)
             .fill(
                 LinearGradient(
-                    colors: [Color.white, Color.prussianSoft],
+                    colors: [Color.celSurfaceTop, Color.celSurfaceBottom],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
-            .shadow(color: Color.prussianBlue.opacity(0.1), radius: 4, x: 0, y: 2)
+            .shadow(color: Color.celCyan.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 
     private var seaLevelPressureText: String {
@@ -384,12 +384,12 @@ private struct StatRow: View {
         HStack {
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
             Spacer()
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
         }
     }
 }

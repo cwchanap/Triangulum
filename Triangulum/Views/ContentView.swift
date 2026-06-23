@@ -47,97 +47,86 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List {
+                // Hero header
+                heroHeader
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .moveDisabled(true)
+                    .deleteDisabled(true)
+
+                // Observatory console — navigation instruments
+                consoleStrip
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .moveDisabled(true)
+                    .deleteDisabled(true)
+
+                Text("Sensor Array")
+                    .celEyebrow()
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 2, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .moveDisabled(true)
+
                 ForEach(widgetOrderManager.widgetOrder, id: \.id) { widgetType in
                     if isWidgetVisible(widgetType) {
                         widgetView(for: widgetType)
-                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                     }
                 }
                 .onMove(perform: widgetOrderManager.moveWidget)
 
-                // Camera button as a separate section
+                // Capture snapshot button
                 Section {
-                    HStack {
-                        Spacer()
-                        Button(action: takeSnapshot) {
-                            Image(systemName: "camera.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .padding(12)
-                                .background(Color.prussianBlue)
-                                .clipShape(Circle())
-                        }
-                        Spacer()
-                    }
-                    .listRowInsets(EdgeInsets(top: 20, leading: 16, bottom: 20, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+                    captureButton
+                        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 28, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .moveDisabled(true)
                 }
             }
             .listStyle(PlainListStyle())
-            .background(Color.prussianSoft.ignoresSafeArea())
-            .navigationTitle("Sensor Monitor")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .scrollContentBackground(.hidden)
+            .celestialBackground()
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.celBackgroundTop.opacity(0.85), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .environment(\.editMode, .constant(isEditMode ? EditMode.active : EditMode.inactive))
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .principal) {
+                    Text("TRIANGULUM")
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .tracking(3)
+                        .foregroundStyle(Color.celText)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             isEditMode.toggle()
                         }
                     } label: {
                         Image(systemName: isEditMode ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-
-                    NavigationLink(destination: ConstellationMapView(
-                        locationManager: locationManager,
-                        satelliteManager: satelliteManager
-                    )) {
-                        Image(systemName: "star.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-
-                    NavigationLink(destination: SolarEventsView(locationManager: locationManager)) {
-                        Image(systemName: "sun.max.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-
-                    NavigationLink(destination: CompassPageView(locationManager: locationManager)) {
-                        Image(systemName: "location.north.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-
-                    NavigationLink(destination: LevelPageView(barometerManager: barometerManager)) {
-                        Image(systemName: "level")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-
-                    NavigationLink(destination: PreferencesView(locationManager: locationManager)) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-
-                    NavigationLink(destination: FootprintView(snapshotManager: snapshotManager)) {
-                        Image(systemName: "location.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
+                            .font(.title3)
+                            .foregroundStyle(isEditMode ? Color.celGreen : Color.celCyan)
                     }
                 }
             }
         } detail: {
-            Color.prussianSoft.ignoresSafeArea()
+            ZStack {
+                StarfieldBackground()
+                VStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 40))
+                        .foregroundStyle(Color.celCyan.opacity(0.6))
+                    Text("Select an instrument")
+                        .celEyebrow()
+                }
+            }
         }
         .onAppear {
             guard !isRunningUITests else { return }
@@ -208,6 +197,84 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Dashboard chrome
+
+    private var heroHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Triangulum")
+                .font(.celDisplay(40, weight: .semibold))
+                .foregroundStyle(Color.celText)
+                .shadow(color: .celCyan.opacity(0.25), radius: 12)
+            Text("Celestial Sensor Array")
+                .celEyebrow(.celTextDim)
+            HStack(spacing: 10) {
+                StatusPill("Live", color: .celGreen)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text("UT \(Self.utFormatter.string(from: context.date))")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.celCyan)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var consoleStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                ConsoleTile(icon: "star.fill", label: "Atlas", tint: .celGold) {
+                    ConstellationMapView(locationManager: locationManager,
+                                         satelliteManager: satelliteManager)
+                }
+                ConsoleTile(icon: "sun.max.fill", label: "Solar", tint: .celAmber) {
+                    SolarEventsView(locationManager: locationManager)
+                }
+                ConsoleTile(icon: "location.north.fill", label: "Compass", tint: .celCyan) {
+                    CompassPageView(locationManager: locationManager)
+                }
+                ConsoleTile(icon: "level", label: "Level", tint: .celGreen) {
+                    LevelPageView(barometerManager: barometerManager)
+                }
+                ConsoleTile(icon: "map.fill", label: "Tracks", tint: .celViolet) {
+                    FootprintView(snapshotManager: snapshotManager)
+                }
+                ConsoleTile(icon: "gearshape.fill", label: "Config", tint: .celTextDim) {
+                    PreferencesView(locationManager: locationManager)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var captureButton: some View {
+        Button(action: takeSnapshot) {
+            HStack(spacing: 10) {
+                Image(systemName: "camera.aperture")
+                    .font(.system(size: 18, weight: .semibold))
+                Text("Capture Snapshot")
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .tracking(1.5)
+                    .textCase(.uppercase)
+            }
+            .foregroundStyle(Color.celBackgroundBottom)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .background(
+                Capsule().fill(CelGradient.cyanGlow)
+                    .shadow(color: .celCyan.opacity(0.6), radius: 16, y: 4)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private static let utFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
     private func takeSnapshot() {
         let snapshot = SensorSnapshot.capture(
             barometerManager: barometerManager,
@@ -220,6 +287,32 @@ struct ContentView: View {
         )
         currentSnapshot = snapshot
         showEnhancedSnapshotDialog = true
+    }
+}
+
+// MARK: - Console navigation tile
+
+private struct ConsoleTile<Destination: View>: View {
+    let icon: String
+    let label: String
+    var tint: Color = .celCyan
+    @ViewBuilder var destination: () -> Destination
+
+    var body: some View {
+        NavigationLink {
+            destination()
+        } label: {
+            VStack(spacing: 9) {
+                CelGlyph(systemName: icon, tint: tint, size: 52)
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Color.celTextDim)
+            }
+            .frame(width: 76)
+        }
+        .buttonStyle(.plain)
     }
 }
 

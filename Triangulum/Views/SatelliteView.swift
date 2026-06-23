@@ -21,20 +21,10 @@ struct SatelliteView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            // Header
-            HStack {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.title)
-                    .foregroundColor(.prussianAccent)
-                Text("Satellite Tracker")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
-                Spacer()
-
+            InstrumentHeader(icon: "antenna.radiowaves.left.and.right",
+                             title: "Satellite Tracker", tint: .celCyan) {
                 if satelliteManager.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    ProgressView().scaleEffect(0.7).tint(.celCyan)
                 }
             }
 
@@ -57,18 +47,18 @@ struct SatelliteView: View {
             if satelliteManager.isLoading {
                 Text("Fetching satellite data...")
                     .font(.subheadline)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             } else {
                 Text(satelliteManager.errorMessage.isEmpty ?
                      "Satellite data unavailable" : satelliteManager.errorMessage)
                     .font(.subheadline)
-                    .foregroundColor(.prussianError)
+                    .foregroundColor(.celRed)
 
                 Button("Retry") {
                     satelliteManager.forceRefreshTLEs()
                 }
                 .font(.caption)
-                .foregroundColor(.prussianAccent)
+                .foregroundColor(.celCyan)
             }
         }
     }
@@ -81,7 +71,7 @@ struct SatelliteView: View {
             } else {
                 Text("Calculating next ISS pass...")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
 
             Divider()
@@ -95,10 +85,10 @@ struct SatelliteView: View {
         VStack(spacing: 8) {
             HStack {
                 Image(systemName: "airplane")
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Next ISS Pass")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
             }
 
@@ -111,11 +101,11 @@ struct SatelliteView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Rises in")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text(formatTimeInterval(timeUntilRise))
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
                     }
 
                     Spacer()
@@ -123,11 +113,11 @@ struct SatelliteView: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Max Elevation")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text("\(Int(pass.maxAltitudeDeg))°")
                             .font(.title3)
                             .fontWeight(.semibold)
-                            .foregroundColor(.prussianAccent)
+                            .foregroundColor(.celCyan)
                     }
                 }
 
@@ -144,29 +134,29 @@ struct SatelliteView: View {
                 // Currently visible
                 HStack {
                     Image(systemName: "eye.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.celGreen)
                     Text("ISS is visible now!")
                         .font(.headline)
-                        .foregroundColor(.green)
+                        .foregroundColor(.celGreen)
                     Spacer()
                     Text("Sets in \(formatTimeInterval(pass.setTime.timeIntervalSince(currentTime)))")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
                 .padding(8)
-                .background(Color.green.opacity(0.1))
+                .background(Color.celGreen.opacity(0.1))
                 .cornerRadius(8)
             } else {
                 HStack {
                     Image(systemName: "clock.badge.checkmark")
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text("Pass ended")
                         .font(.headline)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Spacer()
                 }
                 .padding(8)
-                .background(Color.prussianSoft.opacity(0.2))
+                .background(Color.celSurfaceRaised.opacity(0.2))
                 .cornerRadius(8)
             }
         }
@@ -176,15 +166,15 @@ struct SatelliteView: View {
         VStack(spacing: 2) {
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
             if let dir = direction {
                 Text(dir)
                     .font(.caption2)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
         }
     }
@@ -201,12 +191,12 @@ struct SatelliteView: View {
         HStack {
             // Satellite icon with visibility indicator
             Circle()
-                .fill(satellite.currentPosition?.isVisible == true ? Color.green : Color.gray.opacity(0.3))
+                .fill(satellite.currentPosition?.isVisible == true ? Color.celGreen : Color.celTextFaint.opacity(0.4))
                 .frame(width: 8, height: 8)
 
             Text(satellite.name)
                 .font(.subheadline)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
                 .lineLimit(1)
 
             Spacer()
@@ -217,25 +207,25 @@ struct SatelliteView: View {
                     HStack(spacing: 12) {
                         Text("Az: \(Int(azimuth))°")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text("El: \(Int(elevation))°")
                             .font(.caption)
-                            .foregroundColor(elevation > 0 ? .prussianAccent : .prussianBlueLight)
+                            .foregroundColor(elevation > 0 ? .celCyan : .celTextDim)
                     }
                 } else {
                     // Show lat/lon for ground track
                     Text(String(format: "%.1f°, %.1f°", position.latitude, position.longitude))
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
             } else if satellite.tle == nil {
                 Text("No data")
                     .font(.caption)
-                    .foregroundColor(.prussianError)
+                    .foregroundColor(.celRed)
             } else {
                 Text("Calculating...")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             }
         }
     }
