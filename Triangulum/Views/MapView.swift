@@ -242,37 +242,29 @@ struct MapView: View {
             }
 
             if !locationManager.isAvailable {
-                Text("Location services disabled in system settings")
-                    .foregroundColor(.celRed)
-                    .font(.caption)
+                CelInlineMessage(text: "Location services disabled in system settings", color: .celRed)
                     .frame(height: 200)
             } else if locationManager.authorizationStatus == .denied ||
                         locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
-                    Text("Location access denied")
-                        .foregroundColor(.celRed)
-                        .font(.caption)
+                    CelInlineMessage(text: "Location access denied", color: .celRed)
+                    // Once denied/restricted, requestWhenInUseAuthorization() is a
+                    // system no-op, so guide the user to Settings to re-enable access.
                     Button("Open Settings") {
                         locationManager.openAppSettings()
                     }
-                    .font(.caption)
-                    .foregroundColor(.celCyan)
+                    .font(.celLabel)
+                    .foregroundStyle(Color.celCyan)
                 }
                 .frame(height: 200)
             } else if locationManager.authorizationStatus == .notDetermined {
                 VStack(spacing: 8) {
-                    Text("Requesting location permission...")
-                        .foregroundColor(.celTextDim)
-                        .font(.caption)
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .tint(.celCyan)
+                    ProgressView().tint(.celCyan)
+                    Text("Acquiring fix…").celEyebrow()
                 }
                 .frame(height: 200)
             } else if !locationManager.errorMessage.isEmpty {
-                Text(locationManager.errorMessage)
-                    .foregroundColor(.celRed)
-                    .font(.caption)
+                CelInlineMessage(text: locationManager.errorMessage, color: .celRed)
                     .frame(height: 200)
             } else {
                 Group {

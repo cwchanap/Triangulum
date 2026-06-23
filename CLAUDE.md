@@ -115,6 +115,10 @@ xcodebuild test \
 
 ```
 Triangulum/
+├── DesignSystem/    # Cel design system (dark-only, semantic tokens)
+│   ├── CelestialTheme.swift       # Color tokens, gradients, typography, spacing scale
+│   ├── CelestialComponents.swift   # Reusable cards, readouts, bars, status pills, inline messages
+│   └── Starfield.swift            # Animated starfield background (Canvas + TimelineView)
 ├── Views/           # SwiftUI view components
 │   ├── ContentView.swift          # Main app interface with sensor widgets
 │   ├── BarometerView.swift        # Barometer sensor display
@@ -144,7 +148,6 @@ Triangulum/
 │   ├── OSMGeocoder.swift          # OpenStreetMap geocoding services
 │   └── AppleSearchCompleter.swift # Apple Maps search completion
 ├── Extensions/      # SwiftUI extensions and utilities
-│   └── Color+Theme.swift          # Prussian Blue color theme definitions
 ├── Assets.xcassets/ # App icons and visual assets
 ├── Config.swift     # Centralized configuration with Keychain integration
 └── PrivacyInfo.plist # Privacy manifest for App Store compliance
@@ -171,7 +174,8 @@ Triangulum/
 - Photo integration with sensor snapshots using PhotosUI framework
 
 ### UI/UX Features
-- Custom Prussian Blue color theme defined in `Color+Theme.swift`
+- **Cel design system** (`Triangulum/DesignSystem/`): semantic color tokens (`celText`, `celTextDim`, `celCyan`, `celRed`, `celAmber`, `celGreen`, `celSurface*`), gradients (`CelGradient`), typography (`celDisplay`/`celReadout`/`celEyebrow`), and a spacing scale (`CelSpace`) defined in `CelestialTheme.swift`. Reusable components (`InstrumentCardModifier`, `MetricReadout`, `LuminousBar`, `StatusPill`, `CelInlineMessage`, `CelGlyph`, `InstrumentHeader`, `CornerTicks`) live in `CelestialComponents.swift`. The animated `Starfield` background uses `Canvas` + `drawingGroup()` with a pausable `TimelineView`.
+- **Dark-only appearance**: the app applies `.preferredColorScheme(.dark)` at the root (`TriangulumApp.swift`) to support the deep-space aesthetic. Cel tokens are hardcoded RGB literals, not adaptive — light mode is intentionally unsupported.
 - Real-time data visualization with live sensor readings
 - Configurable widget visibility through `@AppStorage` preferences
 - **Drag-and-drop widget reordering**: Users can reorder sensor widgets via edit mode (managed by `WidgetOrderManager`)
