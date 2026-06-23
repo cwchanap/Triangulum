@@ -684,7 +684,7 @@ iOS Home Screen widgets for glanceable sensor information.
 
 **Priority:** Low
 **Effort:** Medium
-**Notes:** Night vision mode (red overlay) exists in `CompassPageView`. The Prussian Blue color scheme in `Color+Theme.swift` is applied consistently. Dark/light mode awareness exists in `ConstellationMapView`. Missing: full system dark/light mode toggle, manual theme override, and custom accent color selection.
+**Notes:** Night vision mode (red overlay) exists in `CompassPageView`. The Cel design system in `DesignSystem/CelestialTheme.swift` is applied consistently. The app is dark-only (`.preferredColorScheme(.dark)` at the app root); Cel tokens are hardcoded RGB literals, not adaptive. Missing: full system dark/light mode toggle, manual theme override, and custom accent color selection.
 
 **Description:**
 Comprehensive theming with light/dark mode support beyond night vision.

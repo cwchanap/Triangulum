@@ -8,7 +8,6 @@ struct ConstellationMapView: View {
     @AppStorage("skyShowSatellites") private var skyShowSatellites = true
     @AppStorage("skyShowPlanets") private var skyShowPlanets = true
     @State private var now: Date = Date()
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("nightVisionMode") private var nightVisionMode = false
     @AppStorage("skyShowStarLabels") private var skyShowStarLabels = true
@@ -112,7 +111,7 @@ struct ConstellationMapView: View {
                         }
                     }
                 }
-                .background(colorScheme == .dark ? Color.black : Color.celBackgroundBottom)
+                .background(Color.celBackgroundBottom)
             }
             .padding()
             footer
