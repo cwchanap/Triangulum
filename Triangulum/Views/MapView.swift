@@ -493,11 +493,11 @@ struct MapView: View {
 
     private var accuracyColor: Color {
         if locationManager.accuracy < 5.0 {
-            return .celCyan
+            return .celGreen
         } else if locationManager.accuracy < 20.0 {
             return .celCyan
         } else {
-            return .celRed
+            return .celAmber
         }
     }
 

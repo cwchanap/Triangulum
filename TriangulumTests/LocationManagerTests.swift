@@ -8,6 +8,7 @@
 import Testing
 import Foundation
 import CoreLocation
+import UIKit
 @testable import Triangulum
 
 @Suite(.serialized)
@@ -235,5 +236,16 @@ struct LocationManagerTests {
         #expect(manager.accuracy == 0.0)
         #expect(manager.errorMessage.isEmpty)
         #expect(manager.isAvailable == CLLocationManager.locationServicesEnabled())
+    }
+
+    @Test func testAppSettingsURLIsValidDeepLink() {
+        // When permission is denied/restricted the UI opens Settings via this URL.
+        // UIApplication.openSettingsURLString is documented to be non-empty.
+        let manager = LocationManager(skipAvailabilityCheck: true)
+
+        let url = manager.appSettingsURL
+        #expect(url.absoluteString.isEmpty == false)
+        #expect(url.absoluteString == UIApplication.openSettingsURLString)
+        #expect(url.scheme != nil) // must be an openable app:// or prefs:// style URL
     }
 }
