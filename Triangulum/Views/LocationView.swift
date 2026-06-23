@@ -20,8 +20,10 @@ struct LocationView: View {
                         locationManager.authorizationStatus == .restricted {
                 VStack(spacing: 8) {
                     CelInlineMessage(text: "Location access denied", color: .celRed)
-                    Button("Grant Permission") {
-                        locationManager.requestLocationPermission()
+                    // Once denied/restricted, requestWhenInUseAuthorization() is a
+                    // system no-op, so guide the user to Settings to re-enable access.
+                    Button("Open Settings") {
+                        locationManager.openAppSettings()
                     }
                     .font(.celLabel)
                     .foregroundStyle(Color.celCyan)

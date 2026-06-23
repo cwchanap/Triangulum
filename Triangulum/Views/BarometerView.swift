@@ -70,7 +70,9 @@ struct BarometerView: View {
         guard let seaLevelPressure = barometerManager.seaLevelPressure else {
             return "--"
         }
-        return String(format: "%.2f kPa", seaLevelPressure)
+        // Unit is rendered separately by MetricReadout(unit: "kPa");
+        // keep the value numeric to avoid a duplicated "kPa kPa".
+        return String(format: "%.2f", seaLevelPressure)
     }
 }
 

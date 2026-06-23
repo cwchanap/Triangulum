@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import UIKit
 import os
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
@@ -98,6 +99,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func requestLocationPermission() {
         locationManager.requestWhenInUseAuthorization()
+    }
+
+    /// The system URL that deep-links into this app's Location permission screen.
+    var appSettingsURL: URL {
+        // openSettingsURLString is documented to never be empty.
+        URL(string: UIApplication.openSettingsURLString)!
+    }
+
+    /// Opens the app's location settings. Used from the UI when authorization
+    /// is `.denied` or `.restricted`, because `requestWhenInUseAuthorization()`
+    /// is a system no-op in those states and will not re-prompt the user.
+    @MainActor
+    func openAppSettings() {
+        UIApplication.shared.open(appSettingsURL)
     }
 
     func startLocationUpdates() {

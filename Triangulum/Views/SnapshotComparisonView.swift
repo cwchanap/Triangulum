@@ -489,8 +489,8 @@ struct ComparisonMapView: UIViewRepresentable {
 
             view?.annotation = annotation
             view?.markerTintColor = comparisonAnnotation.isFirst ?
-                UIColor(red: 0.26, green: 0.52, blue: 0.78, alpha: 1.0) :  // celCyan
-                UIColor(red: 0.92, green: 0.49, blue: 0.13, alpha: 1.0)   // celAmber
+                UIColor(Color.celCyan) :
+                UIColor(Color.celAmber)
             view?.glyphText = comparisonAnnotation.isFirst ? "1" : "2"
             view?.canShowCallout = true
 
@@ -500,7 +500,7 @@ struct ComparisonMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(red: 0.13, green: 0.35, blue: 0.55, alpha: 0.6)  // celTextDim
+                renderer.strokeColor = UIColor(Color.celTextDim.opacity(0.6))
                 renderer.lineWidth = 2
                 renderer.lineDashPattern = [5, 5]
                 return renderer
