@@ -126,11 +126,11 @@ struct SolarEventsView: View {
                 }
             }
         }
-        .background(Color.prussianSoft.ignoresSafeArea())
+        .background(StarfieldBackground(showConstellation: false))
         .navigationTitle("Solar Events")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+        .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -164,24 +164,24 @@ struct SolarEventsView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(Self.dateFormatter.string(from: selectedDate))
                 .font(.headline)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
             if hasUsableLocation {
                 Text(String(format: "%.4f°, %.4f°",
                             locationManager.latitude, locationManager.longitude))
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
             } else {
                 Text(locationManager.errorMessage.isEmpty
                      ? "Waiting for a location fix..."
                      : locationManager.errorMessage)
                     .font(.caption)
-                    .foregroundColor(.prussianError)
+                    .foregroundColor(.celRed)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.85))
+        .background(Color.celSurfaceTop.opacity(0.85))
     }
 
     private func morningSection(solarDay: SolarDay) -> some View {
@@ -192,33 +192,33 @@ struct SolarEventsView: View {
                 if let t = solarDay.astronomicalDawn {
                     SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianBlueDark, isPast: isToday && t < now)
+                                  accent: .celText, isPast: isToday && t < now)
                 }
                 if let t = solarDay.nauticalDawn {
                     SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianBlueDark, isPast: isToday && t < now)
+                                  accent: .celText, isPast: isToday && t < now)
                 }
                 if let t = solarDay.civilDawn {
                     SolarEventRow(icon: "circle.lefthalf.filled", label: "Blue hour begins",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianAccent, isPast: isToday && t < now)
+                                  accent: .celCyan, isPast: isToday && t < now)
                 }
                 if let t = solarDay.sunrise {
                     SolarEventRow(icon: "sunrise.fill", label: "Sunrise · Golden hour",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianWarning, isPast: isToday && t < now)
+                                  accent: .celAmber, isPast: isToday && t < now)
                 }
                 if let t = solarDay.morningGoldenEnd {
                     SolarEventRow(icon: "sun.max.fill", label: "Golden hour ends",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianWarning, isPast: isToday && t < now,
+                                  accent: .celAmber, isPast: isToday && t < now,
                                   showDivider: false)
                 }
             } else {
                 Text("Sun does not rise at this location today.")
                     .font(.subheadline)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -233,33 +233,33 @@ struct SolarEventsView: View {
                 if let t = solarDay.eveningGoldenStart {
                     SolarEventRow(icon: "sun.max.fill", label: "Golden hour begins",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianWarning, isPast: isToday && t < now)
+                                  accent: .celAmber, isPast: isToday && t < now)
                 }
                 if let t = solarDay.sunset {
                     SolarEventRow(icon: "sunset.fill", label: "Sunset · Blue hour",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianWarning, isPast: isToday && t < now)
+                                  accent: .celAmber, isPast: isToday && t < now)
                 }
                 if let t = solarDay.civilDusk {
                     SolarEventRow(icon: "circle.righthalf.filled", label: "Blue hour ends",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianAccent, isPast: isToday && t < now)
+                                  accent: .celCyan, isPast: isToday && t < now)
                 }
                 if let t = solarDay.nauticalDusk {
                     SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianBlueDark, isPast: isToday && t < now)
+                                  accent: .celText, isPast: isToday && t < now)
                 }
                 if let t = solarDay.astronomicalDusk {
                     SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
                                   time: Self.timeFormatter.string(from: t),
-                                  accent: .prussianBlueDark, isPast: isToday && t < now,
+                                  accent: .celText, isPast: isToday && t < now,
                                   showDivider: false)
                 }
             } else {
                 Text("Sun does not set at this location today.")
                     .font(.subheadline)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -270,14 +270,14 @@ struct SolarEventsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Location required")
                 .font(.headline)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
             Text("Solar event times appear after location permissions are granted and a valid GPS fix is available.")
                 .font(.subheadline)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color.white.opacity(0.85))
+        .background(Color.celSurfaceTop.opacity(0.85))
         .cornerRadius(12)
         .padding(.horizontal)
         .padding(.top, 12)
@@ -288,14 +288,14 @@ struct SolarEventsView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
                 .padding(.horizontal)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color.white.opacity(0.85))
+            .background(Color.celSurfaceTop.opacity(0.85))
             .cornerRadius(12)
             .padding(.horizontal)
             .padding(.bottom, 4)
@@ -320,11 +320,11 @@ private struct SolarEventRow: View {
                     .foregroundColor(accent)
                     .frame(width: 24)
                 Text(label)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 Text(time)
                     .font(.system(.body, design: .monospaced))
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
@@ -370,7 +370,7 @@ private struct SolarCountdownCard: View {
             Spacer()
         }
         .padding()
-        .background(Color.prussianBlue)
+        .background(Color.celCyanDeep)
         .foregroundColor(.white)
         .cornerRadius(12)
     }

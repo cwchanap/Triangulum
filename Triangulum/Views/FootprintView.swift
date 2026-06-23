@@ -37,11 +37,11 @@ struct FootprintView: View {
     var body: some View {
         NavigationView {
             content
-            .background(Color.prussianSoft.ignoresSafeArea())
+            .background(StarfieldBackground(showConstellation: false))
             .navigationTitle("Sensor Footprints")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 if !snapshotManager.snapshots.isEmpty {
@@ -65,7 +65,7 @@ struct FootprintView: View {
                             Button("Clear All") {
                                 showingDeleteAlert = true
                             }
-                            .foregroundColor(.prussianError)
+                            .foregroundColor(.celRed)
                         }
                     }
                 }
@@ -107,16 +107,16 @@ struct FootprintView: View {
         VStack(spacing: 20) {
             Image(systemName: "camera.fill")
                 .font(.system(size: 64))
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
 
             Text("No Snapshots Yet")
                 .font(.title2)
                 .fontWeight(.medium)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
 
             Text("Take your first snapshot from the main screen to see your sensor footprints here")
                 .font(.body)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
         }
@@ -139,7 +139,7 @@ struct FootprintView: View {
                     itemsPerPage: itemsPerPage
                 )
                 .padding()
-                .background(Color.prussianSoft)
+                .background(Color.celBackgroundBottom)
             }
         }
     }
@@ -183,15 +183,15 @@ struct FootprintView: View {
             VStack(spacing: 16) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 48))
-                    .foregroundColor(.prussianWarning)
+                    .foregroundColor(.celAmber)
 
                 Text("Comparison Unavailable")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 Text("One or both selected snapshots have been removed")
                     .font(.body)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -209,16 +209,16 @@ struct FootprintView: View {
             HStack {
                 Text("Select 2 snapshots to compare")
                     .font(.subheadline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 Spacer()
 
                 Text("\(selectedSnapshots.count)/2 selected")
                     .font(.caption)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.prussianBlueLight.opacity(0.2))
+                    .background(Color.celTextDim.opacity(0.2))
                     .cornerRadius(8)
             }
 
@@ -234,13 +234,13 @@ struct FootprintView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.prussianBlue)
+                    .background(Color.celCyanDeep)
                     .cornerRadius(10)
                 }
             }
         }
         .padding()
-        .background(Color.white.opacity(0.9))
+        .background(Color.celSurfaceTop.opacity(0.9))
     }
 
     // MARK: - Selection Logic
@@ -294,14 +294,14 @@ struct SnapshotRowView: View {
             if isCompareMode {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
-                    .foregroundColor(isSelected ? .prussianAccent : .prussianBlueLight)
+                    .foregroundColor(isSelected ? .celCyan : .celTextDim)
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Snapshot")
                         .font(.headline)
-                        .foregroundColor(.prussianBlueDark)
+                        .foregroundColor(.celText)
 
                     if photoCount > 0 {
                         HStack(spacing: 2) {
@@ -309,38 +309,38 @@ struct SnapshotRowView: View {
                             Text("\(photoCount)")
                         }
                         .font(.caption)
-                        .foregroundColor(.prussianBlue)
+                        .foregroundColor(.celCyan)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.prussianBlueLight.opacity(0.2))
+                        .background(Color.celTextDim.opacity(0.2))
                         .cornerRadius(8)
                     }
 
                     Spacer()
                     Text(snapshot.timestamp, format: .dateTime.month().day().hour().minute())
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
 
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Pressure")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text(String(format: "%.2f kPa", snapshot.barometer.pressure))
                             .font(.body)
                             .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("GPS Altitude")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text(String(format: "%.1f m", snapshot.location.altitude))
                             .font(.body)
                             .fontWeight(.medium)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
                     }
 
                     Spacer()
@@ -349,14 +349,14 @@ struct SnapshotRowView: View {
                 HStack {
                     Image(systemName: "location.fill")
                         .font(.caption2)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Text(String(format: "%.4f°, %.4f°", snapshot.location.latitude, snapshot.location.longitude))
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                     Spacer()
                     Text(String(format: "±%.1f m", snapshot.location.accuracy))
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
             }
         }
@@ -364,10 +364,10 @@ struct SnapshotRowView: View {
         .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? Color.prussianAccent.opacity(0.1) : Color.white.opacity(0.8))
+                .fill(isSelected ? Color.celCyan.opacity(0.15) : Color.celSurfaceTop.opacity(0.85))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? Color.prussianAccent : Color.clear, lineWidth: 2)
+                        .stroke(isSelected ? Color.celCyan : Color.clear, lineWidth: 2)
                 )
         )
         .padding(.horizontal)
@@ -406,11 +406,11 @@ struct SnapshotDetailView: View {
                 }
                 .padding()
             }
-            .background(Color.prussianSoft.ignoresSafeArea())
+            .background(StarfieldBackground(showConstellation: false))
             .navigationTitle("Snapshot Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -456,7 +456,7 @@ struct SnapshotDetailView: View {
                 Text("Photos")
                     .font(.title2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
                 PhotosPicker(
                     selection: $selectedPhotos,
@@ -465,14 +465,14 @@ struct SnapshotDetailView: View {
                 ) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundColor(loadedPhotos.count >= 5 ? .prussianBlueLight : .prussianBlue)
+                        .foregroundColor(loadedPhotos.count >= 5 ? .celTextDim : .celCyan)
                 }
                 .disabled(loadedPhotos.count >= 5)
             }
             if loadedPhotos.isEmpty {
                 Text("No photos added yet")
                     .font(.body)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .italic()
             } else {
                 LazyVGrid(
@@ -497,7 +497,7 @@ struct SnapshotDetailView: View {
             }
         }
         .padding()
-        .background(Color.white.opacity(0.8))
+        .background(Color.celSurfaceTop.opacity(0.8))
         .cornerRadius(12)
     }
 
@@ -506,7 +506,7 @@ struct SnapshotDetailView: View {
             Text("Barometer Data")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
             DetailRowView(label: "Pressure", value: String(format: "%.2f kPa", snapshot.barometer.pressure))
             DetailRowView(label: "Sea Level Pressure", value: seaLevelPressureText)
             if let attitude = snapshot.barometer.attitude {
@@ -516,7 +516,7 @@ struct SnapshotDetailView: View {
             }
         }
         .padding()
-        .background(Color.white.opacity(0.8))
+        .background(Color.celSurfaceTop.opacity(0.8))
         .cornerRadius(12)
     }
 
@@ -525,14 +525,14 @@ struct SnapshotDetailView: View {
             Text("Location Data")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
             DetailRowView(label: "Latitude", value: String(format: "%.6f°", snapshot.location.latitude))
             DetailRowView(label: "Longitude", value: String(format: "%.6f°", snapshot.location.longitude))
             DetailRowView(label: "GPS Altitude", value: String(format: "%.2f m", snapshot.location.altitude))
             DetailRowView(label: "Accuracy", value: String(format: "±%.2f m", snapshot.location.accuracy))
         }
         .padding()
-        .background(Color.white.opacity(0.8))
+        .background(Color.celSurfaceTop.opacity(0.8))
         .cornerRadius(12)
     }
 
@@ -541,14 +541,14 @@ struct SnapshotDetailView: View {
             Text("Timestamp")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
             Text(snapshot.timestamp,
                  format: .dateTime.weekday().month().day().year().hour().minute().second())
                 .font(.body)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
         }
         .padding()
-        .background(Color.white.opacity(0.8))
+        .background(Color.celSurfaceTop.opacity(0.8))
         .cornerRadius(12)
     }
 }
@@ -573,7 +573,7 @@ struct PaginationView: View {
         VStack(spacing: 12) {
             Text("Showing \(startItem)-\(endItem) of \(totalItems) snapshots")
                 .font(.caption)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
 
             HStack(spacing: 20) {
                 Button {
@@ -586,14 +586,14 @@ struct PaginationView: View {
                         Text("Previous")
                     }
                     .font(.body)
-                    .foregroundColor(currentPage > 0 ? .prussianBlue : .prussianBlueLight)
+                    .foregroundColor(currentPage > 0 ? .celCyan : .celTextDim)
                 }
                 .disabled(currentPage == 0)
 
                 Text("Page \(currentPage + 1) of \(totalPages)")
                     .font(.body)
                     .fontWeight(.medium)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 Button {
                     if currentPage < totalPages - 1 {
@@ -605,7 +605,7 @@ struct PaginationView: View {
                         Image(systemName: "chevron.right")
                     }
                     .font(.body)
-                    .foregroundColor(currentPage < totalPages - 1 ? .prussianBlue : .prussianBlueLight)
+                    .foregroundColor(currentPage < totalPages - 1 ? .celCyan : .celTextDim)
                 }
                 .disabled(currentPage >= totalPages - 1)
             }
@@ -623,12 +623,12 @@ struct DetailRowView: View {
         HStack {
             Text(label)
                 .font(.body)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
             Spacer()
             Text(value)
                 .font(.body)
                 .fontWeight(.medium)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
         }
     }
 }

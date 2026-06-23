@@ -18,11 +18,11 @@ struct MapCacheView: View {
             HStack {
                 Image(systemName: "externaldrive")
                     .font(.title)
-                    .foregroundColor(.prussianAccent)
+                    .foregroundColor(.celCyan)
                 Text("Map Cache")
                     .font(.title2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
                 Spacer()
             }
             .padding(.horizontal)
@@ -33,11 +33,11 @@ struct MapCacheView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Cache Size")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text("\(cacheManager.getCacheInfo().sizeInMB, specifier: "%.1f") MB")
                             .font(.title3)
                             .fontWeight(.semibold)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
                     }
 
                     Spacer()
@@ -45,19 +45,19 @@ struct MapCacheView: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Tiles Cached")
                             .font(.caption)
-                            .foregroundColor(.prussianBlueLight)
+                            .foregroundColor(.celTextDim)
                         Text("\(cacheManager.tilesCount)")
                             .font(.title3)
                             .fontWeight(.semibold)
-                            .foregroundColor(.prussianBlueDark)
+                            .foregroundColor(.celText)
                     }
                 }
                 .padding()
-                .background(Color.white.opacity(0.8))
+                .background(Color.celSurfaceTop.opacity(0.8))
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.celCyan.opacity(0.2), lineWidth: 1)
                 )
             }
 
@@ -65,30 +65,30 @@ struct MapCacheView: View {
             VStack(spacing: 8) {
                 Text("Download Tiles")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 Text(
                     "Use the Map view to download tiles for specific areas. " +
                     "Toggle the cache mode button in the Map view to access download controls."
                 )
                     .font(.callout)
-                    .foregroundColor(.prussianBlueLight)
+                    .foregroundColor(.celTextDim)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
             .padding()
-            .background(Color.prussianSoft.opacity(0.3))
+            .background(Color.celSurfaceTop.opacity(0.3))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.celCyan.opacity(0.2), lineWidth: 1)
             )
 
             // Cache Management
             VStack(spacing: 12) {
                 Text("Cache Management")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 Button {
                     Task {
@@ -104,16 +104,16 @@ struct MapCacheView: View {
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.prussianError)
+                    .background(Color.celRed)
                     .cornerRadius(8)
                 }
             }
             .padding()
-            .background(Color.white.opacity(0.8))
+            .background(Color.celSurfaceTop.opacity(0.8))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.prussianBlue.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.celCyan.opacity(0.2), lineWidth: 1)
             )
 
             Spacer()
@@ -121,7 +121,7 @@ struct MapCacheView: View {
         .padding()
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color.white, Color.prussianSoft]),
+                gradient: Gradient(colors: [Color.celSurfaceTop, Color.celSurfaceBottom]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

@@ -5,102 +5,44 @@ struct MagnetometerView: View {
     @ObservedObject var magnetometerManager: MagnetometerManager
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "location.north.line")
-                    .font(.title)
-                    .foregroundColor(.prussianAccent)
-                Text("Magnetometer")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
-                Spacer()
-            }
+        VStack(spacing: CelSpace.md) {
+            InstrumentHeader(icon: "location.north.line.fill", title: "Magnetometer", tint: .celCyan)
 
             if !magnetometerManager.isAvailable {
-                Text("Magnetometer not available on this device")
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: "Magnetometer not available on this device", color: .celRed)
             } else if !magnetometerManager.errorMessage.isEmpty {
-                Text(magnetometerManager.errorMessage)
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: magnetometerManager.errorMessage, color: .celRed)
             } else {
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("X-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(magnetometerManager.magneticFieldX, specifier: "%.1f") µT")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Y-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(magnetometerManager.magneticFieldY, specifier: "%.1f") µT")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                VStack(spacing: CelSpace.md) {
+                    HStack(alignment: .top) {
+                        MetricReadout("X-Axis",
+                                      value: String(format: "%.1f", magnetometerManager.magneticFieldX),
+                                      unit: "µT")
+                        MetricReadout("Y-Axis",
+                                      value: String(format: "%.1f", magnetometerManager.magneticFieldY),
+                                      unit: "µT", alignment: .trailing)
+                    }
+                    HStack(alignment: .top) {
+                        MetricReadout("Z-Axis",
+                                      value: String(format: "%.1f", magnetometerManager.magneticFieldZ),
+                                      unit: "µT")
+                        MetricReadout("Magnitude",
+                                      value: String(format: "%.1f", magnetometerManager.magnitude),
+                                      unit: "µT", alignment: .trailing, valueColor: magneticColor)
                     }
 
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Z-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(magnetometerManager.magneticFieldZ, specifier: "%.1f") µT")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                    CelDivider()
 
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Magnitude")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(magnetometerManager.magnitude, specifier: "%.1f") µT")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                    HStack(alignment: .top) {
+                        MetricReadout("Heading",
+                                      value: String(format: "%.1f°", magnetometerManager.heading),
+                                      valueColor: .celGold)
+                        MetricReadout("Direction", value: compassDirection,
+                                      alignment: .trailing, valueColor: .celGold)
                     }
 
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Heading")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(magnetometerManager.heading, specifier: "%.1f")°")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Direction")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text(compassDirection)
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-                    }
-
-                    ProgressView(value: magnetometerManager.magnitude / 100.0)
-                        .progressViewStyle(LinearProgressViewStyle(tint: magneticColor))
+                    LuminousBar(value: min(max(magnetometerManager.magnitude / 100.0, 0.0), 1.0),
+                                tint: magneticColor)
                 }
             }
         }
@@ -131,11 +73,11 @@ struct MagnetometerView: View {
     private var magneticColor: Color {
         let magnitude = magnetometerManager.magnitude
         if magnitude > 80 {
-            return .prussianError
+            return .celAmber
         } else if magnitude < 20 {
-            return .prussianAccent
+            return .celViolet
         } else {
-            return .prussianSuccess
+            return .celCyan
         }
     }
 }

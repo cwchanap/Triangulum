@@ -8,55 +8,24 @@ struct BarometerView: View {
         Button {
             showingDetail = true
         } label: {
-            VStack(spacing: 16) {
-                // Header with navigation indicator
-                HStack {
-                    Image(systemName: "barometer")
-                        .font(.title)
-                        .foregroundColor(.prussianAccent)
-                    Text("Barometer")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.prussianBlueDark)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+            VStack(spacing: CelSpace.md) {
+                InstrumentHeader(icon: "barometer", title: "Barometer", tint: .celCyan) {
+                    CelChevron()
                 }
 
                 if !barometerManager.isAvailable {
-                    Text("Barometer not available on this device")
-                        .foregroundColor(.prussianError)
-                        .font(.caption)
+                    CelInlineMessage(text: "Barometer not available on this device", color: .celRed)
                 } else if !barometerManager.errorMessage.isEmpty {
-                    Text(barometerManager.errorMessage)
-                        .foregroundColor(.prussianError)
-                        .font(.caption)
+                    CelInlineMessage(text: barometerManager.errorMessage, color: .celRed)
                 } else {
-                    VStack(spacing: 12) {
-                        // Pressure values
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("Pressure")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                                Text("\(barometerManager.pressure, specifier: "%.2f") kPa")
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.prussianBlueDark)
-                            }
-
-                            Spacer()
-
-                            VStack(alignment: .trailing) {
-                                Text("Sea Level Pressure")
-                                    .font(.caption)
-                                    .foregroundColor(.prussianBlueLight)
-                                Text(seaLevelPressureText)
-                                    .font(.title3)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.prussianBlueDark)
-                            }
+                    VStack(spacing: CelSpace.md) {
+                        HStack(alignment: .top) {
+                            MetricReadout("Pressure",
+                                          value: String(format: "%.2f", barometerManager.pressure),
+                                          unit: "kPa", valueColor: pressureColor, valueSize: 28)
+                            MetricReadout("Sea Level",
+                                          value: seaLevelPressureText, unit: "kPa",
+                                          alignment: .trailing)
                         }
 
                         // Trend indicator
@@ -66,22 +35,12 @@ struct BarometerView: View {
 
                         // History recording error indicator
                         if let recordingError = barometerManager.historyRecordingError {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(.prussianWarning)
-                                Text("Recording issue: \(recordingError.localizedDescription)")
-                                    .font(.caption2)
-                                    .foregroundColor(.prussianWarning)
-                            }
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 8)
-                            .background(Color.prussianWarning.opacity(0.1))
-                            .cornerRadius(6)
+                            CelInlineMessage(text: "Recording issue: \(recordingError.localizedDescription)",
+                                             color: .celAmber)
                         }
 
-                        ProgressView(value: min(max(barometerManager.pressure / 110.0, 0.0), 1.0))
-                            .progressViewStyle(LinearProgressViewStyle(tint: pressureColor))
+                        LuminousBar(value: min(max(barometerManager.pressure / 110.0, 0.0), 1.0),
+                                    tint: pressureColor)
                     }
                 }
             }
@@ -99,11 +58,11 @@ struct BarometerView: View {
     private var pressureColor: Color {
         let normalizedPressure = barometerManager.pressure / 101.325
         if normalizedPressure > 1.02 {
-            return .prussianError
+            return .celAmber
         } else if normalizedPressure < 0.98 {
-            return .prussianAccent
+            return .celViolet
         } else {
-            return .prussianSuccess
+            return .celCyan
         }
     }
 
@@ -125,30 +84,32 @@ struct TrendIndicatorView: View {
             // Trend arrow
             Image(systemName: historyManager.trend.systemImage)
                 .font(.title2)
-                .foregroundColor(trendColor)
+                .foregroundStyle(trendColor)
+                .shadow(color: trendColor.opacity(0.6), radius: 6)
 
             VStack(alignment: .leading, spacing: 2) {
                 // Prediction text
                 Text(historyManager.trend.prediction)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.prussianBlueDark)
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.celText)
 
                 // Rate of change
                 if historyManager.trend != .unknown {
                     Text(rateText)
-                        .font(.caption2)
-                        .foregroundColor(.prussianBlueLight)
+                        .font(.celTiny)
+                        .foregroundStyle(Color.celTextDim)
                 }
             }
 
             Spacer()
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .padding(.horizontal, 12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(trendColor.opacity(0.1))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(trendColor.opacity(0.12))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(trendColor.opacity(0.3), lineWidth: 0.5))
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(trendAccessibilityLabel)
@@ -158,13 +119,13 @@ struct TrendIndicatorView: View {
     private var trendColor: Color {
         switch historyManager.trend {
         case .risingFast, .rising:
-            return .prussianSuccess
+            return .celGreen
         case .steady:
-            return .prussianBlueLight
+            return .celCyan
         case .falling, .fallingFast:
-            return .prussianWarning
+            return .celAmber
         case .unknown:
-            return .prussianBlueLight
+            return .celTextDim
         }
     }
 

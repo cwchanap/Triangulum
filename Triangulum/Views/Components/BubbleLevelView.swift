@@ -18,7 +18,7 @@ struct BubbleLevelView: View {
                 x: center.x - outerRadius, y: center.y - outerRadius,
                 width: outerRadius * 2, height: outerRadius * 2
             ))
-            context.stroke(outerRing, with: .color(Color.prussianBlueDark.opacity(0.4)), lineWidth: 1.5)
+            context.stroke(outerRing, with: .color(Color.celText.opacity(0.4)), lineWidth: 1.5)
 
             // Cross-hair
             var hLine = Path()
@@ -27,8 +27,8 @@ struct BubbleLevelView: View {
             var vLine = Path()
             vLine.move(to: CGPoint(x: center.x, y: center.y - outerRadius))
             vLine.addLine(to: CGPoint(x: center.x, y: center.y + outerRadius))
-            context.stroke(hLine, with: .color(Color.prussianBlueDark.opacity(0.2)), lineWidth: 1)
-            context.stroke(vLine, with: .color(Color.prussianBlueDark.opacity(0.2)), lineWidth: 1)
+            context.stroke(hLine, with: .color(Color.celText.opacity(0.2)), lineWidth: 1)
+            context.stroke(vLine, with: .color(Color.celText.opacity(0.2)), lineWidth: 1)
 
             // Cardinal tick marks
             for angle in [Double.pi * -0.5, 0.0, Double.pi * 0.5, Double.pi] {
@@ -43,7 +43,7 @@ struct BubbleLevelView: View {
                 var tick = Path()
                 tick.move(to: outer)
                 tick.addLine(to: inner)
-                context.stroke(tick, with: .color(Color.prussianBlueDark.opacity(0.4)), lineWidth: 2)
+                context.stroke(tick, with: .color(Color.celText.opacity(0.4)), lineWidth: 2)
             }
 
             // Level zone indicator (dashed circle at threshold radius)
@@ -53,7 +53,7 @@ struct BubbleLevelView: View {
                     x: center.x - thresholdRadius, y: center.y - thresholdRadius,
                     width: thresholdRadius * 2, height: thresholdRadius * 2
                 )),
-                with: .color(Color.prussianBlueDark.opacity(0.4)),
+                with: .color(Color.celText.opacity(0.4)),
                 style: StrokeStyle(lineWidth: 1, dash: [4, 3])
             )
 
@@ -77,7 +77,7 @@ struct BubbleLevelView: View {
             }
 
             let isLevel = LevelMath.isLevel(roll: rollDeg, pitch: pitchDeg, threshold: clampedThresholdDeg)
-            let bubbleColor: Color = isLevel ? .prussianGreen : .prussianAccent
+            let bubbleColor: Color = isLevel ? .celGreen : .celCyan
             let bubbleRect = CGRect(
                 x: bubbleX - bubbleRadius, y: bubbleY - bubbleRadius,
                 width: bubbleRadius * 2, height: bubbleRadius * 2
@@ -106,5 +106,5 @@ struct BubbleLevelView: View {
             .frame(width: 260, height: 260)
     }
     .padding()
-    .background(Color.prussianSoft)
+    .background(Color.celBackgroundBottom)
 }

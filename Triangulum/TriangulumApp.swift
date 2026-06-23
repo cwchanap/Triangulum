@@ -37,6 +37,8 @@ struct TriangulumApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark)
+                .tint(.celCyan)
         }
         .modelContainer(sharedModelContainer)
     }

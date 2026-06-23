@@ -8,25 +8,29 @@ struct CompassPageView: View {
 
     var body: some View {
         ZStack {
-            (nightVisionMode ? Color.black : Color.prussianSoft).ignoresSafeArea()
+            if nightVisionMode {
+                Color.black.ignoresSafeArea()
+            } else {
+                StarfieldBackground(showConstellation: false)
+            }
             VStack(spacing: 24) {
                 Spacer()
                 CompassView(
                     heading: locationManager.heading,
                     redMode: nightVisionMode,
-                    tint: nightVisionMode ? .red : .prussianBlueDark
+                    tint: nightVisionMode ? .red : .celText
                 )
                     .frame(width: 260, height: 260)
                 Text("\(Int(locationManager.heading.rounded()))°")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(nightVisionMode ? .red : .prussianBlueDark)
+                    .foregroundColor(nightVisionMode ? .red : .celText)
                 Spacer()
             }
         }
         .navigationTitle("Compass")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+        .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {

@@ -45,7 +45,7 @@ struct SnapshotCreationView: View {
                 // Success Icon
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 60))
-                    .foregroundColor(.prussianSuccess)
+                    .foregroundColor(.celCyan)
                     .padding(.top, 20)
 
                 // Title and Message
@@ -67,23 +67,23 @@ struct SnapshotCreationView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.prussianBlue)
+                        .background(Color.celCyanDeep)
                         .cornerRadius(12)
                     }
                     .disabled(isProcessingPhotos)
 
                     Button("Skip Photos", action: saveSnapshotWithoutPhotos)
                         .font(.callout)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
             }
-            .background(Color.prussianSoft.ignoresSafeArea())
+            .background(StarfieldBackground(showConstellation: false))
             .navigationTitle("New Snapshot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+            .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -154,14 +154,14 @@ struct SnapshotCreationView: View {
             Text("Snapshot Captured!")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.prussianBlueDark)
+                .foregroundColor(.celText)
 
             Text(
                 "Sensor data has been recorded at " +
                 "\(snapshot?.timestamp.formatted(date: .omitted, time: .shortened) ?? "now")"
             )
                 .font(.body)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
         }
@@ -173,7 +173,7 @@ struct SnapshotCreationView: View {
             HStack {
                 Text("\u{1F4F7} Add Photos (Optional)")
                     .font(.headline)
-                    .foregroundColor(.prussianBlueDark)
+                    .foregroundColor(.celText)
 
                 Spacer()
 
@@ -181,10 +181,10 @@ struct SnapshotCreationView: View {
                     let totalPhotos = capturedImages.count + pairedPreviewItems.count
                     Text("\(totalPhotos)/5")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.prussianBlueLight.opacity(0.1))
+                        .background(Color.celTextDim.opacity(0.1))
                         .cornerRadius(6)
                 }
             }
@@ -199,10 +199,10 @@ struct SnapshotCreationView: View {
                         Text("Camera")
                     }
                     .font(.callout)
-                    .foregroundColor(.prussianBlue)
+                    .foregroundColor(.celCyan)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color.prussianBlueLight.opacity(0.1))
+                    .background(Color.celTextDim.opacity(0.1))
                     .cornerRadius(8)
                 }
                 .disabled(capturedImages.count + tempSelectedPhotos.count >= 5)
@@ -217,10 +217,10 @@ struct SnapshotCreationView: View {
                         Text("Library")
                     }
                     .font(.callout)
-                    .foregroundColor(.prussianBlue)
+                    .foregroundColor(.celCyan)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color.prussianBlueLight.opacity(0.1))
+                    .background(Color.celTextDim.opacity(0.1))
                     .cornerRadius(8)
                 }
                 .disabled(capturedImages.count + tempSelectedPhotos.count >= 5)
@@ -237,12 +237,12 @@ struct SnapshotCreationView: View {
                         .scaleEffect(0.8)
                     Text("Processing photos...")
                         .font(.caption)
-                        .foregroundColor(.prussianBlueLight)
+                        .foregroundColor(.celTextDim)
                 }
             }
         }
         .padding()
-        .background(Color.white.opacity(0.8))
+        .background(Color.celSurfaceTop.opacity(0.8))
         .cornerRadius(12)
         .padding(.horizontal)
         .sheet(isPresented: $showingCamera) {
@@ -306,7 +306,7 @@ struct SnapshotCreationView: View {
         } else {
             Text("Take photos with camera or select from your photo library")
                 .font(.caption)
-                .foregroundColor(.prussianBlueLight)
+                .foregroundColor(.celTextDim)
                 .italic()
                 .multilineTextAlignment(.center)
                 .padding(.vertical, 8)

@@ -81,7 +81,7 @@ struct ConstellationMapView: View {
                         CompassView(
                             heading: locationManager.heading,
                             redMode: nightVisionMode,
-                            tint: nightVisionMode ? .red : .prussianBlueDark
+                            tint: nightVisionMode ? .red : .celText
                         )
                             .frame(width: 44, height: 44)
                             .padding([.top, .trailing], 12)
@@ -112,7 +112,7 @@ struct ConstellationMapView: View {
                         }
                     }
                 }
-                .background(colorScheme == .dark ? Color.black : Color.prussianSoft)
+                .background(colorScheme == .dark ? Color.black : Color.celBackgroundBottom)
             }
             .padding()
             footer
@@ -120,7 +120,7 @@ struct ConstellationMapView: View {
         .navigationTitle("Constellation Map")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color.prussianBlue, for: .navigationBar)
+        .toolbarBackground(Color.celBackgroundTop, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onReceive(timer) { date in
             now = date
@@ -130,20 +130,22 @@ struct ConstellationMapView: View {
     // MARK: - UI
 
     private var header: some View {
-        VStack(spacing: 8) {
+        let primary: Color = nightVisionMode ? .red : .celText
+        let dim: Color = nightVisionMode ? Color.red.opacity(0.75) : .celTextDim
+        let accent: Color = nightVisionMode ? .red : .celCyan
+
+        return VStack(spacing: 8) {
             if locationManager.authorizationStatus == .denied || !locationManager.isAvailable {
                 Text("Location unavailable. Enable permissions to view sky.")
                     .font(.footnote)
-                    .foregroundColor(.red)
+                    .foregroundColor(nightVisionMode ? .red : .celRed)
             }
-            HStack {
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Observer")
-                        .font(.caption)
-                        .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
+                    Text("Observer").celEyebrow(dim)
                     Text(String(format: "%.4f, %.4f", locationManager.latitude, locationManager.longitude))
-                        .font(.headline)
-                        .foregroundColor(nightVisionMode ? Color.red : .prussianBlueDark)
+                        .font(.celReadout(17, weight: .medium))
+                        .foregroundColor(primary)
                     // Moon info row
                     let sunEq = Astronomer.sunEquatorial(date: now)
                     let moonEq = Astronomer.moonEquatorial(date: now)
@@ -152,9 +154,9 @@ struct ConstellationMapView: View {
                     HStack(spacing: 8) {
                         MoonPhaseGlyph(k: k, redMode: nightVisionMode)
                             .frame(width: 14, height: 14)
-                        Text(String(format: "Moon: %.1f d · %d%%", age, Int((k*100).rounded())))
-                            .font(.caption2)
-                            .foregroundColor(nightVisionMode ? Color.red.opacity(0.85) : .prussianBlueLight)
+                        Text(String(format: "Moon %.1fd · %d%%", age, Int((k*100).rounded())))
+                            .font(.celTiny)
+                            .foregroundColor(dim)
                     }
                     // Next planet rise/set event
                     if skyShowPlanets,
@@ -169,25 +171,31 @@ struct ConstellationMapView: View {
                             Circle()
                                 .fill(nightVisionMode ? Color.red : event.planet.skyColor)
                                 .frame(width: 6, height: 6)
+                                .shadow(color: nightVisionMode ? .red : event.planet.skyColor, radius: 3)
                             Text(event.label)
-                                .font(.caption2)
-                                .foregroundColor(nightVisionMode ? Color.red.opacity(0.85) : .prussianBlueLight)
+                                .font(.celTiny)
+                                .foregroundColor(dim)
                         }
                     }
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("Time (UTC)")
-                        .font(.caption)
-                        .foregroundColor(nightVisionMode ? Color.red.opacity(0.7) : .prussianBlueLight)
+                    Text("Time · UTC").celEyebrow(dim)
                     Text(Self.utcFormatter.string(from: now))
-                        .font(.headline)
-                        .foregroundColor(nightVisionMode ? Color.red : .prussianBlueDark)
+                        .font(.celReadout(17, weight: .medium))
+                        .foregroundColor(accent)
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .background((nightVisionMode ? Color.red.opacity(0.08) : Color.white.opacity(0.85)))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(nightVisionMode ? Color.red.opacity(0.06) : Color.celSurfaceTop.opacity(0.75))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(accent.opacity(0.3), lineWidth: 0.75)
+                    )
+            )
         }
     }
 
@@ -203,7 +211,7 @@ struct ConstellationMapView: View {
                     LegendDot(color: nightVisionMode ? .red : .cyan, label: "Satellite")
                 }
                 if skyShowPlanets {
-                    LegendDot(color: nightVisionMode ? .red : .prussianBlue, label: "Planet")
+                    LegendDot(color: nightVisionMode ? .red : .celCyan, label: "Planet")
                 }
             }
             Spacer(minLength: 8)
@@ -240,7 +248,7 @@ struct ConstellationMapView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(nightVisionMode ? Color.red.opacity(0.08) : Color.white.opacity(0.85))
+        .background(nightVisionMode ? Color.red.opacity(0.08) : Color.celSurfaceTop.opacity(0.85))
     }
 
     private func orientationStatus(heading: Double, isExploring: Bool) -> some View {
@@ -711,7 +719,7 @@ private struct LegendDot: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(label).font(.caption2).foregroundColor(.prussianBlueLight)
+            Text(label).font(.caption2).foregroundColor(.celTextDim)
         }
     }
 }
@@ -722,7 +730,7 @@ private struct LegendLine: View {
     var body: some View {
         HStack(spacing: 6) {
             Rectangle().fill(color).frame(width: 20, height: 2)
-            Text(label).font(.caption2).foregroundColor(.prussianBlueLight)
+            Text(label).font(.caption2).foregroundColor(.celTextDim)
         }
     }
 }

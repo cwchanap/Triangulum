@@ -5,78 +5,33 @@ struct GyroscopeView: View {
     @ObservedObject var gyroscopeManager: GyroscopeManager
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "rotate.3d")
-                    .font(.title)
-                    .foregroundColor(.prussianAccent)
-                Text("Gyroscope")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.prussianBlueDark)
-                Spacer()
-            }
+        VStack(spacing: CelSpace.md) {
+            InstrumentHeader(icon: "rotate.3d", title: "Gyroscope", tint: .celCyan)
 
             if !gyroscopeManager.isAvailable {
-                Text("Gyroscope not available on this device")
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: "Gyroscope not available on this device", color: .celRed)
             } else if !gyroscopeManager.errorMessage.isEmpty {
-                Text(gyroscopeManager.errorMessage)
-                    .foregroundColor(.prussianError)
-                    .font(.caption)
+                CelInlineMessage(text: gyroscopeManager.errorMessage, color: .celRed)
             } else {
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("X-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(gyroscopeManager.rotationX, specifier: "%.3f") rad/s")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Y-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(gyroscopeManager.rotationY, specifier: "%.3f") rad/s")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                VStack(spacing: CelSpace.md) {
+                    HStack(alignment: .top) {
+                        MetricReadout("X-Axis",
+                                      value: String(format: "%.3f", gyroscopeManager.rotationX),
+                                      unit: "rad/s")
+                        MetricReadout("Y-Axis",
+                                      value: String(format: "%.3f", gyroscopeManager.rotationY),
+                                      unit: "rad/s", alignment: .trailing)
                     }
-
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Z-Axis")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(gyroscopeManager.rotationZ, specifier: "%.3f") rad/s")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing) {
-                            Text("Magnitude")
-                                .font(.caption)
-                                .foregroundColor(.prussianBlueLight)
-                            Text("\(gyroscopeManager.magnitude, specifier: "%.3f") rad/s")
-                                .font(.title3)
-                                .fontWeight(.medium)
-                                .foregroundColor(.prussianBlueDark)
-                        }
+                    HStack(alignment: .top) {
+                        MetricReadout("Z-Axis",
+                                      value: String(format: "%.3f", gyroscopeManager.rotationZ),
+                                      unit: "rad/s")
+                        MetricReadout("Magnitude",
+                                      value: String(format: "%.3f", gyroscopeManager.magnitude),
+                                      unit: "rad/s", alignment: .trailing, valueColor: rotationColor)
                     }
-
-                    ProgressView(value: min(max(gyroscopeManager.magnitude / 5.0, 0.0), 1.0))
-                        .progressViewStyle(LinearProgressViewStyle(tint: rotationColor))
+                    LuminousBar(value: min(max(gyroscopeManager.magnitude / 5.0, 0.0), 1.0),
+                                tint: rotationColor)
                 }
             }
         }
@@ -86,11 +41,11 @@ struct GyroscopeView: View {
     private var rotationColor: Color {
         let magnitude = gyroscopeManager.magnitude
         if magnitude > 3.0 {
-            return .prussianError
+            return .celAmber
         } else if magnitude < 1.0 {
-            return .prussianAccent
+            return .celViolet
         } else {
-            return .prussianSuccess
+            return .celCyan
         }
     }
 }
