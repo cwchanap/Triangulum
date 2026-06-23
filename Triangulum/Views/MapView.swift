@@ -252,8 +252,8 @@ struct MapView: View {
                     Text("Location access denied")
                         .foregroundColor(.celRed)
                         .font(.caption)
-                    Button("Grant Permission") {
-                        locationManager.requestLocationPermission()
+                    Button("Open Settings") {
+                        locationManager.openAppSettings()
                     }
                     .font(.caption)
                     .foregroundColor(.celCyan)

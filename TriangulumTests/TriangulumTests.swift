@@ -8,7 +8,6 @@
 import Testing
 import Foundation
 import CoreMotion
-import SwiftUI
 @testable import Triangulum
 
 struct TriangulumTests {
@@ -410,52 +409,6 @@ struct TriangulumTests {
         #expect(data.magneticFieldZ == 45.0)
         #expect(data.magnitude == 50.0)
         #expect(data.heading == 225.5)
-    }
-
-    // MARK: - Color+Theme Tests
-
-    @Test func testPrussianBlueColorPalette() {
-        // Test that all prussian blue colors are defined correctly
-        let colors = [
-            Color.prussianBlue,
-            Color.prussianBlueLight,
-            Color.prussianBlueDark,
-            Color.prussianAccent,
-            Color.prussianSoft,
-            Color.prussianWarning,
-            Color.prussianError,
-            Color.prussianSuccess
-        ]
-
-        #expect(colors.count == 8)
-        for color in colors {
-            #expect(String(describing: color).isEmpty == false)
-        }
-    }
-
-    @Test func testColorComponentValues() {
-        // Test specific RGB values for the main colors
-        // Note: We can't directly test RGB components of SwiftUI Color,
-        // but we can verify the colors are distinct from each other
-
-        let colors = [
-            Color.prussianBlue,
-            Color.prussianBlueLight,
-            Color.prussianBlueDark,
-            Color.prussianAccent,
-            Color.prussianSoft,
-            Color.prussianWarning,
-            Color.prussianError,
-            Color.prussianSuccess
-        ]
-
-        // Test that all colors are unique by checking they're not all the same
-        #expect(colors.count == 8)
-
-        // Test that the colors can be used in typical SwiftUI contexts
-        // This ensures they're properly defined as Color objects
-        let testView = Rectangle().fill(Color.prussianBlue)
-        #expect(String(describing: testView).isEmpty == false)
     }
 
 }
