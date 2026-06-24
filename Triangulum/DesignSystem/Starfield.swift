@@ -56,6 +56,8 @@ struct StarfieldBackground: View {
     var showConstellation: Bool = true
     var twinkles: Bool = true
 
+    @Environment(\.scenePhase) private var scenePhase
+
     private let stars: [Star]
 
     init(starCount: Int = 150, showConstellation: Bool = true, twinkles: Bool = true) {
@@ -65,11 +67,27 @@ struct StarfieldBackground: View {
         self.stars = makeStars(count: starCount, seed: 0xCAFE_BABE)
     }
 
+    /// Whether the animated star canvas should tick this frame.
+    /// Paused when twinkles are disabled OR the scene is not foreground-active,
+    /// so backgrounded screens do not burn per-frame GPU work on a sensor-heavy app.
+    private var animationPaused: Bool {
+        Self.shouldPauseAnimation(twinkles: twinkles, scenePhase: scenePhase)
+    }
+
+    /// Pure, testable pause decision for the star `TimelineView`.
+    /// - Returns: `true` when the star canvas should stop ticking.
+    static func shouldPauseAnimation(twinkles: Bool, scenePhase: ScenePhase) -> Bool {
+        !twinkles || scenePhase != .active
+    }
+
     var body: some View {
         ZStack {
             CelGradient.space
 
-            // Nebula glow blobs for depth.
+            // Nebula glow blobs for depth. These are static and intentionally kept
+            // OUTSIDE drawingGroup so their expensive Gaussian blurs are composed
+            // once and cached by the render tree, rather than re-rasterized on
+            // every animated star frame.
             Circle()
                 .fill(Color.celCyan.opacity(0.10))
                 .frame(width: 360, height: 360)
@@ -81,7 +99,11 @@ struct StarfieldBackground: View {
                 .blur(radius: 130)
                 .offset(x: 140, y: 320)
 
-            TimelineView(.animation(minimumInterval: twinkles ? 0.1 : .infinity, paused: !twinkles)) { timeline in
+            // Only the animated star canvas is flattened/rasterized via drawingGroup.
+            TimelineView(.animation(
+                minimumInterval: twinkles ? 0.1 : .infinity,
+                paused: animationPaused
+            )) { timeline in
                 Canvas { context, size in
                     let t = timeline.date.timeIntervalSinceReferenceDate
                     drawStars(context: &context, size: size, time: t)
@@ -90,9 +112,9 @@ struct StarfieldBackground: View {
                     }
                 }
             }
+            .drawingGroup()
         }
         .ignoresSafeArea()
-        .drawingGroup()
     }
 
     private func drawStars(context: inout GraphicsContext, size: CGSize, time: Double) {

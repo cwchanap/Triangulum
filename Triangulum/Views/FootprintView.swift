@@ -58,7 +58,7 @@ struct FootprintView: View {
                             } label: {
                                 Image(systemName: isCompareMode ? "xmark.circle.fill" : "arrow.left.arrow.right")
                             }
-                            .foregroundColor(.white)
+                            .foregroundColor(.celText)
                         }
 
                         if !isCompareMode {
@@ -231,7 +231,7 @@ struct FootprintView: View {
                         Text("Compare Selected")
                     }
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(.celText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color.celCyanDeep)
@@ -415,7 +415,7 @@ struct SnapshotDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(.white)
+                        .foregroundColor(.celText)
                 }
             }
         }
