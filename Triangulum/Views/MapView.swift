@@ -98,7 +98,7 @@ struct MapView: View {
                     if isSearching {
                         ProgressView().scaleEffect(0.7).tint(.celCyan)
                     } else {
-                        Text("Search").font(.subheadline).foregroundColor(.white)
+                        Text("Search").font(.subheadline).foregroundColor(.celText)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -298,7 +298,7 @@ struct MapView: View {
                                                 .foregroundColor(.blue.opacity(0.8))
                                                 .background(
                                                     Circle()
-                                                        .fill(Color.white.opacity(0.8))
+                                                        .fill(Color.celText.opacity(0.8))
                                                         .frame(width: 30, height: 30)
                                                 )
                                             Spacer()
@@ -324,7 +324,7 @@ struct MapView: View {
                                                         .fontWeight(.medium)
                                                 }
                                                 .font(.subheadline)
-                                                .foregroundColor(.white)
+                                                .foregroundColor(.celText)
                                                 .padding(.horizontal, 16)
                                                 .padding(.vertical, 12)
                                                 .background(
@@ -351,7 +351,7 @@ struct MapView: View {
                                             Text("⊕ \(Int(cacheRadius))m radius")
                                                 .font(.caption)
                                                 .fontWeight(.medium)
-                                                .foregroundColor(.white)
+                                                .foregroundColor(.celText)
                                                 .padding(.horizontal, 10)
                                                 .padding(.vertical, 4)
                                                 .background(Color.blue.opacity(0.8))
@@ -368,10 +368,10 @@ struct MapView: View {
                             if let message = searchMessage {
                                 Text(message)
                                     .font(.caption)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(.celText)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
-                                    .background(Color.black.opacity(0.6))
+                                    .background(Color.celBackgroundBottom.opacity(0.6))
                                     .cornerRadius(8)
                                     .padding(.top, 8)
                             }
@@ -385,7 +385,7 @@ struct MapView: View {
                                 Annotation("Current Location", coordinate: userLocation) {
                                     Circle()
                                         .fill(Color.celCyan)
-                                        .stroke(Color.white, lineWidth: 2)
+                                        .stroke(Color.celText, lineWidth: 2)
                                         .frame(width: 12, height: 12)
                                 }
                             }

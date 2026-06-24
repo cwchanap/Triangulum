@@ -4,7 +4,8 @@ struct CompassPageView: View {
     @ObservedObject var locationManager: LocationManager
     @AppStorage("nightVisionMode") private var nightVisionMode = false
     @State private var isCalibrating = false
-    @Environment(\.openURL) private var openURL
+
+    private var iconTint: Color { nightVisionMode ? .red : .celText }
 
     var body: some View {
         ZStack {
@@ -38,15 +39,13 @@ struct CompassPageView: View {
                     locationManager.requestHeadingCalibration()
                 } label: {
                     Image(systemName: "scope")
-                        .foregroundColor(.white)
+                        .foregroundColor(iconTint)
                 }
                 Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(url)
-                    }
+                    locationManager.openAppSettings()
                 } label: {
                     Image(systemName: "gearshape")
-                        .foregroundColor(.white)
+                        .foregroundColor(iconTint)
                 }
             }
         }

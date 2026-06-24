@@ -3,6 +3,13 @@ import CoreLocation
 import UIKit
 import os
 
+// Note: this class is NOT yet `@MainActor`. Annotating it cascades into
+// `SatelliteManager`, whose `updatePositions()`/`updateNextPass()` read
+// location state from main-actor-isolated callbacks but run SGP4 CPU work
+// that must stay off-main. A full migration is tracked as a separate
+// concurrency PR (LocationManager + SatelliteManager together). For now,
+// `openAppSettings()` is individually `@MainActor` because UIApplication.shared
+// must be touched on the main thread — see the method doc below.
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
     private let skipAvailabilityCheck: Bool
@@ -110,6 +117,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     /// Opens the app's location settings. Used from the UI when authorization
     /// is `.denied` or `.restricted`, because `requestWhenInUseAuthorization()`
     /// is a system no-op in those states and will not re-prompt the user.
+    ///
+    /// `@MainActor` is intentional and enforced: `UIApplication.shared.open(_:)`
+    /// must run on the main thread. Callers (View button actions) are already
+    /// main-actor-isolated. See the class note above re: whole-class annotation.
     @MainActor
     func openAppSettings() {
         UIApplication.shared.open(appSettingsURL)

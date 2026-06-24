@@ -91,7 +91,7 @@ struct ContentView: View {
             }
             .listStyle(PlainListStyle())
             .scrollContentBackground(.hidden)
-            .celestialBackground()
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.celBackgroundTop.opacity(0.85), for: .navigationBar)
@@ -117,17 +117,22 @@ struct ContentView: View {
                 }
             }
         } detail: {
-            ZStack {
-                StarfieldBackground()
-                VStack(spacing: 12) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color.celCyan.opacity(0.6))
-                    Text("Select an instrument")
-                        .celEyebrow()
-                }
+            // Detail placeholder is transparent so the single shared starfield
+            // (applied to the NavigationSplitView below) shows through both the
+            // sidebar and detail columns on iPad split view — no second instance.
+            VStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 40))
+                    .foregroundStyle(Color.celCyan.opacity(0.6))
+                Text("Select an instrument")
+                    .celEyebrow()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // ONE shared starfield behind both NavigationSplitView columns, replacing
+        // the previous sidebar (.celestialBackground) + detail (StarfieldBackground)
+        // duplication that doubled per-frame GPU work on iPad split view.
+        .background(StarfieldBackground())
         .onAppear {
             guard !isRunningUITests else { return }
 

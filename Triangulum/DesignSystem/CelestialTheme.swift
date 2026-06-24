@@ -96,8 +96,9 @@ extension Font {
 
 extension View {
     /// Uppercase, tracked, dim monospaced label used above values & as section eyebrows.
-    func celEyebrow(_ color: Color = .celTextDim) -> some View {
-        self.font(.celEyebrow)
+    /// - Parameter size: Mono font size in points. Defaults to 11 (matches `Font.celEyebrow`).
+    func celEyebrow(_ color: Color = .celTextDim, size: CGFloat = 11) -> some View {
+        self.font(.system(size: size, weight: .semibold, design: .monospaced))
             .tracking(1.6)
             .textCase(.uppercase)
             .foregroundStyle(color)

@@ -139,8 +139,7 @@ struct InstrumentHeader<Trailing: View>: View {
         HStack(spacing: CelSpace.sm) {
             CelGlyph(systemName: icon, tint: tint, size: 36)
             Text(title)
-                .celEyebrow(.celText)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .celEyebrow(.celText, size: 13)
             Spacer(minLength: 8)
             trailing()
         }
