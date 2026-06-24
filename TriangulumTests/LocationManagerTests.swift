@@ -248,4 +248,13 @@ struct LocationManagerTests {
         #expect(url.absoluteString == UIApplication.openSettingsURLString)
         #expect(url.scheme != nil) // must be an openable app:// or prefs:// style URL
     }
+
+    @MainActor
+    @Test func testOpenAppSettingsDoesNotCrash() {
+        // openAppSettings() calls UIApplication.shared.open(appSettingsURL) — a
+        // documented no-op on the simulator. Covers the method body line.
+        let manager = LocationManager(skipAvailabilityCheck: true)
+
+        manager.openAppSettings()
+    }
 }
