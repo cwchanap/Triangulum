@@ -95,6 +95,24 @@ struct BarometerDetailView: View {
                 }
             }
 
+            // Sea-level pressure requires a valid location fix. When location
+            // access is denied or restricted, offer a remediation affordance
+            // matching the LocationView/MapView pattern.
+            if barometerManager.seaLevelPressure == nil &&
+                barometerManager.isLocationDenied {
+                VStack(spacing: 8) {
+                    CelInlineMessage(text: "Sea level pressure needs location access",
+                                     color: .celAmber)
+                    // Once denied/restricted, requestWhenInUseAuthorization()
+                    // is a system no-op, so guide the user to Settings.
+                    Button("Open Settings") {
+                        barometerManager.openLocationSettings()
+                    }
+                    .font(.celLabel)
+                    .foregroundStyle(Color.celCyan)
+                }
+            }
+
             // Trend indicator
             if let historyManager = historyManager {
                 TrendIndicatorView(historyManager: historyManager)

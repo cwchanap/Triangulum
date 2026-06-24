@@ -68,6 +68,12 @@ identifier_name:
     - ma
     - a1
     - e2
+    # Cel design-system spacing scale tokens (CelestialTheme.swift)
+    - xs
+    - sm
+    - md
+    - lg
+    - xl
 
 function_body_length:
   warning: 100
