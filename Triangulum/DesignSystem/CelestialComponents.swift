@@ -124,6 +124,9 @@ struct CelGlyph: View {
         }
         .frame(width: size, height: size)
         .shadow(color: tint.opacity(0.5), radius: 8)
+        // Decorative icon — the accompanying title text (e.g. in
+        // InstrumentHeader) conveys the meaning to VoiceOver.
+        .accessibilityHidden(true)
     }
 }
 
@@ -208,6 +211,9 @@ struct LuminousBar: View {
     var value: Double            // 0...1
     var tint: Color = .celCyan
     var height: CGFloat = 6
+    /// Optional VoiceOver label. When nil, the bar is treated as decorative
+    /// (it typically lives inside a card that already provides context).
+    var accessibilityLabel: String?
 
     var body: some View {
         GeometryReader { geo in
@@ -223,6 +229,24 @@ struct LuminousBar: View {
             }
         }
         .frame(height: height)
+        .modifier(LuminousBarAccessibility(value: value, label: accessibilityLabel))
+    }
+}
+
+private struct LuminousBarAccessibility: ViewModifier {
+    let value: Double
+    let label: String?
+
+    func body(content: Content) -> some View {
+        if let label {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
+                .accessibilityValue("\(Int(max(0, min(1, value)) * 100)) percent")
+        } else {
+            content
+                .accessibilityHidden(true)
+        }
     }
 }
 
@@ -259,6 +283,10 @@ struct StatusPill: View {
             Capsule().fill(color.opacity(0.12))
                 .overlay(Capsule().strokeBorder(color.opacity(0.35), lineWidth: 0.5))
         )
+        // Combine the icon/dot + text into a single VoiceOver element so the
+        // status is announced as one readable label rather than fragments.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }
 

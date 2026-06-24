@@ -96,6 +96,22 @@ class BarometerManager: ObservableObject {
         isAttitudeAvailable = motionManager.isDeviceMotionAvailable
     }
 
+    /// True when location authorization is `.denied` or `.restricted`, which
+    /// prevents sea-level pressure calculation. Surfaced to the UI so the
+    /// barometer can offer an "Open Settings" remediation affordance.
+    var isLocationDenied: Bool {
+        locationManager.authorizationStatus == .denied ||
+        locationManager.authorizationStatus == .restricted
+    }
+
+    /// Opens the app's system location-settings screen. Delegates to
+    /// `LocationManager.openAppSettings()`, which is `@MainActor` and safe to
+    /// call from button actions. Use when `isLocationDenied` is true.
+    @MainActor
+    func openLocationSettings() {
+        locationManager.openAppSettings()
+    }
+
     func startBarometerUpdates() {
         guard !didStartBarometerUpdates else { return }
         altimeterSessionGeneration += 1
