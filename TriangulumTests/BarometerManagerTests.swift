@@ -1510,6 +1510,50 @@ struct BarometerManagerTests {
         let finalReadings = historyManager.fetchReadings(for: .oneHour)
         #expect(finalReadings.isEmpty)
     }
+
+    @Test func testIsLocationDeniedTrueForDeniedAndRestricted() {
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            barometerAvailability: { false }
+        )
+
+        locationManager.authorizationStatus = .denied
+        #expect(manager.isLocationDenied == true)
+
+        locationManager.authorizationStatus = .restricted
+        #expect(manager.isLocationDenied == true)
+    }
+
+    @Test func testIsLocationDeniedFalseForValidStatuses() {
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            barometerAvailability: { false }
+        )
+
+        for status in [CLAuthorizationStatus.notDetermined, .authorizedWhenInUse, .authorizedAlways] {
+            locationManager.authorizationStatus = status
+            #expect(manager.isLocationDenied == false, "expected false for \(status.rawValue)")
+        }
+    }
+
+    @Test func testOpenLocationSettingsDoesNotCrash() {
+        // openLocationSettings() delegates to LocationManager.openAppSettings()
+        // (UIApplication.shared.open). Verified safe (~5ms, no hang) on simulator.
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            barometerAvailability: { false }
+        )
+
+        // No #expect: the test passes iff the call does not crash/hang.
+        // We spiked that openLocationSettings() completes in ~5ms on the
+        // simulator. The value of this test is crash-safety + line coverage
+        // of the method body; UIApplication.shared.open returns nothing
+        // assertable and we are not permitted to change production code.
+        manager.openLocationSettings()
+    }
 }
 
 // Test error enum
