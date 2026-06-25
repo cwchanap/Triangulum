@@ -29,14 +29,18 @@ struct BarometerView: View {
                         }
 
                         // Sea-level pressure requires a valid location fix.
-                        // When location access is denied, surface a hint so the
-                        // user understands why "Sea Level" reads "--". Tapping
-                        // the card opens the detail view, which hosts the
-                        // actionable "Open Settings" button.
+                        // Surface a distinct hint per reason so the user
+                        // understands why "Sea Level" reads "--". Tapping the
+                        // card opens the detail view, which hosts the
+                        // actionable "Open Settings" button for the denial case.
                         if barometerManager.seaLevelPressure == nil &&
                             barometerManager.isLocationDenied {
-                            CelInlineMessage(text: "Sea level unavailable — location denied. Tap for settings.",
+                            CelInlineMessage(text: "Sea level unavailable — location denied. Tap for details.",
                                              color: .celAmber)
+                        } else if barometerManager.seaLevelPressure == nil &&
+                            barometerManager.isLocationServicesDisabled {
+                            CelInlineMessage(text: "Sea level unavailable — location services disabled",
+                                             color: .celRed)
                         }
 
                         // Trend indicator

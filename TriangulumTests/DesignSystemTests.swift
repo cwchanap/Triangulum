@@ -61,3 +61,58 @@ struct DesignSystemConstructionTests {
         #expect(header.tint == .celCyan)
     }
 }
+
+@Suite
+struct CelFormattingTests {
+    // Boundary tests for the pure helpers extracted from LuminousBar /
+    // MetricReadout (review #4). These were previously only exercised by
+    // render-only tests that asserted nothing about the computed values.
+
+    @Test func clampedToUnitClampsBelowZeroAndAboveOne() {
+        #expect((-0.5).clampedToUnit() == 0.0)
+        #expect(0.0.clampedToUnit() == 0.0)
+        #expect(0.5.clampedToUnit() == 0.5)
+        #expect(1.0.clampedToUnit() == 1.0)
+        #expect(1.5.clampedToUnit() == 1.0)
+    }
+
+    @Test func percentStringClampsAndFormats() {
+        #expect(celPercentString(for: -0.5) == "0 percent")
+        #expect(celPercentString(for: 0.0) == "0 percent")
+        #expect(celPercentString(for: 0.5) == "50 percent")
+        #expect(celPercentString(for: 1.0) == "100 percent")
+        #expect(celPercentString(for: 1.5) == "100 percent")
+    }
+
+    @Test func percentStringRoundsTruncatesDown() {
+        // Mirrors the original `Int(...)` truncation behavior.
+        #expect(celPercentString(for: 0.999) == "99 percent")
+        #expect(celPercentString(for: 0.001) == "0 percent")
+    }
+
+    @Test func frameAlignmentMapsAllAxes() {
+        #expect(HorizontalAlignment.leading.frameAlignment == .leading)
+        #expect(HorizontalAlignment.trailing.frameAlignment == .trailing)
+        #expect(HorizontalAlignment.center.frameAlignment == .center)
+    }
+}
+
+@Suite
+struct CelStatusTests {
+    // Review #3: the typed status→color mapping prevents status/color drift.
+
+    @Test func statusMapsToCanonicalColors() {
+        #expect(CelStatus.nominal.color == .celGreen)
+        #expect(CelStatus.caution.color == .celAmber)
+        #expect(CelStatus.alert.color == .celRed)
+    }
+
+    @Test func statusPillTypedInitAdoptsStatusColor() {
+        let nominal = StatusPill("Live", status: .nominal)
+        let alert = StatusPill("Down", status: .alert)
+        #expect(nominal.color == .celGreen)
+        #expect(alert.color == .celRed)
+        // Default icon stays nil (dot) for visual parity with existing pills.
+        #expect(nominal.icon == nil)
+    }
+}

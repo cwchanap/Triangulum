@@ -2,12 +2,16 @@
 //  CelComponentRenderingTests.swift
 //  TriangulumTests
 //
-//  Renders Cel design-system components through a UIHostingController so their
-//  SwiftUI `body` code is executed (closing the design-system patch coverage
-//  gap). Each test asserts the view renders into a live window without crashing.
-//  Branch coverage is achieved by rendering every variant (e.g. both StatusPill
-//  icon/dot branches, all MetricReadout alignments, both LuminousBar
-//  accessibility branches).
+//  Smoke test: renders every Cel design-system component (and every relevant
+//  branch) through a live UIHostingController in a single composite view, so
+//  each component's SwiftUI `body` is executed and the full render pipeline
+//  completes without crashing.
+//
+//  Note: this is intentionally a *smoke* test. Assertions on the computed
+//  values (clamp boundaries, percentage formatting, alignment mapping,
+//  status→color) live in `CelFormattingTests` / `CelStatusTests`, where they
+//  can actually observe the logic. A window-attachment assertion here only
+//  proves "no layout crash".
 //
 
 import Testing
@@ -15,16 +19,15 @@ import SwiftUI
 import UIKit
 @testable import Triangulum
 
-// MARK: - Render helpers
+// MARK: - Render host
 
 /// Wraps a SwiftUI view in a UIHostingController installed in a live UIWindow
-/// and forces layout. This causes SwiftUI to evaluate the view's `body`, which
-/// unit tests cannot otherwise reach. Returns the hosting controller so callers
-/// can assert on the rendered state.
+/// and forces layout, causing SwiftUI to evaluate `body`. Returns the hosting
+/// controller so callers can assert on the rendered state.
 @MainActor
 private func renderHost<V: View>(
     _ view: V,
-    size: CGSize = CGSize(width: 320, height: 240)
+    size: CGSize = CGSize(width: 320, height: 568)
 ) -> UIHostingController<V> {
     let host = UIHostingController(rootView: view)
     host.view.frame = CGRect(origin: .zero, size: size)
@@ -35,127 +38,68 @@ private func renderHost<V: View>(
     return host
 }
 
-/// Renders a view and asserts it was attached to a window — i.e. that the full
-/// render pipeline (including `body` evaluation) completed without crashing.
-@MainActor
-private func expectRendered<V: View>(_ view: V) {
-    let host = renderHost(view)
-    #expect(host.view.window != nil, "View failed to attach to a window during rendering")
-}
-
 @MainActor
 @Suite
 struct CelComponentRenderingTests {
 
-    // MARK: - Background modifier (celestialBackground)
+    // A single composite view exercises every component and every branch that
+    // the per-variant tests used to cover individually:
+    //   • celestialBackground modifier
+    //   • InstrumentCard cornerTicks: true / false
+    //   • CornerTicks (standalone)
+    //   • CelGlyph
+    //   • InstrumentHeader (trailing + EmptyView overload)
+    //   • CelChevron, CelDivider
+    //   • MetricReadout leading/no-unit, trailing/unit, center
+    //   • LuminousBar labeled (value 1.5 → clamp) + unlabeled (value 0)
+    //   • StatusPill icon + dot + typed(status:) init
+    //   • CelInlineMessage
+    //   • Text().celEyebrow() modifier
+    @Test func compositeCelComponentsRenderWithoutCrashing() {
+        let host = renderHost(
+            ScrollView {
+                VStack(alignment: .leading, spacing: CelSpace.md) {
+                    // Card with corner ticks + a trailing StatusPill header.
+                    VStack(spacing: CelSpace.sm) {
+                        InstrumentHeader(icon: "barometer", title: "BAROMETER", tint: .celCyan) {
+                            StatusPill("LIVE", color: .celGreen)
+                        }
+                        InstrumentHeader(icon: "location", title: "LOCATION", tint: .celGold)
+                        MetricReadout("PRESSURE", value: "1013.25", alignment: .leading)
+                        MetricReadout("ALT", value: "100", unit: "m", alignment: .trailing)
+                        MetricReadout("X", value: "0", unit: "°", alignment: .center)
+                        LuminousBar(value: 1.5, tint: .celCyan, height: 8,
+                                    accessibilityLabel: "Signal")
+                        LuminousBar(value: 0.0)
+                    }
+                    .instrumentCard(tint: .celGold, cornerTicks: true)
 
-    @Test func celestialBackgroundModifierRenders() {
-        expectRendered(Color.clear.celestialBackground())
-    }
+                    // cornerTicks: false branch.
+                    Color.clear.frame(height: 24)
+                        .instrumentCard(tint: .celCyan, cornerTicks: false)
 
-    // MARK: - Instrument card (InstrumentCardModifier + CornerTicks)
+                    // Remaining components.
+                    CornerTicks(tint: .celCyan).frame(height: 24)
+                    CelGlyph(systemName: "barometer", tint: .celCyan, size: 40)
+                    HStack {
+                        CelChevron()
+                        StatusPill("ONLINE", color: .celGreen, icon: "wifi") // icon branch
+                        StatusPill("OFFLINE", color: .celRed)                // dot branch
+                        StatusPill("Ready", status: .nominal)                // typed init
+                    }
+                    CelDivider()
+                    CelInlineMessage(text: "No data",
+                                     icon: "exclamationmark.triangle.fill",
+                                     color: .celRed)
+                    Text("SECTION").celEyebrow()
+                }
+                .padding()
+            }
+            .celestialBackground()
+        )
 
-    @Test func instrumentCardRendersWithCornerTicks() {
-        expectRendered(Color.celCyan.frame(width: 80, height: 80)
-            .instrumentCard(tint: .celGold, cornerTicks: true))
-    }
-
-    @Test func instrumentCardRendersWithoutCornerTicks() {
-        // cornerTicks: false → the `if cornerTicks { CornerTicks(...) }` branch is skipped.
-        expectRendered(Color.celCyan.frame(width: 80, height: 80)
-            .instrumentCard(tint: .celGold, cornerTicks: false))
-    }
-
-    @Test func cornerTicksRendersStandalone() {
-        expectRendered(CornerTicks(tint: .celCyan, length: 7).frame(width: 100, height: 100))
-    }
-
-    // MARK: - CelGlyph
-
-    @Test func celGlyphRenders() {
-        expectRendered(CelGlyph(systemName: "barometer", tint: .celCyan, size: 40))
-    }
-
-    // MARK: - InstrumentHeader (both initializers)
-
-    @Test func instrumentHeaderTrailingRenders() {
-        expectRendered(InstrumentHeader(icon: "barometer", title: "BAROMETER", tint: .celCyan) {
-            StatusPill("LIVE", color: .celGreen)
-        })
-    }
-
-    @Test func instrumentHeaderEmptyViewOverloadRenders() {
-        // Exercises the `InstrumentHeader where Trailing == EmptyView` convenience init.
-        expectRendered(InstrumentHeader(icon: "location", title: "LOCATION", tint: .celGold))
-    }
-
-    // MARK: - CelChevron, CelDivider
-
-    @Test func celChevronRenders() {
-        expectRendered(CelChevron())
-    }
-
-    @Test func celDividerRenders() {
-        expectRendered(CelDivider())
-    }
-
-    // MARK: - MetricReadout (alignment ternary + optional unit)
-
-    @Test func metricReadoutLeadingWithoutUnit() {
-        // unit nil → the `if let unit { Text(unit) }` branch is skipped.
-        expectRendered(MetricReadout("PRESSURE", value: "1013.25", alignment: .leading))
-    }
-
-    @Test func metricReadoutTrailingWithUnit() {
-        // unit non-nil → the `if let unit { Text(unit) }` branch executes.
-        expectRendered(MetricReadout("ALT", value: "100", unit: "m", alignment: .trailing)
-            .frame(width: 200))
-    }
-
-    @Test func metricReadoutCenter() {
-        // .center branch of the alignment ternary.
-        expectRendered(MetricReadout("X", value: "0", unit: "°", alignment: .center)
-            .frame(width: 200))
-    }
-
-    // MARK: - LuminousBar (clamp + both accessibility branches)
-
-    @Test func luminousBarClampsAboveOneWithLabel() {
-        // value 1.5 → clamped to 1.0 via `max(0, min(1, value))`.
-        // accessibilityLabel non-nil → LuminousBarAccessibility renders the labeled branch.
-        expectRendered(LuminousBar(value: 1.5, tint: .celCyan, height: 8, accessibilityLabel: "Signal")
-            .frame(width: 200))
-    }
-
-    @Test func luminousBarZeroWithoutLabel() {
-        // value 0 → clamp lower bound. accessibilityLabel nil → `.accessibilityHidden(true)` branch.
-        expectRendered(LuminousBar(value: 0.0).frame(width: 200))
-    }
-
-    // MARK: - StatusPill (icon branch + dot branch)
-
-    @Test func statusPillWithIcon() {
-        // icon non-nil → the `Image(systemName:)` branch.
-        expectRendered(StatusPill("ONLINE", color: .celGreen, icon: "wifi"))
-    }
-
-    @Test func statusPillWithoutIconDotBranch() {
-        // icon nil → the `Circle().fill(color)` dot branch.
-        expectRendered(StatusPill("OFFLINE", color: .celRed))
-    }
-
-    // MARK: - CelInlineMessage
-
-    @Test func celInlineMessageRenders() {
-        expectRendered(CelInlineMessage(text: "No data",
-                                        icon: "exclamationmark.triangle.fill",
-                                        color: .celRed))
-    }
-
-    // MARK: - CelestialTheme.View.celEyebrow(_:) modifier
-
-    @Test func celEyebrowModifierRenders() {
-        // Covers the `View.celEyebrow(_:)` body in CelestialTheme.swift.
-        expectRendered(Text("SECTION").celEyebrow())
+        // Window attachment == the full render pipeline (including every body
+        // above) completed without a layout crash.
+        #expect(host.view.window != nil, "Composite Cel view failed to attach to a window during rendering")
     }
 }

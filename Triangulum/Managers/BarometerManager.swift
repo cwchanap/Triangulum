@@ -104,9 +104,20 @@ class BarometerManager: ObservableObject {
         locationManager.authorizationStatus == .restricted
     }
 
-    /// Opens the app's system location-settings screen. Delegates to
-    /// `LocationManager.openAppSettings()`, which is `@MainActor` and safe to
-    /// call from button actions. Use when `isLocationDenied` is true.
+    /// True when location services are disabled system-wide (the global toggle
+    /// in Settings → Privacy & Security → Location Services), independent of
+    /// this app's per-app authorization status. Distinct from `isLocationDenied`:
+    /// there is no in-app "Open Settings" remediation for the global toggle
+    /// (`openSettingsURLString` lands on the app page, not the system Location
+    /// switch), so the UI shows an informational message only.
+    var isLocationServicesDisabled: Bool {
+        !locationManager.isAvailable
+    }
+
+    /// Opens this app's top-level Settings page (via
+    /// `LocationManager.openAppSettings()`), from which the user can navigate
+    /// to Location Services to re-grant access. `@MainActor` and safe to call
+    /// from button actions. Use when `isLocationDenied` is true.
     @MainActor
     func openLocationSettings() {
         locationManager.openAppSettings()

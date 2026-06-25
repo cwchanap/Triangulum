@@ -251,8 +251,11 @@ struct LocationManagerTests {
 
     @MainActor
     @Test func testOpenAppSettingsDoesNotCrash() {
-        // openAppSettings() calls UIApplication.shared.open(appSettingsURL) — a
-        // documented no-op on the simulator. Covers the method body line.
+        // openAppSettings() calls UIApplication.shared.open(appSettingsURL) with
+        // a completion handler. On the simulator `open(_:)` is a documented
+        // no-op that calls back with success=false (which logs via
+        // Logger.location). The test passes iff the call + completion do not
+        // crash/hang. Covers the method body line.
         let manager = LocationManager(skipAvailabilityCheck: true)
 
         manager.openAppSettings()

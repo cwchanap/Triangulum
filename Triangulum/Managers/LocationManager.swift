@@ -108,22 +108,36 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.requestWhenInUseAuthorization()
     }
 
-    /// The system URL that deep-links into this app's Location permission screen.
+    /// The system URL for this app's top-level Settings page.
+    ///
+    /// `UIApplication.openSettingsURLString` opens the app's Settings page —
+    /// not the Location toggle directly — so the user still navigates to
+    /// Privacy & Security → Location Services themselves.
     var appSettingsURL: URL {
         // openSettingsURLString is documented to never be empty.
         URL(string: UIApplication.openSettingsURLString)!
     }
 
-    /// Opens the app's location settings. Used from the UI when authorization
-    /// is `.denied` or `.restricted`, because `requestWhenInUseAuthorization()`
-    /// is a system no-op in those states and will not re-prompt the user.
+    /// Opens this app's top-level Settings page. Used from the UI when
+    /// authorization is `.denied` or `.restricted`, because
+    /// `requestWhenInUseAuthorization()` is a system no-op in those states and
+    /// will not re-prompt the user.
+    ///
+    /// The completion handler logs on failure: this deep link is the only
+    /// remediation path offered for a denied-permission dead end, so a silent
+    /// no-op would strand the user with no feedback and no diagnostic trail.
     ///
     /// `@MainActor` is intentional and enforced: `UIApplication.shared.open(_:)`
     /// must run on the main thread. Callers (View button actions) are already
     /// main-actor-isolated. See the class note above re: whole-class annotation.
     @MainActor
     func openAppSettings() {
-        UIApplication.shared.open(appSettingsURL)
+        let url = appSettingsURL
+        UIApplication.shared.open(url) { success in
+            if !success {
+                Logger.location.error("openAppSettings: failed to open \(url.absoluteString)")
+            }
+        }
     }
 
     func startLocationUpdates() {
