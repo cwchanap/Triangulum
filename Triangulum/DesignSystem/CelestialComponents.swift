@@ -382,5 +382,10 @@ struct CelInlineMessage: View {
                 .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(color.opacity(0.25), lineWidth: 0.5))
         )
+        // Combine the icon + text into a single VoiceOver element so the
+        // message is announced as one readable label (matching StatusPill);
+        // otherwise VoiceOver reads the decorative SF Symbol name first.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }

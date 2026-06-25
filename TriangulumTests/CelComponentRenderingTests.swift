@@ -112,4 +112,32 @@ struct CelComponentRenderingTests {
             #expect(host.view.window != nil, "Composite Cel view failed to attach to a window during rendering")
         }
     }
+
+    // CelInlineMessage applies `.accessibilityElement(children: .ignore)` +
+    // `.accessibilityLabel(text)` (mirroring StatusPill) so VoiceOver announces
+    // the message once instead of reading the decorative SF Symbol name first.
+    //
+    // SwiftUI's accessibility tree is built lazily and is NOT materialized
+    // synchronously through UIKit (`host.view.accessibilityElements` is empty
+    // outside a live assistive-tech session), so the combined-element label
+    // can't be asserted via UIKit introspection here. Instead we render the
+    // accessibility-modified body directly and assert the full pipeline
+    // completes without crashing — a regression in the modifiers (e.g. a
+    // malformed label binding) surfaces as a render failure.
+    @Test func celInlineMessageRendersWithAccessibilityModifiers() {
+        let (host, window) = renderHost(
+            VStack {
+                CelInlineMessage(text: "Location access denied", color: .celRed)
+                CelInlineMessage(text: "Hint with default icon")
+            }
+        )
+
+        withExtendedLifetime(window) {
+            guard let view = host.viewIfLoaded else {
+                Issue.record("CelInlineMessage hosting view failed to load")
+                return
+            }
+            #expect(view.window != nil, "CelInlineMessage with accessibility modifiers failed to attach to a window during rendering")
+        }
+    }
 }
