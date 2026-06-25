@@ -95,9 +95,10 @@ struct BarometerDetailView: View {
                 }
             }
 
-            // Sea-level pressure requires a valid location fix. When location
-            // access is denied or restricted, offer a remediation affordance
-            // matching the LocationView/MapView pattern.
+            // Sea-level pressure requires a valid location fix. Distinguish the
+            // two failure reasons: per-app denial (remediable via Settings) vs
+            // system-wide disabled (informational only — the global toggle isn't
+            // reachable from openSettingsURLString).
             if barometerManager.seaLevelPressure == nil &&
                 barometerManager.isLocationDenied {
                 VStack(spacing: 8) {
@@ -111,6 +112,10 @@ struct BarometerDetailView: View {
                     .font(.celLabel)
                     .foregroundStyle(Color.celCyan)
                 }
+            } else if barometerManager.seaLevelPressure == nil &&
+                barometerManager.isLocationServicesDisabled {
+                CelInlineMessage(text: "Location services are disabled in system settings",
+                                 color: .celRed)
             }
 
             // Trend indicator

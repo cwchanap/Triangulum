@@ -213,7 +213,7 @@ struct ContentView: View {
             Text("Celestial Sensor Array")
                 .celEyebrow(.celTextDim)
             HStack(spacing: 10) {
-                StatusPill("Live", color: .celGreen)
+                StatusPill("Live", status: .nominal)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text("UT \(Self.utFormatter.string(from: context.date))")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))

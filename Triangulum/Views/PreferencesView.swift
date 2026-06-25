@@ -69,7 +69,7 @@ struct PreferencesView: View {
                         Text("API Key").foregroundStyle(Color.celTextDim)
                         Spacer()
                         StatusPill(Config.hasValidAPIKey ? "Active" : "Not Set",
-                                   color: Config.hasValidAPIKey ? .celGreen : .celRed)
+                                   status: Config.hasValidAPIKey ? .nominal : .alert)
                     }
 
                     configButton(Config.hasValidAPIKey ? "Update API Key" : "Set API Key",

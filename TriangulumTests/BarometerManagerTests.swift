@@ -1538,6 +1538,28 @@ struct BarometerManagerTests {
         }
     }
 
+    @Test func testIsLocationServicesDisabledReflectsSystemWideToggle() {
+        // Review #2 (real gap): distinguish system-wide-disabled location from
+        // per-app denial. isAvailable mirrors CLLocationManager.locationServicesEnabled().
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            barometerAvailability: { false }
+        )
+
+        // System-wide off → disabled, regardless of per-app authorization status.
+        locationManager.isAvailable = false
+        locationManager.authorizationStatus = .authorizedWhenInUse
+        #expect(manager.isLocationServicesDisabled == true)
+        #expect(manager.isLocationDenied == false, "system-wide off must not read as per-app denial")
+
+        // System-wide on + denied → NOT disabled (distinct from per-app denial).
+        locationManager.isAvailable = true
+        locationManager.authorizationStatus = .denied
+        #expect(manager.isLocationServicesDisabled == false)
+        #expect(manager.isLocationDenied == true)
+    }
+
     @Test func testOpenLocationSettingsDoesNotCrash() {
         // openLocationSettings() delegates to LocationManager.openAppSettings()
         // (UIApplication.shared.open). Verified safe (~5ms, no hang) on simulator.
@@ -1548,10 +1570,11 @@ struct BarometerManagerTests {
         )
 
         // No #expect: the test passes iff the call does not crash/hang.
-        // We spiked that openLocationSettings() completes in ~5ms on the
-        // simulator. The value of this test is crash-safety + line coverage
-        // of the method body; UIApplication.shared.open returns nothing
-        // assertable and we are not permitted to change production code.
+        // openLocationSettings() delegates to LocationManager.openAppSettings(),
+        // which now passes a completion handler to UIApplication.shared.open
+        // (logs on failure). We spiked that it completes in ~5ms on the
+        // simulator. The value of this test is crash-safety + line coverage of
+        // the delegating method body.
         manager.openLocationSettings()
     }
 }

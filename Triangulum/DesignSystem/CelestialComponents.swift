@@ -9,6 +9,58 @@
 
 import SwiftUI
 
+// MARK: - Pure formatting helpers
+
+extension Double {
+    /// Clamps the receiver to the closed range [0, 1]. Shared by `LuminousBar`
+    /// (visible fill width) and `celPercentString(for:)` (VoiceOver value) so
+    /// the two never disagree.
+    func clampedToUnit() -> Double {
+        max(0, min(1, self))
+    }
+}
+
+/// Formats a 0...1 fraction as an integer VoiceOver percentage, e.g.
+/// `0.5 → "50 percent"`. Out-of-range values are clamped to [0, 1].
+func celPercentString(for fraction: Double) -> String {
+    "\(Int(fraction.clampedToUnit() * 100)) percent"
+}
+
+extension HorizontalAlignment {
+    /// Maps a stack `HorizontalAlignment` to the `Alignment` accepted by
+    /// `View.frame(maxWidth:alignment:)`. Centralizes the ternary previously
+    /// inlined in `MetricReadout`.
+    var frameAlignment: Alignment {
+        switch self {
+        case .leading: return .leading
+        case .trailing: return .trailing
+        default: return .center
+        }
+    }
+}
+
+// MARK: - Typed status semantics
+
+/// Closed status semantics mapping to the Cel status-color palette. Use the
+/// `StatusPill(_:status:)` initializer to keep status text and color from
+/// drifting apart (e.g. an "OK" label rendering in red). The raw
+/// `StatusPill(_:color:icon:)` initializer remains for callers that compute
+/// color from a continuous value (e.g. GPS accuracy tiers).
+enum CelStatus {
+    case nominal   // green
+    case caution   // amber
+    case alert     // red
+
+    /// Canonical Cel status color for this status.
+    var color: Color {
+        switch self {
+        case .nominal: return .celGreen
+        case .caution: return .celAmber
+        case .alert:   return .celRed
+        }
+    }
+}
+
 // MARK: - Screen background
 
 extension View {
@@ -200,8 +252,7 @@ struct MetricReadout: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading
-                                              : alignment == .trailing ? .trailing : .center)
+        .frame(maxWidth: .infinity, alignment: alignment.frameAlignment)
     }
 }
 
@@ -217,7 +268,7 @@ struct LuminousBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            let clamped = max(0, min(1, value))
+            let clamped = value.clampedToUnit()
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.06))
@@ -242,7 +293,7 @@ private struct LuminousBarAccessibility: ViewModifier {
             content
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(label)
-                .accessibilityValue("\(Int(max(0, min(1, value)) * 100)) percent")
+                .accessibilityValue(celPercentString(for: value))
         } else {
             content
                 .accessibilityHidden(true)
@@ -261,6 +312,13 @@ struct StatusPill: View {
         self.text = text
         self.color = color
         self.icon = icon
+    }
+
+    /// Typed initializer: derives the canonical color from a `CelStatus`, so
+    /// the status text and color can't drift apart. Use for fixed-status pills;
+    /// prefer the raw `init(_:color:icon:)` when color is computed dynamically.
+    init(_ text: String, status: CelStatus) {
+        self.init(text, color: status.color)
     }
 
     var body: some View {

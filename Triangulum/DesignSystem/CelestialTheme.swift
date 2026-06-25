@@ -41,6 +41,7 @@ extension Color {
     static let celCyan     = Color(red: 0.357, green: 0.878, blue: 0.941)            // #5BE0F0
     static let celCyanDeep = Color(red: 0.165, green: 0.576, blue: 0.710)            // #2A93B5
     static let celGold     = Color(red: 0.957, green: 0.808, blue: 0.478)            // #F4CE7A
+    static let celGoldDeep = Color(red: 0.850, green: 0.620, blue: 0.300)            // #D99E4D
     static let celViolet   = Color(red: 0.557, green: 0.482, blue: 0.902)            // #8E7BE6
 
     // Status
@@ -68,7 +69,7 @@ enum CelGradient {
     )
 
     static let goldGlow = LinearGradient(
-        colors: [.celGold, Color(red: 0.85, green: 0.62, blue: 0.30)],
+        colors: [.celGold, .celGoldDeep],
         startPoint: .top, endPoint: .bottom
     )
 }
