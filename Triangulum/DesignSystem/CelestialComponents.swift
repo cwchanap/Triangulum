@@ -18,6 +18,18 @@ extension Double {
     func clampedToUnit() -> Double {
         max(0, min(1, self))
     }
+
+    /// Width (in points) of the filled portion of a `LuminousBar` given the
+    /// total `trackWidth` and the minimum visible `floor`. Returns 0 when the
+    /// clamped value is 0 so a 0% bar renders truly empty — matching the
+    /// VoiceOver "0 percent" value — instead of a `floor`-sized nub that
+    /// visually reports progress where there is none. Positive values are
+    /// floored to `floor` so very small readings stay visible.
+    func luminousFillWidth(trackWidth: CGFloat, floor: CGFloat) -> CGFloat {
+        let clamped = clampedToUnit()
+        guard clamped > 0 else { return 0 }
+        return max(floor, trackWidth * clamped)
+    }
 }
 
 /// Formats a 0...1 fraction as an integer VoiceOver percentage, e.g.
@@ -268,14 +280,14 @@ struct LuminousBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            let clamped = value.clampedToUnit()
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.06))
                 Capsule()
                     .fill(LinearGradient(colors: [tint.opacity(0.7), tint],
                                          startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(height, geo.size.width * clamped))
+                    .frame(width: value.luminousFillWidth(trackWidth: geo.size.width,
+                                                          floor: height))
                     .shadow(color: tint.opacity(0.7), radius: 5)
             }
         }

@@ -99,7 +99,17 @@ struct BarometerDetailView: View {
             // two failure reasons: per-app denial (remediable via Settings) vs
             // system-wide disabled (informational only — the global toggle isn't
             // reachable from openSettingsURLString).
+            //
+            // Check the system-wide toggle first: when Location Services are off
+            // globally the per-app status retains its prior value, so both flags
+            // can be true at once. The "Open Settings" button below only reaches
+            // the app page, which cannot re-enable the global toggle, so the
+            // system-disabled message must win to avoid misdirecting the user.
             if barometerManager.seaLevelPressure == nil &&
+                barometerManager.isLocationServicesDisabled {
+                CelInlineMessage(text: "Location services are disabled in system settings",
+                                 color: .celRed)
+            } else if barometerManager.seaLevelPressure == nil &&
                 barometerManager.isLocationDenied {
                 VStack(spacing: 8) {
                     CelInlineMessage(text: "Sea level pressure needs location access",
@@ -112,10 +122,6 @@ struct BarometerDetailView: View {
                     .font(.celLabel)
                     .foregroundStyle(Color.celCyan)
                 }
-            } else if barometerManager.seaLevelPressure == nil &&
-                barometerManager.isLocationServicesDisabled {
-                CelInlineMessage(text: "Location services are disabled in system settings",
-                                 color: .celRed)
             }
 
             // Trend indicator

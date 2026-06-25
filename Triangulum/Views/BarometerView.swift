@@ -33,14 +33,21 @@ struct BarometerView: View {
                         // understands why "Sea Level" reads "--". Tapping the
                         // card opens the detail view, which hosts the
                         // actionable "Open Settings" button for the denial case.
+                        //
+                        // Check the system-wide toggle first: when Location
+                        // Services are off globally the per-app status retains
+                        // its prior value, so both flags can be true at once.
+                        // The global toggle is the true root cause and the
+                        // app-settings page cannot re-enable it, so it must win
+                        // over the per-app denial hint.
                         if barometerManager.seaLevelPressure == nil &&
-                            barometerManager.isLocationDenied {
-                            CelInlineMessage(text: "Sea level unavailable — location denied. Tap for details.",
-                                             color: .celAmber)
-                        } else if barometerManager.seaLevelPressure == nil &&
                             barometerManager.isLocationServicesDisabled {
                             CelInlineMessage(text: "Sea level unavailable — location services disabled",
                                              color: .celRed)
+                        } else if barometerManager.seaLevelPressure == nil &&
+                            barometerManager.isLocationDenied {
+                            CelInlineMessage(text: "Sea level unavailable — location denied. Tap for details.",
+                                             color: .celAmber)
                         }
 
                         // Trend indicator
