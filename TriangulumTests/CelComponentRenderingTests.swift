@@ -22,20 +22,26 @@ import UIKit
 // MARK: - Render host
 
 /// Wraps a SwiftUI view in a UIHostingController installed in a live UIWindow
-/// and forces layout, causing SwiftUI to evaluate `body`. Returns the hosting
-/// controller so callers can assert on the rendered state.
+/// and forces layout, causing SwiftUI to evaluate `body`.
+///
+/// Returns both the hosting controller and the owning `UIWindow`. The caller
+/// MUST hold the returned window for the lifetime of its assertions: a
+/// `UIWindow` created locally is only kept alive by `UIApplication`'s
+/// undocumented key-window retention, which is unreliable (especially under
+/// `UIScene`) and can let `host.view.window` become `nil` mid-test. Keeping a
+/// strong reference guarantees the window survives until the test finishes.
 @MainActor
 private func renderHost<V: View>(
     _ view: V,
     size: CGSize = CGSize(width: 320, height: 568)
-) -> UIHostingController<V> {
+) -> (host: UIHostingController<V>, window: UIWindow) {
     let host = UIHostingController(rootView: view)
     host.view.frame = CGRect(origin: .zero, size: size)
     let window = UIWindow(frame: CGRect(origin: .zero, size: size))
     window.rootViewController = host
     window.makeKeyAndVisible()
     host.view.layoutIfNeeded()
-    return host
+    return (host, window)
 }
 
 @MainActor
@@ -56,7 +62,7 @@ struct CelComponentRenderingTests {
     //   • CelInlineMessage
     //   • Text().celEyebrow() modifier
     @Test func compositeCelComponentsRenderWithoutCrashing() {
-        let host = renderHost(
+        let (host, window) = renderHost(
             ScrollView {
                 VStack(alignment: .leading, spacing: CelSpace.md) {
                     // Card with corner ticks + a trailing StatusPill header.
@@ -99,7 +105,11 @@ struct CelComponentRenderingTests {
         )
 
         // Window attachment == the full render pipeline (including every body
-        // above) completed without a layout crash.
-        #expect(host.view.window != nil, "Composite Cel view failed to attach to a window during rendering")
+        // above) completed without a layout crash. `withExtendedLifetime`
+        // guarantees the owning window stays alive through the assertion — see
+        // the note on `renderHost` about key-window retention being unreliable.
+        withExtendedLifetime(window) {
+            #expect(host.view.window != nil, "Composite Cel view failed to attach to a window during rendering")
+        }
     }
 }
