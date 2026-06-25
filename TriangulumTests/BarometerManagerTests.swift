@@ -1560,6 +1560,30 @@ struct BarometerManagerTests {
         #expect(manager.isLocationDenied == true)
     }
 
+    @Test func testBothDisabledAndDeniedCanOverlap() {
+        // CoreLocation keeps the per-app authorization status when Location
+        // Services are turned off globally, so BOTH flags can be true at once.
+        // The UI must prefer the system-disabled message in that state (the
+        // app-settings page cannot re-enable the global toggle). This test
+        // pins the overlap so the ordering in BarometerView/Detail stays
+        // correct.
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        let manager = BarometerManager(
+            locationManager: locationManager,
+            barometerAvailability: { false }
+        )
+
+        locationManager.isAvailable = false
+        locationManager.authorizationStatus = .denied
+        #expect(manager.isLocationServicesDisabled == true)
+        #expect(manager.isLocationDenied == true)
+
+        // Document the intended UI precedence: when both are true, the
+        // system-wide disabled state is the root cause to report.
+        let showsDisabledMessage = manager.isLocationServicesDisabled
+        #expect(showsDisabledMessage == true)
+    }
+
     @Test func testOpenLocationSettingsDoesNotCrash() {
         // openLocationSettings() delegates to LocationManager.openAppSettings()
         // (UIApplication.shared.open). Verified safe (~5ms, no hang) on simulator.

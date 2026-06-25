@@ -95,6 +95,30 @@ struct CelFormattingTests {
         #expect(HorizontalAlignment.trailing.frameAlignment == .trailing)
         #expect(HorizontalAlignment.center.frameAlignment == .center)
     }
+
+    @Test func luminousFillWidthRendersEmptyAtZero() {
+        // A 0% bar must render truly empty so the visible state agrees with the
+        // VoiceOver "0 percent" value (no floor-sized nub).
+        #expect(0.0.luminousFillWidth(trackWidth: 200, floor: 6) == 0)
+        // Negative inputs clamp to 0 → also empty.
+        #expect((-0.5).luminousFillWidth(trackWidth: 200, floor: 6) == 0)
+    }
+
+    @Test func luminousFillWidthFloorsSmallPositiveValues() {
+        // Very small positive readings stay visible via the floor so a trace
+        // signal isn't invisible. 0.001 * 200 = 0.2 → floored to 6.
+        #expect(0.001.luminousFillWidth(trackWidth: 200, floor: 6) == 6)
+        // Just above 0 but below floor still floors.
+        #expect(0.01.luminousFillWidth(trackWidth: 200, floor: 6) == 6)
+    }
+
+    @Test func luminousFillWidthScalesAndClamps() {
+        // Mid value scales proportionally once it exceeds the floor.
+        #expect(0.5.luminousFillWidth(trackWidth: 200, floor: 6) == 100)
+        // Full / over-full value fills the whole track.
+        #expect(1.0.luminousFillWidth(trackWidth: 200, floor: 6) == 200)
+        #expect(1.5.luminousFillWidth(trackWidth: 200, floor: 6) == 200)
+    }
 }
 
 @Suite
