@@ -416,7 +416,7 @@ struct SatelliteManagerTests {
     }
 
     @Test func testNextPassDebouncesWorkItem() async {
-        let locationManager = LocationManager()
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
         locationManager.isAvailable = true
         locationManager.authorizationStatus = .authorizedWhenInUse
 
