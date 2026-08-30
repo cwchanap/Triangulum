@@ -23,12 +23,16 @@ final class TriangulumUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testMobileShellDisplaysFourPrimaryTabs() throws {
         let app = makeApp()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 3))
+
+        ["Live", "Field", "Footprint", "Settings"].forEach { title in
+            XCTAssertTrue(tabBar.buttons[title].exists, "Missing \(title) tab")
+        }
     }
 
     @MainActor

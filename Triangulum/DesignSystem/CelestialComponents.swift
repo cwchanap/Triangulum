@@ -104,11 +104,12 @@ struct InstrumentCardModifier: ViewModifier {
                     RoundedRectangle(cornerRadius: CelSpace.cardRadius, style: .continuous)
                         .fill(CelGradient.surface)
 
-                    // Faint top sheen
+                    // A restrained semantic wash keeps each sensor family legible
+                    // without turning the dashboard into a grid of glowing cards.
                     RoundedRectangle(cornerRadius: CelSpace.cardRadius, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [tint.opacity(0.10), .clear],
+                                colors: [tint.opacity(0.07), .clear],
                                 startPoint: .top, endPoint: .center
                             )
                         )
@@ -123,14 +124,13 @@ struct InstrumentCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: CelSpace.cardRadius, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [tint.opacity(0.35), .celStroke],
+                            colors: [tint.opacity(0.42), .celStroke],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ),
                         lineWidth: 1
                     )
             )
-            .shadow(color: .black.opacity(0.45), radius: 14, x: 0, y: 8)
-            .shadow(color: tint.opacity(0.08), radius: 20, x: 0, y: 0)
+            .shadow(color: .black.opacity(0.26), radius: 8, x: 0, y: 4)
     }
 }
 
