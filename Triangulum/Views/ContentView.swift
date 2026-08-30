@@ -79,7 +79,6 @@ struct ContentView: View {
             .tag(ProductTab.settings)
         }
         .tint(.celViolet)
-        .background(StarfieldBackground(showConstellation: false))
         .onAppear {
             guard !isRunningUITests else { return }
 
@@ -155,6 +154,7 @@ struct ContentView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .background(StarfieldBackground(showConstellation: false))
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
