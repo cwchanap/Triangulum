@@ -35,7 +35,7 @@ struct FootprintView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             content
             .background(StarfieldBackground(showConstellation: false))
             .navigationTitle("Sensor Footprints")

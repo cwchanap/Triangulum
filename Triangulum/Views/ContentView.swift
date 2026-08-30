@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var showEnhancedSnapshotDialog = false
     @State private var currentSnapshot: SensorSnapshot?
     @State private var isEditMode = false
+    @State private var selectedTab: ProductTab = .live
 
     @AppStorage("showBarometerWidget") private var showBarometerWidget = true
     @AppStorage("showLocationWidget") private var showLocationWidget = true
@@ -45,94 +46,40 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                // Hero header
-                heroHeader
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .moveDisabled(true)
-                    .deleteDisabled(true)
-
-                // Observatory console — navigation instruments
-                consoleStrip
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 14, trailing: 0))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .moveDisabled(true)
-                    .deleteDisabled(true)
-
-                Text("Sensor Array")
-                    .celEyebrow()
-                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 2, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .moveDisabled(true)
-
-                ForEach(widgetOrderManager.widgetOrder, id: \.id) { widgetType in
-                    if isWidgetVisible(widgetType) {
-                        widgetView(for: widgetType)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                    }
-                }
-                .onMove(perform: widgetOrderManager.moveWidget)
-
-                // Capture snapshot button
-                Section {
-                    captureButton
-                        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 28, trailing: 16))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .moveDisabled(true)
-                }
+        TabView(selection: $selectedTab) {
+            NavigationStack {
+                liveDashboard
             }
-            .listStyle(PlainListStyle())
-            .scrollContentBackground(.hidden)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.celBackgroundTop.opacity(0.85), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .environment(\.editMode, .constant(isEditMode ? EditMode.active : EditMode.inactive))
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("TRIANGULUM")
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .tracking(3)
-                        .foregroundStyle(Color.celText)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isEditMode.toggle()
-                        }
-                    } label: {
-                        Image(systemName: isEditMode ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle")
-                            .font(.title3)
-                            .foregroundStyle(isEditMode ? Color.celGreen : Color.celCyan)
-                    }
-                }
+            .tabItem {
+                Label(ProductTab.live.title, systemImage: ProductTab.live.symbolName)
             }
-        } detail: {
-            // Detail placeholder is transparent so the single shared starfield
-            // (applied to the NavigationSplitView below) shows through both the
-            // sidebar and detail columns on iPad split view — no second instance.
-            VStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 40))
-                    .foregroundStyle(Color.celCyan.opacity(0.6))
-                Text("Select an instrument")
-                    .celEyebrow()
+            .tag(ProductTab.live)
+
+            NavigationStack {
+                FieldHubView(locationManager: locationManager,
+                             satelliteManager: satelliteManager)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .tabItem {
+                Label(ProductTab.field.title, systemImage: ProductTab.field.symbolName)
+            }
+            .tag(ProductTab.field)
+
+            FootprintView(snapshotManager: snapshotManager)
+                .tabItem {
+                    Label(ProductTab.footprint.title, systemImage: ProductTab.footprint.symbolName)
+                }
+                .tag(ProductTab.footprint)
+
+            NavigationStack {
+                PreferencesView(locationManager: locationManager)
+            }
+            .tabItem {
+                Label(ProductTab.settings.title, systemImage: ProductTab.settings.symbolName)
+            }
+            .tag(ProductTab.settings)
         }
-        // ONE shared starfield behind both NavigationSplitView columns, replacing
-        // the previous sidebar (.celestialBackground) + detail (StarfieldBackground)
-        // duplication that doubled per-frame GPU work on iPad split view.
-        .background(StarfieldBackground())
+        .tint(.celViolet)
+        .background(StarfieldBackground(showConstellation: false))
         .onAppear {
             guard !isRunningUITests else { return }
 
@@ -165,6 +112,73 @@ struct ContentView: View {
                 snapshotManager: snapshotManager,
                 isPresented: $showEnhancedSnapshotDialog
             )
+        }
+    }
+
+    private var liveDashboard: some View {
+        List {
+            heroHeader
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .moveDisabled(true)
+                .deleteDisabled(true)
+
+            Text("Sensor Array")
+                .celEyebrow()
+                .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 2, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .moveDisabled(true)
+
+            ForEach(widgetOrderManager.widgetOrder, id: \.id) { widgetType in
+                if isWidgetVisible(widgetType) {
+                    widgetView(for: widgetType)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+            }
+            .onMove(perform: widgetOrderManager.moveWidget)
+
+            utilityStrip
+                .listRowInsets(EdgeInsets(top: 14, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .moveDisabled(true)
+
+            captureButton
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 28, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .moveDisabled(true)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.celBackgroundTop.opacity(0.85), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .environment(\.editMode, .constant(isEditMode ? EditMode.active : EditMode.inactive))
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("TRIANGULUM")
+                    .font(.celDisplay(16, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(Color.celText)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isEditMode.toggle()
+                    }
+                } label: {
+                    Image(systemName: isEditMode ? "checkmark.circle.fill" : "arrow.up.arrow.down.circle")
+                        .font(.title3)
+                        .foregroundStyle(isEditMode ? Color.celGreen : Color.celCyan)
+                }
+            }
         }
     }
 
@@ -206,12 +220,28 @@ struct ContentView: View {
 
     private var heroHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Triangulum")
-                .font(.celDisplay(40, weight: .semibold))
-                .foregroundStyle(Color.celText)
-                .shadow(color: .celCyan.opacity(0.25), radius: 12)
-            Text("Celestial Sensor Array")
-                .celEyebrow(.celTextDim)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Triangulum")
+                    .font(.celDisplay(42, weight: .bold))
+                    .foregroundStyle(Color.celText)
+                Text("Field Instrument · Sensor Array")
+                    .celEyebrow(.celTextDim)
+            }
+            .padding(.leading, 32)
+            .padding(.trailing, 16)
+
+            Image("TriangulumFieldMap")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 148)
+                .clipShape(RoundedRectangle(cornerRadius: CelSpace.cardRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: CelSpace.cardRadius, style: .continuous)
+                        .stroke(Color.celViolet.opacity(0.42), lineWidth: 1)
+                }
+                .accessibilityHidden(true)
+
             HStack(spacing: 10) {
                 StatusPill("Live", status: .nominal)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -221,31 +251,20 @@ struct ContentView: View {
                 }
             }
             .padding(.top, 2)
+            .padding(.leading, 32)
+            .padding(.trailing, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var consoleStrip: some View {
+    private var utilityStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
-                ConsoleTile(icon: "star.fill", label: "Atlas", tint: .celGold) {
-                    ConstellationMapView(locationManager: locationManager,
-                                         satelliteManager: satelliteManager)
-                }
                 ConsoleTile(icon: "sun.max.fill", label: "Solar", tint: .celAmber) {
                     SolarEventsView(locationManager: locationManager)
                 }
-                ConsoleTile(icon: "location.north.fill", label: "Compass", tint: .celCyan) {
-                    CompassPageView(locationManager: locationManager)
-                }
                 ConsoleTile(icon: "level", label: "Level", tint: .celGreen) {
                     LevelPageView(barometerManager: barometerManager)
-                }
-                ConsoleTile(icon: "map.fill", label: "Tracks", tint: .celViolet) {
-                    FootprintView(snapshotManager: snapshotManager)
-                }
-                ConsoleTile(icon: "gearshape.fill", label: "Config", tint: .celTextDim) {
-                    PreferencesView(locationManager: locationManager)
                 }
             }
             .padding(.horizontal, 16)
@@ -258,16 +277,17 @@ struct ContentView: View {
                 Image(systemName: "camera.aperture")
                     .font(.system(size: 18, weight: .semibold))
                 Text("Capture Snapshot")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .tracking(1.5)
+                    .font(.celBody(14, weight: .bold))
+                    .tracking(0.7)
                     .textCase(.uppercase)
             }
             .foregroundStyle(Color.celBackgroundBottom)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .background(
-                Capsule().fill(CelGradient.cyanGlow)
-                    .shadow(color: .celCyan.opacity(0.6), radius: 16, y: 4)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.celViolet)
+                    .shadow(color: .celViolet.opacity(0.35), radius: 10, y: 4)
             )
         }
         .buttonStyle(.plain)
@@ -310,8 +330,8 @@ private struct ConsoleTile<Destination: View>: View {
             VStack(spacing: 9) {
                 CelGlyph(systemName: icon, tint: tint, size: 52)
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .tracking(0.8)
+                    .font(.celBody(11, weight: .semibold))
+                    .tracking(0.45)
                     .textCase(.uppercase)
                     .foregroundStyle(Color.celTextDim)
             }

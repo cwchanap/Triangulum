@@ -9,7 +9,7 @@ struct BarometerView: View {
             showingDetail = true
         } label: {
             VStack(spacing: CelSpace.md) {
-                InstrumentHeader(icon: "barometer", title: "Barometer", tint: .celCyan) {
+                InstrumentHeader(icon: "barometer", title: "Barometer", tint: .celGold) {
                     CelChevron()
                 }
 
@@ -19,14 +19,20 @@ struct BarometerView: View {
                     CelInlineMessage(text: barometerManager.errorMessage, color: .celRed)
                 } else {
                     VStack(spacing: CelSpace.md) {
-                        HStack(alignment: .top) {
-                            MetricReadout("Pressure",
-                                          value: String(format: "%.2f", barometerManager.pressure),
-                                          unit: "kPa", valueColor: pressureColor, valueSize: 28)
-                            MetricReadout("Sea Level",
-                                          value: seaLevelPressureText, unit: "kPa",
-                                          alignment: .trailing)
+                        ZStack {
+                            PressureWeatherMapArt()
+
+                            HStack(alignment: .top) {
+                                MetricReadout("Pressure",
+                                              value: String(format: "%.2f", barometerManager.pressure),
+                                              unit: "kPa", valueColor: pressureColor, valueSize: 28)
+                                MetricReadout("Sea Level",
+                                              value: seaLevelPressureText, unit: "kPa",
+                                              alignment: .trailing)
+                            }
+                            .padding(.horizontal, CelSpace.xs)
                         }
+                        .frame(height: 118)
 
                         // Sea-level pressure requires a valid location fix.
                         // Surface a distinct hint per reason so the user
@@ -66,7 +72,7 @@ struct BarometerView: View {
                     }
                 }
             }
-            .widgetCard()
+            .instrumentCard(tint: .celGold)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Barometer details")
@@ -95,6 +101,59 @@ struct BarometerView: View {
         // Unit is rendered separately by MetricReadout(unit: "kPa");
         // keep the value numeric to avoid a duplicated "kPa kPa".
         return String(format: "%.2f", seaLevelPressure)
+    }
+}
+
+private struct PressureWeatherMapArt: View {
+    var body: some View {
+        Canvas { context, size in
+            let dashed = StrokeStyle(lineWidth: 1, dash: [5, 6])
+            let isobar = Color.celGold.opacity(0.30)
+
+            context.stroke(
+                Path(ellipseIn: CGRect(x: -size.width * 0.18,
+                                       y: size.height * 0.08,
+                                       width: size.width * 0.72,
+                                       height: size.height * 0.82)),
+                with: .color(isobar), style: dashed
+            )
+            context.stroke(
+                Path(ellipseIn: CGRect(x: size.width * 0.12,
+                                       y: -size.height * 0.42,
+                                       width: size.width * 0.72,
+                                       height: size.height * 1.36)),
+                with: .color(isobar), style: dashed
+            )
+            context.stroke(
+                Path(ellipseIn: CGRect(x: size.width * 0.64,
+                                       y: size.height * 0.16,
+                                       width: size.width * 0.48,
+                                       height: size.height * 0.72)),
+                with: .color(isobar), style: dashed
+            )
+
+            var front = Path()
+            front.move(to: CGPoint(x: -8, y: size.height * 0.74))
+            front.addCurve(to: CGPoint(x: size.width + 8, y: size.height * 0.34),
+                           control1: CGPoint(x: size.width * 0.30, y: size.height * 0.96),
+                           control2: CGPoint(x: size.width * 0.64, y: size.height * 0.05))
+            context.stroke(front, with: .color(.celCyan.opacity(0.62)), lineWidth: 1.4)
+
+            context.fill(Path(ellipseIn: CGRect(x: size.width * 0.20,
+                                                y: size.height * 0.70,
+                                                width: 6, height: 6)),
+                         with: .color(.celCyan.opacity(0.85)))
+            context.fill(Path(ellipseIn: CGRect(x: size.width * 0.70,
+                                                y: size.height * 0.27,
+                                                width: 6, height: 6)),
+                         with: .color(.celCyan.opacity(0.85)))
+        }
+        .background(
+            RadialGradient(colors: [.celGold.opacity(0.10), .clear],
+                           center: .center, startRadius: 0, endRadius: 150)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 
