@@ -29,6 +29,8 @@ jobs:
             exit 1
           fi
           DESTINATION="platform=iOS Simulator,id=$SIMULATOR_UDID,arch=arm64"
+          echo "Pre-booting simulator $SIMULATOR_UDID to avoid cold-launch timeouts"
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           RESULT_BUNDLE="${RUNNER_TEMP}/triangulum-uitests.xcresult"
           if command -v xcpretty >/dev/null 2>&1; then
             xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum -destination "$DESTINATION" -parallel-testing-enabled NO -only-testing:TriangulumUITests -resultBundlePath "$RESULT_BUNDLE" | xcpretty
