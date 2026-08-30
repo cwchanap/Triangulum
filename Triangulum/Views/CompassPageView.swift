@@ -11,8 +11,6 @@ struct CompassPageView: View {
         ZStack {
             if nightVisionMode {
                 Color.black.ignoresSafeArea()
-            } else {
-                StarfieldBackground(showConstellation: false)
             }
             VStack(spacing: 24) {
                 Spacer()
