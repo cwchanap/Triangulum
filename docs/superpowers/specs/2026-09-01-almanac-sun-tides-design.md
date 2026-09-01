@@ -8,8 +8,8 @@
 
 Add a fifth primary tab, **Almanac**, to Triangulum. Almanac combines worldwide
 solar events with predicted tides for Canada, the United States, Japan, and
-Hong Kong. A shared location and seven-day date strip drive two sections:
-**Sun** and **Tides**.
+Hong Kong. A shared location and rolling seven-day date strip drive two
+sections: **Sun** and **Tides**.
 
 The first release stays deliberately narrow:
 
@@ -44,7 +44,7 @@ place and local calendar day.
 4. Present the next predicted tide, a daily hourly curve, exact high/low events,
    and source station metadata for Canada, the United States, Japan, and Hong
    Kong.
-5. Remain useful offline after a tide week has been loaded once.
+5. Remain useful offline after a tide window has been loaded once.
 6. Keep implementation and maintenance cost appropriate for a hobby project.
 
 ## Non-goals
@@ -81,7 +81,8 @@ together. The existing **Solar** tile is removed from the Live dashboard.
 Almanac becomes the only user-facing home for solar events.
 
 `ProductTab` remains where it is today in `FieldHubView.swift`; add an
-`.almanac` case rather than moving the enum solely for architectural neatness.
+`.almanac` case with title `Almanac` and the stable SF Symbol `calendar` rather
+than moving the enum solely for architectural neatness.
 
 ### Almanac layout
 
@@ -95,7 +96,7 @@ Vancouver, BC                           Change
 Current Location
 PDT · UTC−7
 
-‹ Week      31  1  2  3  4  5  6      Week ›
+‹ Window    31  1  2  3  4  5  6    Window ›
                          Today
 
                     Sun | Tides
@@ -106,8 +107,9 @@ when switching sections. Both sections therefore describe the same selected
 place and civil calendar date.
 
 On each app launch Almanac restores the location mode and last fixed location,
-then opens on "today" at that destination and defaults to **Sun**. The previous
-selected date and active section are not persisted.
+then selects today in that destination, starts the visible window on today, and
+defaults to **Sun**. The window contains today plus the following six days. The
+previous selected date and active section are not persisted.
 
 ## Domain model and local-time rules
 
@@ -133,11 +135,17 @@ Calendar calculations always use an explicit `TimeZone` and Gregorian
 `Calendar`. This prevents Tokyo, Vancouver, and Hong Kong from silently sharing
 the device's day boundary.
 
+A "week" in cache and service names means the active rolling seven-day window,
+not an ISO or locale calendar week. Its cache key uses the first visible date.
+
 The selected `LocalDate` is defined in the active Almanac location's time zone.
 Solar events use that location time zone. Tide samples and events use the tide
 station's authoritative time zone. The same year-month-day is interpreted in
 the station time zone for the Tides section. If the location and station time
 zones differ, the station card displays the tide time zone explicitly.
+
+The header time-zone abbreviation and UTC offset are calculated for the selected
+local date, so a future date reflects the correct daylight-saving offset.
 
 Hourly source points are stored as absolute `Date` instants. A daylight-saving
 transition may yield 23 or 25 hourly points for a local day; the model must not
@@ -171,7 +179,8 @@ Persist only:
 
 - the selected location mode;
 - the last valid fixed location;
-- the manual tide station override and the coordinate at which it was chosen.
+- the manual tide station provider/code and the coordinate at which it was
+  chosen.
 
 Use one Codable `UserDefaults` value. No SwiftData entity is required.
 
@@ -187,18 +196,20 @@ through MapKit into:
 
 If the first placemark has no time zone, perform one reverse-geocode lookup for
 the resolved coordinate. If the second lookup still has no time zone, reject
-that selection with a clear search error rather than falling back to the device
-time zone.
+that selection with `Time zone unavailable for this place` rather than falling
+back to the device time zone.
 
-For Current Location, reverse geocode only after the first valid fix and after
-meaningful movement, not on every GPS callback. Reuse the last resolved
-placemark while movement remains below the tide-override threshold.
+For Current Location, reverse geocode after the first valid fix and again after
+movement of at least 5 km. Coalesce concurrent lookups and do not geocode every
+GPS callback. Automatic nearest-station resolution may update at the same 5 km
+threshold when no manual override is active. A manual override remains active
+until the separate 25 km reset threshold described below.
 
 Changing to a different fixed location:
 
 1. updates the shared Almanac location;
 2. resets the selected day to today at the new destination;
-3. resets the visible seven-day window around that day;
+3. starts a new visible seven-day window on that day;
 4. clears the manual tide-station override;
 5. recalculates solar events immediately;
 6. resolves tide coverage and the nearest station.
@@ -376,7 +387,7 @@ It exposes JSON endpoints for stations, station metadata, tide tables, data, and
 time-series definitions. Select stations that publish both the hourly
 prediction series and high/low events required by the common model.
 
-Request one seven-day prediction range per normalized week. Cache the station
+Request one seven-day prediction range per active window. Cache the station
 catalogue so opening Almanac does not repeatedly consume the published API
 limits of three requests per second and thirty requests per minute. Seven-day
 hourly requests fit within the service's published lower-resolution limit.
@@ -389,7 +400,7 @@ station's official vertical datum label.
 Use the NOAA CO-OPS Metadata API for the tide-prediction station catalogue and
 the Data Retrieval API for predictions.
 
-A complete week requires two Data API requests:
+A complete seven-day window requires two Data API requests:
 
 ```text
 product=predictions
@@ -421,7 +432,7 @@ publication. It provides station coordinates, tide-table datum, exact high/low
 predictions, and hourly predicted heights and permits a displayed range of up
 to 35 days.
 
-`JapanTideClient` requests the selected seven-day range from the published tide
+`JapanTideClient` requests the active seven-day range from the published tide
 page and parses only the station metadata, hourly table, and high/low table
 needed by the normalized model. Parsing remains feature-local and is protected
 by checked-in Japanese response fixtures. Do not parse unrelated presentation
@@ -442,7 +453,7 @@ Use the Hong Kong Observatory annual CSV APIs:
 - `HLT` for predicted high/low times and heights.
 
 The request unit is station plus year. Cache each source CSV pair and slice the
-selected normalized week locally. A week that crosses New Year may require two
+active seven-day window locally. A window that crosses New Year may require two
 station-year pairs.
 
 Keep the small HKO station catalogue as feature-owned metadata derived from the
@@ -529,7 +540,7 @@ Suggested layout:
 
 ```text
 catalogs/<schema>/<provider>.json
-weeks/<schema>/<provider>/<station>/<week-start>.json
+windows/<schema>/<provider>/<station>/<window-start>.json
 sources/hko/<station>/<year>-hourly.csv
 sources/hko/<station>/<year>-hilo.csv
 ```
@@ -537,47 +548,57 @@ sources/hko/<station>/<year>-hilo.csv
 The cache schema has a small integer version. A mismatch is a clean cache miss;
 there is no migration code.
 
-### Weekly cache key
+Fetched CHS and NOAA station catalogues are fresh for 30 days. A stale catalogue
+remains usable while one foreground refresh is attempted. JMA and HKO may use
+small checked-in station metadata derived from their official publications when
+that is more reliable than repeatedly parsing a catalogue page.
+
+### Window cache key
 
 The normalized prediction cache key is:
 
 ```text
-schema-version / provider / station-id / local-week-start
+schema-version / provider / station-id / local-window-start
 ```
 
-Changing only the selected date inside that week must not trigger another
+`local-window-start` is the first date visible in the rolling seven-day strip.
+Changing only the selected date inside that window must not trigger another
 network request.
 
 ### Loading behavior
 
 Use a small stale-while-refresh flow:
 
-1. Display a valid cached week immediately.
+1. Display a valid cached window immediately.
 2. Treat it as fresh for 24 hours.
-3. Refresh when stale data is opened online, on station or week change when no
-   fresh cache exists, on retry, or on pull-to-refresh.
+3. Attempt refresh when stale data is opened, when a station/window has no fresh
+   cache, on retry, or on pull-to-refresh.
 4. If refresh fails, keep cached content visible and show its last-updated time.
 5. If no cache exists, show the stable user-facing error and Retry action.
 
+Do not add a reachability monitor. Attempt the request and map connectivity
+failures to `networkUnavailable`; this is enough to label retained cache as
+offline.
+
 No background scheduler or app-launch preload is added. Tide work starts only
-when Almanac appears or its active location/station/week changes. Leaving the
+when Almanac appears or its active location/station/window changes. Leaving the
 screen cancels disposable in-flight tasks without deleting cache entries.
 
 ### Atomic completeness
 
-Write a fetched week to a temporary file and replace the existing entry only
+Write a fetched window to a temporary file and replace the existing entry only
 after all validation succeeds:
 
 - station metadata is complete;
 - hourly samples parse successfully;
 - exact high/low events parse successfully;
 - all values belong to the requested station and datum;
-- timestamps intersect the requested local week;
+- timestamps intersect the requested local window;
 - values use finite numeric heights.
 
 Providers requiring two source responses, especially NOAA and HKO, commit them
 as one logical result. A partial response must not overwrite an earlier complete
-week.
+window.
 
 ## Tides UI
 
@@ -618,7 +639,7 @@ Use native Swift Charts. Plot:
 
 - official hourly source samples as the line;
 - exact high/low events as independent markers;
-- destination/station-local times on the horizontal axis;
+- station-local times on the horizontal axis;
 - metres on the vertical axis;
 - a current-time rule only for today.
 
@@ -648,7 +669,8 @@ The station card shows:
 - datum;
 - official provider attribution;
 - last successful update;
-- `Choose another station`.
+- `Choose another station`;
+- `Predictions are for planning, not navigation`.
 
 Cached content remains visible after a refresh failure. Example labels:
 
@@ -658,19 +680,21 @@ Cached content remains visible after a refresh failure. Example labels:
 
 ## Shared date navigation
 
-Default to today in the active location's time zone. Display seven consecutive
-selectable dates in a horizontally scrollable strip.
+Default to today in the active location's time zone. The visible rolling window
+starts on today and contains today plus the following six dates in a
+horizontally scrollable strip.
 
-- Previous and next controls move the visible window by seven days.
-- Selecting a day updates Sun and Tides together.
-- A Today action returns to the current destination-local date and containing
-  week.
-- Moving within one loaded tide week changes presentation only.
-- Moving to another week requests or loads the corresponding cache entry.
+- Previous and next controls move the complete window by exactly seven days.
+- Selecting a day updates Sun and Tides together without re-anchoring the
+  window.
+- Today selects the current destination-local date and re-anchors the visible
+  window to today plus the following six days.
+- Moving within one loaded tide window changes presentation only.
+- Moving to another window requests or loads the corresponding cache entry.
 
-There is no arbitrary date picker in v1. Providers may return no data for weeks
-outside their published prediction horizon; show the explicit no-predictions
-state.
+There is no arbitrary date picker in v1. Providers may return no data for
+windows outside their published prediction horizon; show the explicit
+no-predictions state.
 
 ## View-model data flow
 
@@ -687,18 +711,23 @@ ContentView
                  `-- asks TideService for station + TideWeek
 ```
 
-For a location or week change:
+For a location or window change:
 
 1. resolve the active coordinate and location time zone;
 2. set or reset the destination-local selected day as required;
 3. recalculate solar events synchronously;
 4. resolve tide-region coverage;
 5. resolve the automatic or manually overridden station;
-6. display a valid cached week immediately;
+6. display a valid cached window immediately;
 7. fetch and atomically replace the cache when required.
 
 Use cancellable `Task` properties in the view model so a newer location,
-station, or week selection cannot be overwritten by an older response.
+station, or window selection cannot be overwritten by an older response.
+
+Inject `now: () -> Date` into the view model, defaulting to `Date.init`. Reuse it
+for destination-local today, next-event selection, countdowns, cache age, and
+tests. This is a closure seam, not a clock framework. The production minute
+timer only triggers reevaluation against that closure.
 
 ## Error model
 
@@ -770,7 +799,7 @@ Narrow existing-file changes:
   - remove the Solar utility tile;
   - pass the shared `LocationManager`.
 - `Triangulum/Views/FieldHubView.swift`
-  - add `.almanac` to `ProductTab` with an appropriate title and SF Symbol.
+  - add `.almanac` to `ProductTab` with title `Almanac` and symbol `calendar`.
 - `Triangulum/Views/SolarEventsView.swift`
   - remove after the calculation model and UI behavior are migrated.
 - `TriangulumTests/SolarEventsTests.swift`
@@ -786,9 +815,12 @@ Narrow existing-file changes:
 Retain existing solar tests and add:
 
 - destination-local today differs correctly from device-local today;
-- seven-day windows cross month and year boundaries;
+- rolling windows cross month and year boundaries;
+- previous/next moves the window exactly seven days;
+- Today re-anchors the window at destination-local today;
 - daylight-saving changes preserve 23/25-hour local days;
 - switching locations recalculates the correct destination day;
+- selected-date time-zone labels use the correct daylight-saving offset;
 - sunrise, sunset, twilight, golden-hour ordering, next-event selection, and
   polar conditions remain correct.
 
@@ -803,6 +835,7 @@ Retain existing solar tests and add:
 - A fixed-location change clears the manual override.
 - Current-location movement below 25 km retains the override; movement beyond
   25 km clears it.
+- Current-location movement below 5 km does not repeat reverse geocoding.
 
 ### Provider fixture tests
 
@@ -825,23 +858,26 @@ source response do not produce a cacheable `TideWeek`.
 
 - A fresh cache displays without waiting for the network.
 - Stale cached content survives a refresh failure.
-- A complete refresh atomically replaces the previous week.
+- A complete refresh atomically replaces the previous window.
 - A partial provider result leaves the previous cache untouched.
-- Date changes inside a week do not refetch.
-- Station/week changes use distinct keys.
+- Date changes inside a window do not refetch.
+- Station/window changes use distinct keys.
 - A cache-version mismatch is a clean miss.
-- HKO New Year weeks combine the correct two station-year source pairs.
+- A stale station catalogue remains usable when refresh fails.
+- HKO New Year windows combine the correct two station-year source pairs.
 
 ### View-model tests
 
 - Current and selected locations remain isolated from the app's Live location
   consumers.
 - Switching Sun/Tides preserves location and selected day.
-- Changing location resets the day to destination-local today.
+- Changing location resets the day and rolling window to destination-local
+  today.
 - Restoring a fixed location does not restore an obsolete selected day.
 - Older asynchronous responses cannot overwrite newer selections.
 - Today countdowns use the destination or station time zone.
 - Unsupported tides never disable solar output.
+- Injected `now` controls all date-sensitive output deterministically.
 
 ### UI tests
 
@@ -849,10 +885,10 @@ Keep UI automation small and deterministic:
 
 1. Update the shell test to expect `Live`, `Field`, `Almanac`, `Footprint`, and
    `Settings`.
-2. Add one Almanac smoke test that launches with injected fixed location and
-   tide fixtures, opens Almanac, confirms the location/date context, switches
-   Sun to Tides, and sees the tide summary, chart accessibility label, and
-   station details.
+2. Add one Almanac smoke test that launches with an injected fixed time,
+   location, and tide fixtures, opens Almanac, confirms the location/date
+   context, switches Sun to Tides, and sees the tide summary, chart
+   accessibility label, and station details.
 
 UI tests must not require GPS permission, the current wall-clock date, or public
 network access. No screenshot-golden suite is required.
