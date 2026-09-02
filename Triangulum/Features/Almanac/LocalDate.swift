@@ -35,7 +35,8 @@ struct LocalDate: Codable, Hashable, Comparable {
         self.day = components.day ?? 0
     }
 
-    /// Local midnight of this date.
+    /// Local midnight of this date (01:00 on zones whose DST transition
+    /// skips midnight, e.g. America/Santiago's spring-forward day).
     func start(in timeZone: TimeZone) throws -> Date {
         try date(atHour: 0, in: timeZone)
     }
@@ -49,12 +50,10 @@ struct LocalDate: Codable, Hashable, Comparable {
     /// Local midnight of the following day. On DST days the interval to this
     /// instant can be 23 or 25 hours rather than 24.
     func endExclusive(in timeZone: TimeZone) throws -> Date {
-        let calendar = Self.calendar(in: timeZone)
-        let start = try start(in: timeZone)
-        guard let next = calendar.date(byAdding: .day, value: 1, to: start) else {
-            throw LocalDateError.invalidDate
-        }
-        return next
+        // Resolve the next civil day's own start: calendar day-arithmetic on
+        // this day's start would preserve the wall hour of a DST-shifted
+        // start (01:00 on a midnight-transition day), shortening the day.
+        try adding(days: 1, in: timeZone).start(in: timeZone)
     }
 
     /// The date `days` calendar days away in the destination's time zone.
@@ -84,24 +83,26 @@ struct LocalDate: Codable, Hashable, Comparable {
 
     private func date(atHour hour: Int, in timeZone: TimeZone) throws -> Date {
         let calendar = Self.calendar(in: timeZone)
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = day
-        components.hour = hour
-        guard let date = calendar.date(from: components) else {
-            throw LocalDateError.invalidDate
+        // DST zones that move midnight (e.g. America/Santiago) skip the 00:00
+        // wall time on their spring-forward day; Calendar resolves the gap to
+        // 01:00 (and reports nil on some platforms), so try 01:00 as well.
+        // Accept any resolved instant on the requested civil date — calendar
+        // arithmetic silently wraps overflowing components (Feb 30 → Mar 2),
+        // which still fails the same civil-date check below.
+        let candidates = hour == 0 ? [0, 1] : [hour]
+        for candidate in candidates {
+            var components = DateComponents()
+            components.year = year
+            components.month = month
+            components.day = day
+            components.hour = candidate
+            guard let date = calendar.date(from: components) else { continue }
+            let resolved = calendar.dateComponents([.year, .month, .day], from: date)
+            if resolved.year == year, resolved.month == month, resolved.day == day {
+                return date
+            }
         }
-        // `Calendar.date(from:)` silently wraps overflowing components
-        // (Feb 30 → Mar 2); the round trip rejects such dates.
-        let resolved = calendar.dateComponents([.year, .month, .day, .hour], from: date)
-        guard resolved.year == year,
-              resolved.month == month,
-              resolved.day == day,
-              resolved.hour == hour else {
-            throw LocalDateError.invalidDate
-        }
-        return date
+        throw LocalDateError.invalidDate
     }
 }
 

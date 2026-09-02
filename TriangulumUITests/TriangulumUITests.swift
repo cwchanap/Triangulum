@@ -36,10 +36,13 @@ final class TriangulumUITests: XCTestCase {
     }
 
     /// End-to-end smoke over the `-ui-testing` fixture only: the Almanac tab
-    /// restores the fixed Vancouver selection (September 15, 2026) with no
-    /// location prompts, wall clock, or network. The fixture's restored date
-    /// is not the device's today, so the Tides summary leads with the day's
-    /// first tide (no countdown) and the fixture station sits 0 m away.
+    /// restores the fixed Vancouver selection with the fixture's pinned
+    /// September 15, 2026 12:00 clock — no GPS prompts, wall clock, or
+    /// network. Every "today"/countdown judgment reads the injected fixture
+    /// clock, so the copy below is deterministic on any device date: the
+    /// selected day IS the fixture's station-local today, the summary leads
+    /// with the next tide (18:00 high, exactly 6h after the 12:00 clock), and
+    /// the Canadian notice row is pinned.
     @MainActor
     func testAlmanacFixtureShowsSunAndTides() throws {
         let app = makeApp()
@@ -60,12 +63,16 @@ final class TriangulumUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS %@", "Pacific Daylight Time"))
             .firstMatch.exists, "Destination time-zone line missing")
 
-        // Tides section: first-tide summary, chart accessibility summary,
-        // station, distance, datum, provider attribution, planning-only warning.
+        // Tides section: next-tide summary (fixture clock's station-local
+        // today) with its deterministic countdown, chart accessibility
+        // summary, station, distance, datum, provider attribution, the
+        // required Canadian notice, and the planning-only warning.
         app.buttons["Tides"].tap()
-        XCTAssertTrue(app.staticTexts["First tide"].waitForExistence(timeout: 8),
-                      "First-tide summary missing")
+        XCTAssertTrue(app.staticTexts["Next tide"].waitForExistence(timeout: 8),
+                      "Next-tide summary missing")
         XCTAssertTrue(app.staticTexts["Tuesday, September 15"].exists, "Summary date missing")
+        XCTAssertTrue(app.staticTexts["in 6h 00m"].exists,
+                      "Countdown to the 18:00 high from the 12:00 fixture clock missing")
 
         let chartSummary = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Tide chart for September 15, 2026"))
@@ -73,8 +80,18 @@ final class TriangulumUITests: XCTestCase {
         XCTAssertTrue(chartSummary.waitForExistence(timeout: 5),
                       "Tide chart accessibility summary missing")
 
+        // The station card's Canadian derivative-product notice sits above
+        // the planning-only warning; swipe until each is visible.
+        let notice = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS %@", "made by or for Triangulum"))
+            .firstMatch
+        for _ in 0..<8 where !notice.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(notice.exists, "Canadian attribution notice missing")
+
         let warning = app.staticTexts["Predictions are for planning only, not navigation."]
-        for _ in 0..<8 where !warning.exists {
+        for _ in 0..<6 where !warning.exists {
             app.swipeUp()
         }
         XCTAssertTrue(warning.exists, "Planning-only warning missing")

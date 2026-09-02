@@ -302,6 +302,113 @@ struct TideServiceTests {
         #expect(resolver.resolveCount == 1)
     }
 
+    /// Regression (C1): enrichment must reach everything downstream. The
+    /// resolved context's `selected` station has to be the ENRICHED row (the
+    /// same one `updateCatalogTimeZone` persisted), so cached days, refreshes,
+    /// and the view-model-published context all agree on the station's zone.
+    @Test func enrichmentReachesThePublishedContextAndTheRefreshDispatch() async throws {
+        let clock = Clock(Self.fetchedAt)
+        let cache = makeCache(clock: clock)
+        let unresolved = station(id: "07735", latitude: 49.2827, timeZoneIdentifier: nil)
+        let chsClient = FakeTideClient(
+            provider: .canadaCHS,
+            catalog: [unresolved],
+            week: try septemberWeek(station: unresolved, fetchedAt: clock.current)
+        )
+        let resolver = FakeTimeZoneResolver()
+        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache, timeZoneResolver: resolver)
+
+        let context = try await service.resolveStation(for: vancouverLocation(), override: nil)
+
+        #expect(context.selected.timeZoneIdentifier == "America/Vancouver")
+        #expect(context.selected.timeZone == context.timeZone)
+        #expect(resolver.resolveCount == 1)
+
+        // The enriched station (not the pre-enrichment copy) reaches the
+        // refresh dispatch, so GMT-bound clients derive their request window
+        // from the station's real zone instead of the UTC fallback.
+        _ = try await service.refreshRange(station: context.selected, range: Self.septemberRange)
+        #expect(chsClient.predictionRequests.count == 1)
+        #expect(chsClient.predictionRequests.first?.station.timeZoneIdentifier == "America/Vancouver")
+        #expect(resolver.resolveCount == 1) // already-zoned: no second geocode
+    }
+
+    // MARK: - Complete-response gate
+
+    /// Regression (I1): non-finite heights are malformed provider output and
+    /// must fail with the stable `.invalidProviderResponse` category before
+    /// any cache write.
+    @Test func refreshGateRejectsNonFiniteHeightsBeforeAnyCacheWrite() async throws {
+        let clock = Clock(Self.fetchedAt)
+        let cache = makeCache(clock: clock)
+        let vancouver = station(id: "07735", latitude: 49.2827)
+        let week = try septemberWeek(station: vancouver, fetchedAt: clock.current)
+        let noonSep3 = try LocalDate(year: 2026, month: 9, day: 3).noon(in: Self.vancouver)
+        let poisoned = TideWeek(
+            station: week.station,
+            localDateRange: week.localDateRange,
+            hourlySamples: week.hourlySamples + [TideSample(instant: noonSep3, heightMetres: .infinity)],
+            events: week.events,
+            fetchedAt: week.fetchedAt,
+            sourceAttribution: week.sourceAttribution
+        )
+        let chsClient = FakeTideClient(provider: .canadaCHS, week: poisoned)
+        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+
+        await #expect(throws: TideLoadError.invalidProviderResponse) {
+            try await service.refreshRange(station: vancouver, range: Self.septemberRange)
+        }
+        let snapshot = try await cache.loadDay(
+            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3)
+        )
+        #expect(snapshot == nil)
+    }
+
+    @Test func refreshGateRejectsSamplesOutsideTheRequestedRange() async throws {
+        let clock = Clock(Self.fetchedAt)
+        let cache = makeCache(clock: clock)
+        let vancouver = station(id: "07735", latitude: 49.2827)
+        let week = try septemberWeek(station: vancouver, fetchedAt: clock.current)
+        let outOfRange = try Self.septemberRange.start.start(in: Self.vancouver).addingTimeInterval(-3600)
+        let poisoned = TideWeek(
+            station: week.station,
+            localDateRange: week.localDateRange,
+            hourlySamples: week.hourlySamples + [TideSample(instant: outOfRange, heightMetres: 1.0)],
+            events: week.events,
+            fetchedAt: week.fetchedAt,
+            sourceAttribution: week.sourceAttribution
+        )
+        let chsClient = FakeTideClient(provider: .canadaCHS, week: poisoned)
+        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+
+        await #expect(throws: TideLoadError.invalidProviderResponse) {
+            try await service.refreshRange(station: vancouver, range: Self.septemberRange)
+        }
+        let snapshot = try await cache.loadDay(
+            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3)
+        )
+        #expect(snapshot == nil)
+    }
+
+    @Test func refreshGateRejectsAnotherStationsWeek() async throws {
+        let clock = Clock(Self.fetchedAt)
+        let cache = makeCache(clock: clock)
+        let vancouver = station(id: "07735", latitude: 49.2827)
+        // A complete, in-range week for a DIFFERENT station id.
+        let other = station(id: "OTHER", latitude: 49.2827)
+        let otherWeek = try septemberWeek(station: other, fetchedAt: clock.current)
+        let chsClient = FakeTideClient(provider: .canadaCHS, week: otherWeek)
+        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+
+        await #expect(throws: TideLoadError.invalidProviderResponse) {
+            try await service.refreshRange(station: vancouver, range: Self.septemberRange)
+        }
+        let snapshot = try await cache.loadDay(
+            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3)
+        )
+        #expect(snapshot == nil)
+    }
+
     @Test func catalogueRefreshMergesPreviouslyResolvedZones() async throws {
         // A stale catalogue whose station was enriched earlier; the fresh
         // provider row still lacks a zone.

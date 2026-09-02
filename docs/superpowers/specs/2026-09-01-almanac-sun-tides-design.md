@@ -1,7 +1,9 @@
 # Almanac Sun and Tide Tab
 
-**Date:** 2026-09-01  
-**Branch:** `docs/almanac-sun-tides-design`  
+**Date:** 2026-09-01
+
+**Branch:** `docs/almanac-sun-tides-design`
+
 **Status:** Approved design; implementation plan updated after reuse review
 
 ## Summary

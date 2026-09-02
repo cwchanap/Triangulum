@@ -267,6 +267,43 @@ struct AlmanacPresentationTests {
         #expect(day.sourceAttribution == "Canadian Hydrographic Service")
     }
 
+    // MARK: - Required derivative-product notices
+
+    /// Each non-U.S. provider's required notice wording is pinned verbatim
+    /// (docs/almanac-tide-source-contracts.md); NOAA data is U.S. public
+    /// domain, where source acknowledgment alone satisfies the contract.
+    @Test func attributionNoticesCarryTheRequiredLegalWording() {
+        #expect(TideProvider.canadaCHS.attributionNotice
+            == "This product is not to be used for navigation. This product was made by or for Triangulum "
+                + "and contains intellectual property (Data) of the Canadian Hydrographic Service of the "
+                + "Department of Fisheries and Oceans. The copyrights in the Data are and remain the "
+                + "property of His Majesty the King in Right of Canada and shall not be sold, licensed, "
+                + "leased, assigned or given to a third party. The incorporation of the Data in this "
+                + "product does not constitute an endorsement or an approval of this product by the "
+                + "Canadian Hydrographic Service, the Department of Fisheries and Oceans or His Majesty "
+                + "the King in Right of Canada.")
+        #expect(TideProvider.japanJMA.attributionNotice?.contains("Source: Japan Meteorological Agency website") == true)
+        #expect(TideProvider.japanJMA.attributionNotice?.contains("not presented as if created by the Government of Japan") == true)
+        #expect(TideProvider.hongKongHKO.attributionNotice?.contains("Government of the Hong Kong Special Administrative Region") == true)
+        #expect(TideProvider.hongKongHKO.attributionNotice?.contains("DATA.GOV.HK") == true)
+        #expect(TideProvider.unitedStatesNOAA.attributionNotice == nil)
+    }
+
+    // MARK: - Station time-zone row
+
+    @Test func stationTimeZoneRowShowsOnlyWhenTheStationZoneDiffersFromTheLocationZone() {
+        let tokyoZone = TimeZone(identifier: "Asia/Tokyo")!
+        let vancouverZone = TimeZone(identifier: "America/Vancouver")!
+        // Same zone (the common case): no row.
+        #expect(AlmanacTidesView.showsStationTimeZoneRow(stationZone: vancouverZone, locationZone: vancouverZone) == false)
+        // A station across a zone boundary from the Almanac location: row.
+        #expect(AlmanacTidesView.showsStationTimeZoneRow(stationZone: tokyoZone, locationZone: vancouverZone) == true)
+        #expect(AlmanacTidesView.showsStationTimeZoneRow(stationZone: vancouverZone, locationZone: tokyoZone) == true)
+        // Unknown zones hide the row rather than guess.
+        #expect(AlmanacTidesView.showsStationTimeZoneRow(stationZone: nil, locationZone: vancouverZone) == false)
+        #expect(AlmanacTidesView.showsStationTimeZoneRow(stationZone: vancouverZone, locationZone: nil) == false)
+    }
+
     @Test func cacheStateFormattingDistinguishesCachedFromUpdated() {
         let fetchedAt = localDate(2026, 9, 15, 12)
         #expect(AlmanacTidesView.updatedRowText(fetchedAt: fetchedAt, isStale: false, timeZone: vancouverTimeZone)

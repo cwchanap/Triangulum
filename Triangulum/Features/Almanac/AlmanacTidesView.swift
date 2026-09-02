@@ -13,7 +13,10 @@ import SwiftUI
 /// pull-to-refresh.
 struct AlmanacTidesView: View {
     @ObservedObject var viewModel: AlmanacViewModel
-    @State private var now = Date()
+    /// Render trigger only: every today/countdown judgment reads the view
+    /// model's injected clock, so the -ui-testing fixture stays deterministic
+    /// and this tick (at most once per minute) keeps production copy fresh.
+    @State private var minuteTick = 0
     @State private var showsStationSheet = false
 
     /// Spec: countdown updates at most once per minute.
@@ -97,7 +100,7 @@ struct AlmanacTidesView: View {
         .refreshable {
             await viewModel.loadTides(forceRefresh: true)
         }
-        .onReceive(minuteTimer) { now = $0 }
+        .onReceive(minuteTimer) { _ in minuteTick += 1 }
         .sheet(isPresented: $showsStationSheet) {
             if let context = viewModel.stationContext {
                 NavigationStack {
@@ -130,7 +133,7 @@ struct AlmanacTidesView: View {
     private var sectionContent: some View {
         if let context = viewModel.stationContext {
             if let day = viewModel.tideDay {
-                let isToday = LocalDate(now, in: context.timeZone) == day.localDate
+                let isToday = viewModel.today(in: context.timeZone) == day.localDate
 
                 if viewModel.tideIsStale {
                     CelInlineMessage(text: Self.offlinePredictionsText,
@@ -165,7 +168,7 @@ struct AlmanacTidesView: View {
     // MARK: - Summary
 
     private func summaryCard(day: TideDay, context: TideStationContext, isToday: Bool) -> some View {
-        let event = Self.summaryEvent(day: day, isToday: isToday, now: now)
+        let event = Self.summaryEvent(day: day, isToday: isToday, now: viewModel.currentDate)
 
         return VStack(alignment: .leading, spacing: CelSpace.sm) {
             InstrumentHeader(icon: "water.waves", title: Self.summaryTitle(day: day, isToday: isToday),
@@ -195,7 +198,7 @@ struct AlmanacTidesView: View {
                     }
                     Spacer()
                     if isToday {
-                        Text(AlmanacText.countdownText(from: now, to: event.instant))
+                        Text(AlmanacText.countdownText(from: viewModel.currentDate, to: event.instant))
                             .font(.celReadout(16))
                             .foregroundStyle(Color.celAmber)
                     }
@@ -216,7 +219,7 @@ struct AlmanacTidesView: View {
     }
 
     private func dayStart(_ day: TideDay, in timeZone: TimeZone) -> Date {
-        (try? day.localDate.start(in: timeZone)) ?? Date()
+        (try? day.localDate.start(in: timeZone)) ?? viewModel.currentDate
     }
 
     // MARK: - Chart
@@ -229,7 +232,7 @@ struct AlmanacTidesView: View {
             TideChartView(
                 day: day,
                 timeZone: context.timeZone,
-                now: isToday ? now : nil
+                now: isToday ? viewModel.currentDate : nil
             )
             Text("Official hourly predictions; markers show the exact high and low waters. Linear chart, no sub-hour precision.")
                 .font(.system(size: 10, design: .monospaced))
@@ -284,11 +287,25 @@ struct AlmanacTidesView: View {
 
     // MARK: - Station card
 
+    /// Whether the station's own zone differs from the Almanac LOCATION's
+    /// zone: the station card then shows the station-local time (and the
+    /// amber pill). The location zone — not the context zone, which is the
+    /// station's own — is the comparison baseline, so the row appears only
+    /// when the station really does sit in another zone.
+    static func showsStationTimeZoneRow(stationZone: TimeZone?, locationZone: TimeZone?) -> Bool {
+        guard let stationZone, let locationZone else { return false }
+        return stationZone.identifier != locationZone.identifier
+    }
+
     private func stationCard(day: TideDay, context: TideStationContext) -> some View {
-        VStack(alignment: .leading, spacing: CelSpace.xs) {
+        let stationZoneDiffers = Self.showsStationTimeZoneRow(
+            stationZone: day.station.timeZone,
+            locationZone: viewModel.location?.timeZone
+        )
+
+        return VStack(alignment: .leading, spacing: CelSpace.xs) {
             InstrumentHeader(icon: "mappin.and.ellipse", title: "Station", tint: .celGold) {
-                if let stationZone = day.station.timeZone,
-                   stationZone.identifier != context.timeZone.identifier {
+                if stationZoneDiffers {
                     StatusPill("Local time zone", color: .celAmber)
                 }
             }
@@ -300,8 +317,7 @@ struct AlmanacTidesView: View {
 
                 stationRow(label: "Distance",
                            value: Self.distanceText(metres: context.distanceMetres))
-                if let stationZone = day.station.timeZone,
-                   stationZone.identifier != context.timeZone.identifier {
+                if stationZoneDiffers, let stationZone = day.station.timeZone {
                     stationRow(label: "Local time",
                                value: AlmanacText.timeZoneLine(stationZone, at: contextAnchor(day: day, in: stationZone)))
                 }
@@ -311,6 +327,15 @@ struct AlmanacTidesView: View {
                            value: Self.updatedRowText(fetchedAt: day.fetchedAt,
                                                       isStale: viewModel.tideIsStale,
                                                       timeZone: context.timeZone))
+                // Required derivative-product notice, next to the source
+                // attribution (TideProvider.attributionNotice).
+                if let notice = day.station.provider.attributionNotice {
+                    Text(notice)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(Color.celTextFaint)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, CelSpace.xs)
+                }
             }
 
             Button {

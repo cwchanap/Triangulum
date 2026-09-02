@@ -31,10 +31,12 @@ struct UnitedStatesTideClientTests {
         let lat: Double?
         let lng: Double?
         let referenceID: String?
+        let state: String?
 
         enum CodingKeys: String, CodingKey {
             case id, name, type, lat, lng
             case referenceID = "reference_id"
+            case state
         }
     }
 
@@ -91,9 +93,30 @@ struct UnitedStatesTideClientTests {
             type: "S",
             lat: 14.5,
             lng: -61.0,
-            referenceID: "9414290"
+            referenceID: "9414290",
+            state: ""
         )
         return try JSONEncoder().encode(Catalog(stations: catalog.stations + [subordinate]))
+    }
+
+    /// Canonical fixture rows plus one schema-faithful NON-U.S. type "R"
+    /// row: valid coordinates, empty `reference_id`, hourly-capable (the
+    /// catalogue is `type=tidepredictions`), but no U.S. jurisdiction
+    /// (`state` is empty) — it must be excluded by the jurisdiction filter.
+    private func catalogWithForeignReferenceRow() throws -> Data {
+        var catalog = try JSONDecoder().decode(
+            Catalog.self, from: AlmanacFixtureLoader.data("NOAA/stations-selection.json")
+        )
+        let foreign = CatalogRow(
+            id: "8888888",
+            name: "FOREIGN PORT (Test)",
+            type: "R",
+            lat: 18.55,
+            lng: -72.35,
+            referenceID: nil,
+            state: ""
+        )
+        return try JSONEncoder().encode(Catalog(stations: catalog.stations + [foreign]))
     }
 
     private func sanFrancisco(from client: UnitedStatesTideClient) async throws -> TideStation {
@@ -133,6 +156,24 @@ struct UnitedStatesTideClientTests {
         #expect(sanFrancisco.datumLabel == "MLLW")
         #expect(sanFrancisco.supportsHourlyCurve)
         #expect(sanFrancisco.provider == .unitedStatesNOAA)
+    }
+
+    /// Regression (C5): a type "R" row that would pass every other filter
+    /// (reference/harmonic, no reference_id, valid coordinates, hourly
+    /// capable) must still be excluded when it has no valid U.S.
+    /// jurisdiction — non-U.S. rows carry no `state`.
+    @Test func catalogExcludesSchemaFaithfulForeignTypeRRows() async throws {
+        let (session, recorder, cleanup) = makeSession(routes: [
+            Self.catalogURL: .success((200, try catalogWithForeignReferenceRow()))
+        ])
+        defer { cleanup() }
+        let client = UnitedStatesTideClient(session: session)
+
+        let stations = try await client.loadStationCatalog()
+
+        #expect(recorder.urls == [URL(string: Self.catalogURL)!])
+        #expect(stations.count == 1)
+        #expect(stations.first?.id == "9414290")
     }
 
     // MARK: - Predictions
@@ -225,6 +266,50 @@ struct UnitedStatesTideClientTests {
             Issue.record("Expected a network failure")
         } catch {
             #expect((error as? TideLoadError) == .networkUnavailable)
+        }
+    }
+
+    /// Regression (C2): the inclusive GMT end date must cover the range's
+    /// final instant. A range ending 2026-09-07 in Los Angeles ends at
+    /// 2026-09-08 00:00 PDT = 07:00Z — the final local evening falls on the
+    /// NEXT GMT day, so the request must carry end_date=20260908 (the old
+    /// derivation from the last local day's start sent 20260907 and dropped
+    /// that evening's predictions).
+    @Test func loadPredictionsEndDateCoversTheFinalLocalEveningForWesternStations() async throws {
+        let (session, recorder, cleanup) = makeSession(routes: [:])
+        defer { cleanup() }
+        let client = UnitedStatesTideClient(session: session)
+        let losAngeles = TideStation(
+            id: "9414290",
+            provider: .unitedStatesNOAA,
+            providerStationCode: "9414290",
+            name: "SAN FRANCISCO (Golden Gate)",
+            latitude: 37.80630555555555,
+            longitude: -122.4658888888889,
+            timeZoneIdentifier: "America/Los_Angeles",
+            datumLabel: "MLLW",
+            supportsHourlyCurve: true
+        )
+        let range = LocalDateRange(
+            start: LocalDate(year: 2026, month: 9, day: 1),
+            endInclusive: LocalDate(year: 2026, month: 9, day: 7)
+        )
+
+        do {
+            _ = try await client.loadPredictions(station: losAngeles, range: range)
+            Issue.record("Expected the unrouted datagetter request to fail")
+        } catch {
+            // The 404 route below surfaces as .networkUnavailable; the URL
+            // assertion is what this test checks.
+            #expect((error as? TideLoadError) == .networkUnavailable)
+        }
+
+        let datagetterURLs = recorder.urls.map(\.absoluteString)
+            .filter { $0.contains("datagetter") }
+        #expect(datagetterURLs.count == 2)
+        for url in datagetterURLs {
+            #expect(url.contains("begin_date=20260901"), "GMT begin date must start the range")
+            #expect(url.contains("end_date=20260908"), "GMT end date must cover the final local evening")
         }
     }
 }
