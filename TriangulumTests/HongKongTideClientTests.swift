@@ -283,4 +283,56 @@ struct HongKongTideClientTests {
         #expect(cachedHourly != nil)
         #expect(cachedHilo != nil)
     }
+
+    /// A 200-with-garbage response (captive portal, proxy error page) is
+    /// rejected AND not persisted for either source kind — otherwise it
+    /// would re-poison every call until source expiry.
+    @Test func garbage200IsNotCachedAndLaterGoodFetchRecovers() async throws {
+        let cache = try makeCache()
+        var serveGarbage = true
+        let recorder = RequestRecorder()
+        let (session, cleanup) = TestURLSessionHelper.makeSession { request in
+            let url = try #require(request.url)
+            recorder.record(url)
+            let data = serveGarbage
+                ? Data("<html>captive portal</html>".utf8)
+                : try AlmanacFixtureLoader.data(
+                    url.absoluteString == Self.hourlyURL2026
+                        ? "HKO/tai-po-kau-2026-hourly.csv"
+                        : "HKO/tai-po-kau-2026-hilo.csv"
+                )
+            return TestURLSessionHelper.httpResponse(url: url, statusCode: 200, data: data)
+        }
+        defer { cleanup() }
+        let client = HongKongTideClient(session: session, cache: cache)
+
+        do {
+            _ = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+            Issue.record("Expected a garbage-200 rejection")
+        } catch {
+            #expect((error as? TideLoadError) == .invalidProviderResponse)
+        }
+        #expect(try await cache.loadSource(
+            provider: .hongKongHKO, stationID: "TPK", year: 2026, kind: .hourly
+        ) == nil)
+        #expect(try await cache.loadSource(
+            provider: .hongKongHKO, stationID: "TPK", year: 2026, kind: .hilo
+        ) == nil)
+
+        // Once the provider recovers, a later good fetch succeeds and is cached.
+        serveGarbage = false
+        let week = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+        #expect(week.hourlySamples.count == 119)
+        #expect(recorder.urls == [
+            URL(string: Self.hourlyURL2026)!,
+            URL(string: Self.hourlyURL2026)!,
+            URL(string: Self.hiloURL2026)!
+        ])
+        #expect(try await cache.loadSource(
+            provider: .hongKongHKO, stationID: "TPK", year: 2026, kind: .hourly
+        ) != nil)
+        #expect(try await cache.loadSource(
+            provider: .hongKongHKO, stationID: "TPK", year: 2026, kind: .hilo
+        ) != nil)
+    }
 }

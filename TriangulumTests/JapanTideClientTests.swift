@@ -279,4 +279,51 @@ struct JapanTideClientTests {
             #expect((error as? TideLoadError) == .invalidProviderResponse)
         }
     }
+
+    /// A 200-with-garbage response (captive portal, proxy error page) is
+    /// rejected AND not persisted — otherwise it would re-poison every call
+    /// for that station/year until source expiry.
+    @Test func garbage200IsNotCachedAndLaterGoodFetchRecovers() async throws {
+        let cache = try makeCache()
+        var serveGarbage = true
+        let recorder = RequestRecorder()
+        let (session, cleanup) = TestURLSessionHelper.makeSession { request in
+            let url = try #require(request.url)
+            recorder.record(url)
+            let data = serveGarbage
+                ? Data("<html>captive portal</html>".utf8)
+                : try AlmanacFixtureLoader.data("JMA/tokyo-2026.txt")
+            return TestURLSessionHelper.httpResponse(url: url, statusCode: 200, data: data)
+        }
+        defer { cleanup() }
+        let client = JapanTideClient(session: session, cache: cache)
+
+        let range = LocalDateRange(
+            start: LocalDate(year: 2026, month: 1, day: 15),
+            endInclusive: LocalDate(year: 2026, month: 1, day: 16)
+        )
+
+        do {
+            _ = try await client.loadPredictions(station: try tokyo(), range: range)
+            Issue.record("Expected a garbage-200 rejection")
+        } catch {
+            #expect((error as? TideLoadError) == .invalidProviderResponse)
+        }
+        let poisoned = try await cache.loadSource(
+            provider: .japanJMA, stationID: "TK", year: 2026, kind: .annual
+        )
+        #expect(poisoned == nil)
+
+        // Once the provider recovers, a later good fetch succeeds and is cached.
+        serveGarbage = false
+        let week = try await client.loadPredictions(station: try tokyo(), range: range)
+        #expect(week.hourlySamples.count == 47)
+        #expect(recorder.urls == [
+            URL(string: Self.annualURL2026)!,
+            URL(string: Self.annualURL2026)!
+        ])
+        #expect(try await cache.loadSource(
+            provider: .japanJMA, stationID: "TK", year: 2026, kind: .annual
+        ) != nil)
+    }
 }
