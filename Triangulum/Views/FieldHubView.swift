@@ -3,6 +3,7 @@ import SwiftUI
 enum ProductTab: Hashable {
     case live
     case field
+    case almanac
     case footprint
     case settings
 
@@ -10,6 +11,7 @@ enum ProductTab: Hashable {
         switch self {
         case .live: "Live"
         case .field: "Field"
+        case .almanac: "Almanac"
         case .footprint: "Footprint"
         case .settings: "Settings"
         }
@@ -19,6 +21,7 @@ enum ProductTab: Hashable {
         switch self {
         case .live: "waveform.path.ecg"
         case .field: "map"
+        case .almanac: "calendar"
         case .footprint: "square.stack.3d.up"
         case .settings: "gearshape"
         }

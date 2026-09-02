@@ -119,6 +119,7 @@ Triangulum/
 │   ├── CelestialTheme.swift       # Color tokens, gradients, typography, spacing scale
 │   ├── CelestialComponents.swift   # Reusable cards, readouts, bars, status pills, inline messages
 │   └── Starfield.swift            # Animated starfield background (Canvas + TimelineView)
+├── Features/Almanac/  # location/date almanac, solar projection, tide providers/cache/UI
 ├── Views/           # SwiftUI view components
 │   ├── ContentView.swift          # Main app interface with sensor widgets
 │   ├── BarometerView.swift        # Barometer sensor display
@@ -152,6 +153,8 @@ Triangulum/
 ├── Config.swift     # Centralized configuration with Keychain integration
 └── PrivacyInfo.plist # Privacy manifest for App Store compliance
 ```
+
+Cohesive feature-local code may live under `Triangulum/Features/<FeatureName>/` (see `Features/Almanac/` above for the convention: feature state, providers, cache, and UI shipped together). Existing sensor surfaces remain in `Views/Managers/Models/Utilities` and are not reorganized into feature folders.
 
 ## Development Notes
 

@@ -10,5 +10,6 @@ extension Logger {
     static let satellite = Logger(subsystem: subsystem, category: "satellite")
     static let map = Logger(subsystem: subsystem, category: "map")
     static let snapshot = Logger(subsystem: subsystem, category: "snapshot")
+    static let almanac = Logger(subsystem: subsystem, category: "almanac")
     static let app = Logger(subsystem: subsystem, category: "app")
 }
