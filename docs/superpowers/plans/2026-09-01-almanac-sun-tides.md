@@ -2,30 +2,33 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a fifth Almanac tab that shows destination-local solar events worldwide and official predicted tides for Canada, the United States, Japan, and Hong Kong, with nearest-station selection and offline caching.
+**Goal:** Add a fifth Almanac tab that shows destination-local solar events worldwide and official predicted tides for Canada, the United States, Japan, and Hong Kong, with nearest-station selection and offline reuse.
 
-**Architecture:** Keep the feature under `Triangulum/Features/Almanac/`. `AlmanacViewModel` owns Almanac-only location, rolling seven-day range, selected day, and Sun/Tides state. `TideService` uses one explicit closed `TideProvider` switch, a selected-station time-zone resolver, and one actor-backed disk cache. Provider tests reuse the repo's existing token-isolated `URLProtocol` seam after extracting it to a shared test helper; SwiftUI smoke tests likewise reuse one shared render host. There is no backend, package dependency, runtime provider registry, or SwiftData migration.
+**Architecture:** Keep the feature under `Triangulum/Features/Almanac/`. `AlmanacViewModel` owns Almanac-only location, the rolling seven-day strip, selected day, and Sun/Tides state. `TideService` uses one closed `TideProvider` switch, the same injected enabled-provider set as coverage routing, selected-station time-zone resolution, and one actor-backed file cache. Provider tests reuse the existing token-isolated weather `URLProtocol` after extracting it to a shared helper; SwiftUI smoke tests reuse the existing UIWindow-retaining render host. There is no backend, package dependency, runtime registry, SwiftData migration, or bundled runtime data-resource layer.
 
-**Tech Stack:** Swift 5 language mode (`SWIFT_VERSION = 5.0`) on the repository's current latest-stable Xcode/Swift toolchain, SwiftUI, Swift Charts, MapKit, CoreLocation, Foundation `URLSession`/`FileManager`/`UserDefaults`, Swift Testing, XCTest UI tests, SwiftLint, iOS 18.5+. Match the repo's existing concurrency seams: `@MainActor` for feature UI/state that owns published values, an `actor` for disk-cache serialization, injected `URLSession` for networking, and no whole-app isolation migration.
+**Tech Stack:** Swift 5 language mode (`SWIFT_VERSION = 5.0`) on the repository's current latest-stable Xcode/Swift toolchain, SwiftUI, Swift Charts, MapKit, CoreLocation, Foundation `URLSession`/`FileManager`/`UserDefaults`, Swift Testing, XCTest UI tests, SwiftLint, iOS 18.5+. Match existing concurrency seams: `@MainActor` for published feature state, an `actor` for disk-cache serialization, injected `URLSession` for networking, cancellable tasks plus generation-token checks for async result application, and no whole-app isolation migration.
 
 **Spec:** `docs/superpowers/specs/2026-09-01-almanac-sun-tides-design.md`
 
 ## Global Constraints
 
-- Deliver all implementation in this one PR; incremental task commits remain in this PR.
-- Do not edit `Triangulum.xcodeproj/project.pbxproj`; the project uses file-system-synchronised groups.
-- Add no package, backend, reachability monitor, background refresh, favourites system, SwiftData model, or generic dependency container.
-- Use `LocalDate` for destination/station civil days and `Date` for event instants.
+- Deliver the approved Sun + Canada + United States + Japan + Hong Kong scope in this **single PR**. Incremental task commits remain in this PR.
+- Do not edit `Triangulum.xcodeproj/project.pbxproj`; test fixtures are source-relative test files and JMA/HKO production station catalogues are compiled Swift data, so no new resource membership is required.
+- Add no package, backend, reachability monitor, background refresh, favourites system, SwiftData model, AsyncStream, runtime registry, or generic DI container.
+- Use `LocalDate` for destination/station civil dates and `Date` for event instants.
 - Use selected-location time for Sun and selected-station time for Tides.
 - Keep Sun available worldwide; Tides is limited to Canada, the United States, Japan, and Hong Kong.
 - Plot official hourly tide points with default/linear `LineMark` interpolation and exact official high/low `PointMark`s. Do not use Catmull-Rom interpolation, `AreaMark`, or synthetic finer precision.
 - Auto-select only an eligible station within 250 km and show at most eight manual alternatives.
-- Preserve a complete stale cache after refresh failure; never replace it with a partial provider response.
+- Normalize fetched tide ranges only after both hourly and exact high/low inputs are complete. A partial provider response writes nothing.
+- Store normalized prediction cache entries by **provider + station + local day**, so tomorrow can reuse the six overlapping days already cached.
+- Treat normalized prediction days and remotely fetched station catalogues as fresh for 30 days; explicit pull-to-refresh remains available. Complete stale data remains usable if refresh fails.
 - Provider tests use checked-in slim fixtures and injected `URLSession`; automated tests make no public requests.
+- Test-only source fixtures load through one `#filePath`-anchored helper. Do not add test-bundle resource plumbing.
 - Reuse one shared test `URLProtocol` transport and one shared SwiftUI render host; do not create Almanac-only copies.
 - Run tests with `-parallel-testing-enabled NO`.
 - Display provider attribution, datum, update state, and `Predictions are for planning only, not navigation.`
-- A provider is routed only when it is present in `TideProvider.enabled`; a source-contract failure removes it from that set and surfaces `.providerUnavailable` while Sun continues to work.
+- `TideProvider.enabled` is only the production default. `TideCoverageResolver`, `TideService`, and `AlmanacDependencies.live()` must all consume the same injected enabled-provider set so disabled-provider behavior is directly testable.
 
 ## Local Command Setup
 
@@ -35,15 +38,16 @@ export TRIANGULUM_IPHONE_DESTINATION='platform=iOS Simulator,name=iPhone 17'
 export TRIANGULUM_IPAD_DESTINATION='platform=iOS Simulator,name=iPad Pro 13-inch (M4)'
 ```
 
-Replace either destination with an exact available simulator name from `-showdestinations` when that model is not installed.
+Replace either destination with an exact available simulator from `-showdestinations` when that model is unavailable.
 
 ---
 
-### Task 1: Lock slim source fixtures, provider enablement, and attribution
+### Task 1: Lock four source contracts, slim fixtures, and the typed provider gate
 
 **Files:**
 - Create: `docs/almanac-tide-source-contracts.md`
 - Create: `Triangulum/Features/Almanac/TideProvider.swift`
+- Create: `TriangulumTests/AlmanacFixtureLoader.swift`
 - Create: `TriangulumTests/TideProviderTests.swift`
 - Create: `TriangulumTests/Fixtures/Almanac/CHS/stations-vancouver.json`
 - Create: `TriangulumTests/Fixtures/Almanac/CHS/vancouver-hourly.json`
@@ -57,14 +61,14 @@ Replace either destination with an exact available simulator name from `-showdes
 - Create: `TriangulumTests/Fixtures/Almanac/HKO/tai-po-kau-2026-hilo.csv`
 
 **Interfaces:**
-- Produces: `TideProvider`, `TideProvider.enabled`, provider attribution/source metadata, and immutable slim fixtures used by later parser tests.
+- Produces: `TideProvider`, the production default `TideProvider.enabled`, provider attribution, one source-relative fixture loader, and canonical slim source fixtures used by Tasks 5–6.
 
-- [ ] **Step 1: Verify and record the four official source contracts**
+- [ ] **Step 1: Verify and record all four official source contracts**
 
 Create `docs/almanac-tide-source-contracts.md` with one section per provider containing:
 
 ```text
-runtime catalogue URL or bundled-catalogue source
+runtime catalogue URL or static-catalogue source
 runtime prediction URL form
 direct iOS-use status
 required attribution / derivative-product notice
@@ -89,9 +93,20 @@ HKO HLT: https://data.gov.hk/en-data/dataset/hk-hko-rss-times-and-heights-of-hig
 DATA.GOV.HK terms: https://data.gov.hk/en/terms-and-conditions
 ```
 
-For CHS, record the current documented `tide tables` endpoint for exact high/low events rather than inventing a `wlp-hilo` series if the Swagger contract does not expose one. The source-contract document is authoritative for the exact runtime request shape implemented later.
+For CHS, use the documented IWLS **tide tables** endpoint for exact high/low predictions and the `wlp` data series for hourly predictions. Task 1 does not pass until the exact request forms have produced a non-empty Vancouver hourly fixture and a non-empty Vancouver high/low fixture.
 
-- [ ] **Step 2: Add the typed provider gate**
+For every intended provider, Task 1 passes only when both source forms needed by the common model have been captured and validated:
+
+```text
+CHS: hourly + high/low
+NOAA: interval=h + interval=hilo
+JMA: one fixed-width annual file containing hourly + exact highs/lows
+HKO: HHOT + HLT
+```
+
+If a provider cannot satisfy direct-use terms or both prediction forms on the implementation date, keep its enum case but omit it from `TideProvider.enabled`; later coverage reports `.providerUnavailable` and Sun remains functional. Do not invent another endpoint or add a proxy.
+
+- [ ] **Step 2: Add the closed provider enum and production default**
 
 ```swift
 enum TideProvider: String, CaseIterable, Codable, Hashable {
@@ -118,25 +133,9 @@ enum TideProvider: String, CaseIterable, Codable, Hashable {
 }
 ```
 
-Only keep a case in `enabled` after Step 1 verifies direct use and complete hourly-plus-high/low prediction availability. Keep all four enum cases so an otherwise supported jurisdiction can distinguish `.providerUnavailable` from `.unsupportedRegion`.
+Edit the `enabled` set in this task if Step 1 disables a source. Do not remove enum cases; supported-but-disabled must remain distinguishable from unsupported geography.
 
-Add tests:
-
-```swift
-@Test func enabledProvidersHaveAttribution() {
-    #expect(TideProvider.enabled.allSatisfy { !$0.attribution.isEmpty })
-}
-
-@Test func expectedProvidersAreRepresented() {
-    #expect(Set(TideProvider.allCases) == [
-        .canadaCHS, .unitedStatesNOAA, .japanJMA, .hongKongHKO
-    ])
-}
-```
-
-- [ ] **Step 3: Capture live data, then check in only slim fixtures**
-
-Capture full catalogues to a temporary directory, never directly into the repository:
+- [ ] **Step 3: Capture full source data temporarily, then commit only named slim fixtures**
 
 ```bash
 set -euo pipefail
@@ -147,8 +146,6 @@ mkdir -p TriangulumTests/Fixtures/Almanac/{CHS,NOAA,JMA,HKO}
 curl -fsSL 'https://api-iwls.dfo-mpo.gc.ca/api/v1/stations' > "$TMP_DIR/chs-stations.json"
 jq '[.[] | select(.code == "07735")]' "$TMP_DIR/chs-stations.json" \
   > TriangulumTests/Fixtures/Almanac/CHS/stations-vancouver.json
-
-test "$(jq 'length' TriangulumTests/Fixtures/Almanac/CHS/stations-vancouver.json)" -eq 1
 
 curl -fsSL 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions' \
   > "$TMP_DIR/noaa-stations.json"
@@ -161,21 +158,59 @@ reference = next(row for row in rows if row['id'] == '9414290')
 subordinate = next(row for row in rows if row.get('type') == 'S')
 json.dump({'stations': [reference, subordinate]}, open(dst, 'w', encoding='utf-8'), indent=2)
 PY
-
-test "$(jq '.stations | length' TriangulumTests/Fixtures/Almanac/NOAA/stations-selection.json)" -eq 2
 ```
 
-The current NOAA `tidepredictions` catalogue does not expose the review's old `TEC`/`TWC` example. Prove non-U.S. filtering in `UnitedStatesTideClientTests` with one tiny schema-faithful in-memory row using `state: "TEC"`; do not make the canonical capture depend on a row absent from the live source.
+Capture the provider prediction fixtures using the exact URLs recorded in `docs/almanac-tide-source-contracts.md`.
 
-Capture the prediction responses named above using the exact verified request forms from `docs/almanac-tide-source-contracts.md`.
+For JMA, retain only the official `TK` station audit row and the `TK.txt` annual file used by the parser. Do not check in or parse the station HTML page.
 
-For JMA, check in only the official `TK` station audit record and the annual `TK.txt` prediction file used by parser tests. Do **not** check in or parse `stations-2026.html`.
+For HKO, retain only the CSV header plus representative Tai Po Kau rows needed by parser tests; the fixture need not contain the full annual download.
 
-For HKO, check in only Tai Po Kau annual hourly/high-low samples required by parser tests, trimmed to the header plus representative rows spanning the selected test dates.
+Record full capture URLs and the capture date in the source-contract document. Do not commit full CHS/NOAA catalogues.
 
-Record the original full URLs and capture date in `docs/almanac-tide-source-contracts.md` so fixture provenance is auditable without committing multi-megabyte catalogues.
+- [ ] **Step 4: Add a source-relative fixture loader and prove every enabled provider has readable non-empty fixtures**
 
-- [ ] **Step 4: Verify the source gate and commit**
+```swift
+enum AlmanacFixtureLoader {
+    private static let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .appendingPathComponent("Fixtures/Almanac", isDirectory: true)
+
+    static func data(_ relativePath: String) throws -> Data {
+        let data = try Data(contentsOf: root.appendingPathComponent(relativePath))
+        guard !data.isEmpty else { throw FixtureError.empty(relativePath) }
+        return data
+    }
+}
+```
+
+`TideProviderTests` must open the checked-in files, not merely assert attribution strings:
+
+```swift
+@Test func canonicalFixturesAreReadableAndNonEmpty() throws {
+    let required = [
+        "CHS/stations-vancouver.json",
+        "CHS/vancouver-hourly.json",
+        "CHS/vancouver-hilo.json",
+        "NOAA/stations-selection.json",
+        "NOAA/san-francisco-hourly.json",
+        "NOAA/san-francisco-hilo.json",
+        "JMA/tokyo-station.txt",
+        "JMA/tokyo-2026.txt",
+        "HKO/tai-po-kau-2026-hourly.csv",
+        "HKO/tai-po-kau-2026-hilo.csv"
+    ]
+    for path in required {
+        #expect(try !AlmanacFixtureLoader.data(path).isEmpty)
+    }
+}
+```
+
+Also assert the basic source shape: JSON decodes where expected, NOAA has `.predictions`, JMA data records have the documented 136-byte width, and HKO fixtures contain the captured headers.
+
+This deliberately avoids `Bundle(for:)`: the fixture files are test-only source artifacts and do not need runtime resource membership.
+
+- [ ] **Step 5: Verify the source gate and commit**
 
 ```bash
 xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum \
@@ -188,9 +223,10 @@ git diff --check
 
 git add docs/almanac-tide-source-contracts.md \
   Triangulum/Features/Almanac/TideProvider.swift \
+  TriangulumTests/AlmanacFixtureLoader.swift \
   TriangulumTests/TideProviderTests.swift \
   TriangulumTests/Fixtures/Almanac
-git commit -m 'docs: lock Almanac tide source contracts and slim fixtures'
+git commit -m 'docs: lock Almanac tide source contracts and fixtures'
 ```
 
 ---
@@ -204,12 +240,12 @@ git commit -m 'docs: lock Almanac tide source contracts and slim fixtures'
 - Create: `TriangulumTests/AlmanacPreferencesStoreTests.swift`
 
 **Interfaces:**
-- Produces: `LocalDate`, `LocalDateRange`, `AlmanacLocation`, `TideStationOverride`, `AlmanacPreferences`, and `AlmanacPreferencesStore`.
+- Produces: `LocalDate`, `LocalDateRange`, `AlmanacLocation`, `TideStationOverride`, `AlmanacPreferences`, and `AlmanacPreferencesStore` used by every later task.
 
-- [ ] **Step 1: Write failing local-date and persistence tests**
+- [ ] **Step 1: Write failing date and preference tests**
 
 ```swift
-@Test func sameInstantMapsToDestinationLocalDates() {
+@Test func sameInstantMapsToDifferentDestinationDates() {
     let instant = ISO8601DateFormatter().date(from: "2026-09-01T06:30:00Z")!
     let vancouver = TimeZone(identifier: "America/Vancouver")!
     let tokyo = TimeZone(identifier: "Asia/Tokyo")!
@@ -225,7 +261,7 @@ git commit -m 'docs: lock Almanac tide source contracts and slim fixtures'
 }
 ```
 
-Also test seven-day ranges crossing year boundaries, exact destination-local noon creation across DST, preference round-trip, corrupt JSON returning `.default`, and station override persistence.
+Also cover a 25-hour fall day, seven-day ranges across year boundaries, destination-local noon construction, preference round-trip, corrupt JSON returning `.default`, and station-override persistence.
 
 Run and expect missing-type failures:
 
@@ -293,7 +329,7 @@ struct AlmanacPreferencesStore {
 }
 ```
 
-Use an explicit Gregorian calendar with the supplied `TimeZone`. `noon(in:)` constructs hour 12 from date components; it must not use `start + 12h`, which is wrong on DST transition days. Invalid calendar construction throws `LocalDateError.invalidDate`. Store one JSON value in `UserDefaults`; add no migration code.
+Use an explicit Gregorian calendar with the supplied `TimeZone`. `noon(in:)` constructs hour 12 from calendar components; do not use `start + 12h` across DST changes. Invalid construction throws `LocalDateError.invalidDate`. Store one JSON preference value; add no migration machinery.
 
 - [ ] **Step 3: Verify and commit**
 
@@ -312,7 +348,7 @@ git commit -m 'feat: add Almanac local date and selection state'
 
 ---
 
-### Task 3: Move solar calculations to destination time and reuse `Astronomer.altAz` for polar state
+### Task 3: Move solar calculations to destination time and typed event kinds
 
 **Files:**
 - Create: `Triangulum/Features/Almanac/SolarDay.swift`
@@ -321,10 +357,10 @@ git commit -m 'feat: add Almanac local date and selection state'
 - Modify: `TriangulumTests/SolarEventsTests.swift`
 
 **Interfaces:**
-- Consumes: `LocalDate` from Task 2 and existing `ConstellationMapView.Astronomer.sunEquatorial`, `localSiderealTime`, and `altAz`.
+- Consumes: `LocalDate` and existing `Astronomer.sunEquatorial`, `localSiderealTime`, and `altAz`.
 - Produces: destination-aware `solarCrossing`, `SolarEventKind`, `SolarEvent`, `SolarState`, and `SolarDay`.
 
-- [ ] **Step 1: Move tests to the new destination-aware API and add polar classification tests**
+- [ ] **Step 1: Move solar tests to the new API and add destination/polar coverage**
 
 ```swift
 let tokyo = TimeZone(identifier: "Asia/Tokyo")!
@@ -339,7 +375,7 @@ let sunrise = ConstellationMapView.Astronomer.solarCrossing(
 #expect(sunrise != nil)
 ```
 
-Add polar tests that construct `SolarDay` at 89°N in June and December and assert `.polarDay` / `.polarNight` respectively. Run `SolarEventsTests`; expect signature/initializer failures.
+Add `SolarDay` tests at 89°N in June and December for `.polarDay` / `.polarNight`. Run `SolarEventsTests` first and expect signature/initializer failures.
 
 - [ ] **Step 2: Make `solarCrossing` use an explicit destination calendar**
 
@@ -354,22 +390,14 @@ static func solarCrossing(
 ) -> Date?
 ```
 
-Build destination-local noon with `try localDate.noon(in: timeZone)`, then keep the current declination, sidereal-time, transit, and hour-angle math. Remove `Calendar.current` from this calculation path.
+Build destination-local noon with `try localDate.noon(in: timeZone)` and retain the existing declination, sidereal-time, transit, and hour-angle math. Remove `Calendar.current` from this calculation path.
 
-- [ ] **Step 3: Move `SolarDay` and replace string labels with a closed event kind**
+- [ ] **Step 3: Move `SolarDay`, use `SolarEventKind`, and reuse `Astronomer.altAz` for polar state**
 
 ```swift
 enum SolarEventKind: String, CaseIterable, Codable, Hashable {
-    case astronomicalDawn
-    case nauticalDawn
-    case civilDawn
-    case sunrise
-    case morningGoldenEnd
-    case eveningGoldenStart
-    case sunset
-    case civilDusk
-    case nauticalDusk
-    case astronomicalDusk
+    case astronomicalDawn, nauticalDawn, civilDawn, sunrise, morningGoldenEnd
+    case eveningGoldenStart, sunset, civilDusk, nauticalDusk, astronomicalDusk
 
     var displayName: String {
         switch self {
@@ -388,46 +416,26 @@ enum SolarEventKind: String, CaseIterable, Codable, Hashable {
 }
 
 enum SolarState: Equatable { case normal, polarDay, polarNight }
-
-struct SolarEvent: Equatable {
-    let kind: SolarEventKind
-    let instant: Date
-}
-
-struct SolarDay {
-    let localDate: LocalDate
-    let latitude: Double
-    let longitude: Double
-    let timeZone: TimeZone
-    let state: SolarState
-    let events: [SolarEvent]
-
-    var sunrise: Date? { events.first { $0.kind == .sunrise }?.instant }
-    var sunset: Date? { events.first { $0.kind == .sunset }?.instant }
-    var daylightDuration: TimeInterval? { get }
-    func nextEvent(after instant: Date) -> SolarEvent?
-}
+struct SolarEvent: Equatable { let kind: SolarEventKind; let instant: Date }
 ```
 
-When the `-0.833°` sunrise/sunset crossings are both absent, classify polar state using the existing astronomy path, not a second altitude formula:
+The dawn/dusk wording is an intentional approved Almanac copy change from the old `Astronomical twilight` / `Blue hour begins` labels; test the exact `displayName` mapping so it cannot drift as a side effect of the model move.
+
+When the `-0.833°` sunrise/sunset crossings are both absent, classify with the existing altitude path:
 
 ```swift
 let noon = try localDate.noon(in: timeZone)
 let sun = ConstellationMapView.Astronomer.sunEquatorial(date: noon)
 let lst = ConstellationMapView.Astronomer.localSiderealTime(date: noon, longitude: longitude)
-let noonAltitude = ConstellationMapView.Astronomer.altAz(
-    eq: sun,
-    lstHours: lst,
-    latDeg: latitude
-).altDeg
+let noonAltitude = ConstellationMapView.Astronomer.altAz(eq: sun, lstHours: lst, latDeg: latitude).altDeg
 state = noonAltitude > -0.833 ? .polarDay : .polarNight
 ```
 
-Use the same `-0.833°` horizon threshold as sunrise/sunset rather than geometric zero so polar copy cannot disagree with the event definition near the terminator.
+Use the same `-0.833°` threshold as sunrise/sunset rather than introducing another solar-altitude formula.
 
 - [ ] **Step 4: Keep the old Solar screen compiling until final removal, verify, and commit**
 
-Adapt `SolarEventsView` temporarily to construct a device-local `LocalDate` and `SolarDay`; Task 9 removes the screen after Almanac UI reaches parity.
+Adapt `SolarEventsView` temporarily to construct a device-local `LocalDate` and `SolarDay`; Task 9 removes that screen after Almanac UI reaches parity.
 
 ```bash
 xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum \
@@ -443,7 +451,7 @@ git commit -m 'feat: make solar events destination aware'
 
 ---
 
-### Task 4: Add tide domain, coverage, station selection, source kinds, and actor disk cache
+### Task 4: Add tide domain, coverage, station selection, and day-keyed file cache
 
 **Files:**
 - Create: `Triangulum/Features/Almanac/TideModels.swift`
@@ -455,33 +463,34 @@ git commit -m 'feat: make solar events destination aware'
 - Create: `TriangulumTests/TideDiskCacheTests.swift`
 
 **Interfaces:**
-- Consumes: `TideProvider` from Task 1 and `LocalDateRange` from Task 2.
-- Produces: normalized tide types, typed source-cache keys, jurisdiction routing, nearest-station selection, and atomic cache APIs used by all clients/service/UI.
+- Consumes: `TideProvider` and `LocalDateRange`.
+- Produces: normalized tide types, injected jurisdiction routing, nearest-station selection, station-catalog persistence, overlapping day-cache reuse, typed annual-source cache keys, and cache APIs used by clients/service/UI.
 
-- [ ] **Step 1: Write failing domain, coverage, selector, and cache tests**
+- [ ] **Step 1: Write failing domain, selector, and cache tests**
 
 Cover:
 
 ```text
-Canada -> CHS when CHS is enabled
-United States -> NOAA when NOAA is enabled
-Japan -> JMA when JMA is enabled
-Hong Kong geographic fallback -> HKO before broader China routing
-disabled supported provider -> providerUnavailable
+Canada -> CHS when injected enabled set contains CHS
+supported provider absent from injected set -> providerUnavailable
 outside supported regions -> unsupportedRegion
-nearest eligible station within 250 km selected
+Hong Kong fallback routes before broader China
+nearest eligible station <= 250 km selected
 station beyond 250 km rejected
-at most eight alternatives returned
-fresh cache hit
-stale complete cache hit marked stale
+at most eight alternatives
+prediction day fresh for 30 days
+stale day still loads with isStale=true
+seven-day fetch saved on Sep 1 yields Sep 2 cache hit without a new range key
 schema mismatch -> miss
-atomic replacement leaves old week after failed write
-TideSourceKind produces distinct source paths for annual/hourly/hilo
+catalogue fresh for 30 days; stale catalogue still readable
+catalogue timezone enrichment survives reload
+partial provider result never reaches saveCompleteRange
+TideSourceKind annual/hourly/hilo paths are distinct
 ```
 
-Run focused tests and expect missing-type failures.
+The Sep 1/Sep 2 overlap test is the regression for the old rolling-range cache-key defect.
 
-- [ ] **Step 2: Implement normalized models with typed event/source boundaries**
+- [ ] **Step 2: Implement typed tide models**
 
 ```swift
 enum TideEventKind: String, Codable, Hashable { case high, low }
@@ -509,25 +518,14 @@ struct TideStation: Identifiable, Codable, Hashable {
     let name: String
     let latitude: Double
     let longitude: Double
-    let timeZoneIdentifier: String?
+    var timeZoneIdentifier: String?
     let datumLabel: String
     let supportsHourlyCurve: Bool
-
-    var timeZone: TimeZone? {
-        timeZoneIdentifier.flatMap(TimeZone.init(identifier:))
-    }
+    var timeZone: TimeZone? { timeZoneIdentifier.flatMap(TimeZone.init(identifier:)) }
 }
 
-struct TideSample: Codable, Hashable {
-    let instant: Date
-    let heightMetres: Double
-}
-
-struct TideEvent: Codable, Hashable {
-    let kind: TideEventKind
-    let instant: Date
-    let heightMetres: Double
-}
+struct TideSample: Codable, Hashable { let instant: Date; let heightMetres: Double }
+struct TideEvent: Codable, Hashable { let kind: TideEventKind; let instant: Date; let heightMetres: Double }
 
 struct TideWeek: Codable, Hashable {
     let station: TideStation
@@ -537,9 +535,20 @@ struct TideWeek: Codable, Hashable {
     let fetchedAt: Date
     let sourceAttribution: String
 }
+
+struct TideDay: Codable, Hashable {
+    let station: TideStation
+    let localDate: LocalDate
+    let hourlySamples: [TideSample]
+    let events: [TideEvent]
+    let fetchedAt: Date
+    let sourceAttribution: String
+}
 ```
 
-- [ ] **Step 3: Implement coverage and nearest-station selection**
+`TideWeek` is the provider fetch result. `TideDay` is the selected-day/display and normalized disk-cache unit.
+
+- [ ] **Step 3: Implement injected coverage and station selection**
 
 ```swift
 struct TideCoverageResolver {
@@ -550,56 +559,54 @@ struct TideCoverageResolver {
 struct TideStationSelector {
     static let maximumAutomaticDistanceMetres = 250_000.0
     static let maximumAlternatives = 8
-
-    func select(
-        from stations: [TideStation],
-        latitude: Double,
-        longitude: Double
-    ) -> (selected: TideStation?, alternatives: [TideStation])
+    func select(from stations: [TideStation], latitude: Double, longitude: Double)
+        -> (selected: TideStation?, alternatives: [TideStation])
 }
 ```
 
-Filter `supportsHourlyCurve == true`, calculate geodesic distance with `CLLocation`, reject automatic selection beyond 250 km, and return at most eight sorted alternatives.
+Filter `supportsHourlyCurve`, calculate distance with `CLLocation`, reject automatic matches beyond 250 km, and return at most eight sorted alternatives.
 
-- [ ] **Step 4: Implement the actor-backed cache with typed source kinds**
+- [ ] **Step 4: Implement an actor-backed file cache following the existing TLE fresh→stale→refresh behavior, not the TLE storage class**
+
+`TLECache` is useful precedent for `fresh hit -> stale fallback -> refresh`, and `SatelliteManager` is precedent for retaining stale data while a refresh is attempted. Do **not** reuse `TLECache` itself: it is TLE-specific, UserDefaults-backed, and fixed to 24-hour expiry.
 
 ```swift
 actor TideDiskCache {
     static let schemaVersion = 1
+    static let predictionFreshness: TimeInterval = 30 * 24 * 60 * 60
+    static let catalogueFreshness: TimeInterval = 30 * 24 * 60 * 60
 
-    struct CachedWeek {
-        let week: TideWeek
-        let isStale: Bool
-    }
+    struct CachedDay { let day: TideDay; let isStale: Bool }
+    struct CachedCatalog { let stations: [TideStation]; let isStale: Bool }
 
     init(rootURL: URL, now: @escaping () -> Date = Date.init)
 
-    func loadWeek(
-        provider: TideProvider,
-        stationID: String,
-        range: LocalDateRange
-    ) throws -> CachedWeek?
+    func loadDay(provider: TideProvider, stationID: String, date: LocalDate) throws -> CachedDay?
+    func saveCompleteRange(_ week: TideWeek, in timeZone: TimeZone) throws
 
-    func saveWeek(_ week: TideWeek) throws
+    func loadCatalog(provider: TideProvider) throws -> CachedCatalog?
+    func saveCatalog(provider: TideProvider, stations: [TideStation], fetchedAt: Date) throws
+    func updateCatalogTimeZone(provider: TideProvider, stationID: String, identifier: String) throws -> TideStation
 
-    func loadSource(
-        provider: TideProvider,
-        stationID: String,
-        year: Int,
-        kind: TideSourceKind
-    ) throws -> Data?
-
-    func saveSource(
-        _ data: Data,
-        provider: TideProvider,
-        stationID: String,
-        year: Int,
-        kind: TideSourceKind
-    ) throws
+    func loadSource(provider: TideProvider, stationID: String, year: Int, kind: TideSourceKind) throws -> Data?
+    func saveSource(_ data: Data, provider: TideProvider, stationID: String, year: Int, kind: TideSourceKind) throws
 }
 ```
 
-Store under `Application Support/Almanac/Tides/`. Use temp-file write plus `FileManager.replaceItemAt` for complete week replacement. A schema mismatch is a miss. Freshness is 24 hours for normalized weeks and 30 days for remotely fetched station catalogues; annual source files are immutable by station/year/kind once validated.
+Use this layout:
+
+```text
+Application Support/Almanac/Tides/
+  catalogs/v1/<provider>.json
+  days/v1/<provider>/<station>/<yyyy-mm-dd>.json
+  sources/jma/<station>/<year>.txt
+  sources/hko/<station>/<year>-hourly.csv
+  sources/hko/<station>/<year>-hilo.csv
+```
+
+`saveCompleteRange` first validates and partitions the **complete** `TideWeek` in memory, encodes every day successfully, then atomically replaces each day file. The service/client layer must never call it for an incomplete hourly/high-low response. This preserves the important completeness invariant without requiring a cross-file transaction.
+
+Annual JMA/HKO source files are immutable by station/year/kind after validation. A cache schema mismatch is a miss; there is no migration code.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -617,12 +624,12 @@ git add Triangulum/Features/Almanac/TideModels.swift \
   TriangulumTests/TideCoverageResolverTests.swift \
   TriangulumTests/TideStationSelectorTests.swift \
   TriangulumTests/TideDiskCacheTests.swift
-git commit -m 'feat: add Almanac tide domain and cache'
+git commit -m 'feat: add Almanac tide domain and day cache'
 ```
 
 ---
 
-### Task 5: Reuse one test transport and implement the four official tide clients
+### Task 5: Reuse one test transport and implement all four official tide clients
 
 **Files:**
 - Create: `TriangulumTests/TestURLSessionHelper.swift`
@@ -632,25 +639,25 @@ git commit -m 'feat: add Almanac tide domain and cache'
 - Create: `Triangulum/Features/Almanac/UnitedStatesTideClient.swift`
 - Create: `Triangulum/Features/Almanac/JapanTideClient.swift`
 - Create: `Triangulum/Features/Almanac/HongKongTideClient.swift`
-- Create: `Triangulum/Features/Almanac/JapanTideStations.json`
-- Create: `Triangulum/Features/Almanac/HongKongTideStations.json`
+- Create: `Triangulum/Features/Almanac/JapanTideStations.swift`
+- Create: `Triangulum/Features/Almanac/HongKongTideStations.swift`
 - Create: `TriangulumTests/CanadaTideClientTests.swift`
 - Create: `TriangulumTests/UnitedStatesTideClientTests.swift`
 - Create: `TriangulumTests/JapanTideClientTests.swift`
 - Create: `TriangulumTests/HongKongTideClientTests.swift`
 
 **Interfaces:**
-- Consumes: slim Task 1 fixtures and Task 4 domain types.
-- Produces: one shared token-isolated test session helper plus four `TideProviderClient` implementations.
+- Consumes: Task 1 contracts/fixtures and Task 4 domain/cache source kinds.
+- Produces: shared token-isolated test transport, four `TideProviderClient` implementations, and two compiled static station catalogues.
 
 - [ ] **Step 1: Extract the existing weather URLProtocol into a shared test helper**
 
-Move the current token-isolated transport semantics out of `WeatherManagerTestHelpers.swift` without changing behavior:
+Move the current token-isolated behavior from `WeatherManagerTestHelpers.swift` without changing semantics:
 
 ```swift
 final class TestURLProtocol: URLProtocol {
     static let tokenHeader = "X-Test-URLProtocol-Token"
-    // Preserve the existing serial queue, per-token response providers,
+    // Preserve existing serial queue, per-token response providers,
     // register/unregister lifecycle, and .notAllowed cache policy.
 }
 
@@ -661,7 +668,7 @@ enum TestURLSessionHelper {
 }
 ```
 
-Change `WeatherTestHelper.createMockSession` to delegate to `TestURLSessionHelper.makeSession`. Delete `MockWeatherURLProtocol`; do not create an Almanac-specific `URLProtocol`.
+Change `WeatherTestHelper.createMockSession` to delegate to `TestURLSessionHelper.makeSession` and delete `MockWeatherURLProtocol`. Do not create an Almanac-specific transport.
 
 Run existing weather fetch tests before writing provider code:
 
@@ -670,8 +677,6 @@ xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum \
   -destination "$TRIANGULUM_IPHONE_DESTINATION" -parallel-testing-enabled NO \
   -only-testing:TriangulumTests/WeatherManagerFetchTests
 ```
-
-Expected: existing weather transport tests remain green after the extraction.
 
 - [ ] **Step 2: Define the small provider-client seam**
 
@@ -683,51 +688,51 @@ protocol TideProviderClient {
 }
 ```
 
-Every network client receives its `URLSession` in `init`. Tests inject `TestURLSessionHelper.makeSession`; production receives `.shared` from `AlmanacDependencies.live()`.
+Every network client receives `URLSession` in `init`, matching `WeatherManager`. Tests use the shared test session; production uses `.shared` from `AlmanacDependencies.live()`.
 
-- [ ] **Step 3: Implement CHS and NOAA from slim fixtures**
+- [ ] **Step 3: Implement CHS and NOAA against canonical fixtures**
 
 `CanadaTideClient`:
 
 - Fetch the live CHS station catalogue and filter to prediction-capable stations.
-- Fetch hourly `wlp` prediction data using the source-contract request shape.
-- Fetch exact high/low events using the verified CHS `tide tables` endpoint recorded in Task 1.
-- Preserve CHS chart-datum metadata and normalize values to metres.
-- Reject incomplete hourly/high-low pairs.
+- Fetch hourly `wlp` data using the Task 1 contract.
+- Fetch exact high/low events through the verified IWLS tide-tables request.
+- Preserve datum and normalize metres.
+- Reject an incomplete hourly/high-low pair before returning `TideWeek`.
 
 `UnitedStatesTideClient`:
 
-- Parse `stations.json?type=tidepredictions`.
-- Keep only U.S. reference/harmonic rows with `type == "R"`, empty `reference_id`, valid coordinates, and hourly prediction support.
-- Explicitly reject subordinate rows (`type == "S"`).
-- Add one in-memory schema-faithful `state: "TEC"` row in the test and assert it is excluded; do not add a full remote catalogue fixture for that case.
-- Request `product=predictions`, `datum=MLLW`, `units=metric`, `time_zone=gmt`, once with `interval=h` and once with `interval=hilo`.
-- Commit a `TideWeek` only when both responses validate.
+- Parse the `tidepredictions` catalogue.
+- Keep only U.S. reference/harmonic rows with `type == "R"`, empty `reference_id`, valid coordinates, and hourly support.
+- Exclude subordinate `type == "S"` rows.
+- Add one schema-faithful in-memory non-U.S. row in its test rather than bloating the canonical fixture.
+- Request predictions in GMT/metric/MLLW once with `interval=h` and once with `interval=hilo`.
+- Return `TideWeek` only when both responses validate.
 
-Tests assert station filtering, metres, exact event kinds/times, datum, request parameters, and partial-response rejection.
+Tests assert filtering, request parameters, metres, event kinds/times, datum, and incomplete-pair rejection.
 
-- [ ] **Step 4: Implement JMA without an HTML parser**
+- [ ] **Step 4: Implement JMA with compiled station data and no runtime resource loader**
 
-Treat `Triangulum/Features/Almanac/JapanTideStations.json` as the production catalogue source of truth. Populate it from the official JMA station table during Task 1 source review; do not ship or write an HTML parser.
+Create `JapanTideStations.swift` as a static `[TideStation]` generated from the verified official station table. Do not add JSON/HTML resource loading.
 
-Pin Tokyo to the official JMA values shown for `TK` (35°39′N, 139°46′E):
+Pin Tokyo against the captured official audit row:
 
 ```swift
-@Test func bundledTokyoStationMatchesOfficialRecord() throws {
-    let tokyo = try #require(client.bundledStations.first { $0.providerStationCode == "TK" })
+@Test func tokyoStationMatchesCapturedOfficialRecord() throws {
+    let tokyo = try #require(JapanTideStations.all.first { $0.providerStationCode == "TK" })
     #expect(tokyo.name == "Tokyo")
     #expect(abs(tokyo.latitude - 35.65) < 0.0001)
     #expect(abs(tokyo.longitude - 139.7666667) < 0.0001)
 }
 ```
 
-`JapanTideClient` downloads the annual fixed-width `.../<year>/TK.txt` format for the selected station, validates 136-byte records per the official format, slices the requested seven local JST dates, converts centimetres to metres, and emits hourly samples plus exact highs/lows. A New Year range loads both years.
+`JapanTideClient` downloads the annual fixed-width `<year>/<station>.txt`, validates documented 136-byte records, slices the requested JST dates, converts centimetres to metres, and emits hourly samples plus exact highs/lows. A New Year range reads two annual source files. Use `TideSourceKind.annual` for source caching.
 
-- [ ] **Step 5: Implement HKO annual CSV parsing**
+- [ ] **Step 5: Implement HKO with compiled station data and typed annual source cache kinds**
 
-Treat `HongKongTideStations.json` as the small production station catalogue. Fetch station/year `HHOT` and `HLT` CSV, slice requested HKT dates, and reject a week if either source is missing or malformed. A New Year range loads both years.
+Create `HongKongTideStations.swift` as the small static intersection of active HHOT/HLT stations. Fetch station/year `HHOT` and `HLT`, parse CSV correctly (quoted commas, CRLF, BOM), slice HKT dates, and reject the range if either source is missing/malformed. A New Year range may require both years. Use `TideSourceKind.hourly` / `.hilo`.
 
-- [ ] **Step 6: Verify all shared transport and provider fixtures, then commit**
+- [ ] **Step 6: Verify all clients plus the shared transport and commit**
 
 ```bash
 xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum \
@@ -745,8 +750,8 @@ git add TriangulumTests/TestURLSessionHelper.swift \
   Triangulum/Features/Almanac/UnitedStatesTideClient.swift \
   Triangulum/Features/Almanac/JapanTideClient.swift \
   Triangulum/Features/Almanac/HongKongTideClient.swift \
-  Triangulum/Features/Almanac/JapanTideStations.json \
-  Triangulum/Features/Almanac/HongKongTideStations.json \
+  Triangulum/Features/Almanac/JapanTideStations.swift \
+  Triangulum/Features/Almanac/HongKongTideStations.swift \
   TriangulumTests/CanadaTideClientTests.swift \
   TriangulumTests/UnitedStatesTideClientTests.swift \
   TriangulumTests/JapanTideClientTests.swift \
@@ -756,7 +761,7 @@ git commit -m 'feat: add official Almanac tide clients'
 
 ---
 
-### Task 6: Add the closed TideService switch, selected-station time zone, and cache-first load
+### Task 6: Add TideService, one enabled-provider source, station-time-zone enrichment, and cache-first loading
 
 **Files:**
 - Create: `Triangulum/Features/Almanac/TideStationTimeZoneResolver.swift`
@@ -765,42 +770,48 @@ git commit -m 'feat: add official Almanac tide clients'
 - Create: `TriangulumTests/TideServiceTests.swift`
 
 **Interfaces:**
-- Consumes: provider clients, coverage/selector/cache, and `TideProvider.enabled`.
-- Produces: station context, cached-week read, and explicit refresh APIs consumed by the view model.
+- Consumes: provider clients, coverage/selector/cache, and an injected enabled-provider set.
+- Produces: selected station context, cached-day read, range refresh, and catalogue enrichment APIs consumed by the view model.
 
-- [ ] **Step 1: Write failing service tests for the closed switch and stale-cache flow**
+- [ ] **Step 1: Write failing service tests**
 
 Cover:
 
 ```text
-coverage dispatches only through TideProvider.enabled
-unsupported region != disabled supported provider
-nearest station is selected and up to eight alternatives returned
-manual station override wins when still valid
-selected station missing IANA zone is reverse-geocoded once and then cached
-fresh cache returns immediately without network
-stale cache returns immediately as stale
-forced refresh updates stale cache on success
-forced refresh failure preserves stale cache
-partial NOAA/HKO provider result never replaces complete cache
-JMA/HKO New Year source requests cover both years
+same injected enabledProviders drives coverage and client dispatch
+disabled supported provider -> providerUnavailable without editing static enum
+unsupported region remains distinct
+nearest station and up to eight alternatives
+manual override wins while valid
+selected station missing IANA zone is geocoded once, written into cached catalogue, then reused
+fresh selected day returns without network
+stale selected day returns before refresh
+Sep 2 uses day cached by Sep 1 range fetch
+forced refresh updates cache on success
+forced refresh failure preserves cached day
+partial NOAA/HKO result never calls saveCompleteRange
+JMA/HKO New Year requests cover both years
 ```
 
-- [ ] **Step 2: Implement selected-station time-zone resolution**
+- [ ] **Step 2: Make time-zone resolution stateless; persist enrichment only in the station catalogue cache**
 
 ```swift
 protocol TideStationTimeZoneResolving {
-    func resolveTimeZone(for station: TideStation) async throws -> TimeZone
+    func resolveIdentifier(for station: TideStation) async throws -> String
 }
 
 final class TideStationTimeZoneResolver: TideStationTimeZoneResolving {
-    func resolveTimeZone(for station: TideStation) async throws -> TimeZone
+    func resolveIdentifier(for station: TideStation) async throws -> String
 }
 ```
 
-Return `station.timeZone` when present. Otherwise reverse geocode only the selected station coordinate with `CLGeocoder`; cache the resulting identifier keyed by `station.id` in `UserDefaults`. Never reverse geocode the whole provider catalogue.
+Return an existing `station.timeZoneIdentifier` immediately. Otherwise reverse geocode only the selected coordinate with `CLGeocoder` and return its IANA identifier. The resolver itself stores nothing in `UserDefaults`.
 
-- [ ] **Step 3: Implement one explicit service switch and separate cache/read refresh APIs**
+`TideService` immediately writes a resolved identifier back through `TideDiskCache.updateCatalogTimeZone(...)`; the cached catalogue is the single persistence source of truth. A 30-day catalogue refresh can merge a previous non-nil cached zone into a matching fresh provider row rather than discarding the enrichment.
+
+JMA and HKO static station data should already contain their known fixed zones and bypass geocoding.
+
+- [ ] **Step 3: Implement the closed service switch with injected enablement**
 
 ```swift
 struct TideStationContext {
@@ -811,46 +822,43 @@ struct TideStationContext {
     let timeZone: TimeZone
 }
 
-struct TideWeekSnapshot {
-    let week: TideWeek
+struct TideDaySnapshot {
+    let day: TideDay
     let isStale: Bool
 }
 
 protocol TideServing {
-    func resolveStation(
-        for location: AlmanacLocation,
-        override: TideStationOverride?
-    ) async throws -> TideStationContext
-
-    func cachedWeek(
-        station: TideStation,
-        range: LocalDateRange
-    ) async throws -> TideWeekSnapshot?
-
-    func refreshWeek(
-        station: TideStation,
-        range: LocalDateRange
-    ) async throws -> TideWeek
+    func resolveStation(for location: AlmanacLocation, override: TideStationOverride?) async throws -> TideStationContext
+    func cachedDay(station: TideStation, date: LocalDate) async throws -> TideDaySnapshot?
+    func refreshRange(station: TideStation, range: LocalDateRange) async throws -> TideWeek
 }
 ```
 
-Production dispatch remains an explicit switch:
+`TideService` initializer receives:
+
+```swift
+init(
+    enabledProviders: Set<TideProvider> = TideProvider.enabled,
+    clients: [TideProvider: any TideProviderClient],
+    cache: TideDiskCache,
+    timeZoneResolver: any TideStationTimeZoneResolving
+)
+```
+
+Construct `TideCoverageResolver(enabledProviders: enabledProviders)` from the same value. Client dispatch must guard the injected set, not `TideProvider.enabled` directly:
 
 ```swift
 private func client(for provider: TideProvider) throws -> any TideProviderClient {
-    guard TideProvider.enabled.contains(provider) else {
+    guard enabledProviders.contains(provider), let client = clients[provider] else {
         throw TideLoadError.providerUnavailable
     }
-    switch provider {
-    case .canadaCHS: canadaClient
-    case .unitedStatesNOAA: noaaClient
-    case .japanJMA: japanClient
-    case .hongKongHKO: hongKongClient
-    }
+    return client
 }
 ```
 
-`cachedWeek` never fetches. `refreshWeek` always performs the network/source refresh and atomically saves only a complete `TideWeek`. Do not add `AsyncStream`, reachability, launch preload, or a retry scheduler.
+`resolveStation` uses a fresh cached catalogue first; a stale catalogue is still usable offline while a direct refresh is attempted when needed. Remote CHS/NOAA catalogue fetches save to `TideDiskCache`. JMA/HKO return compiled static catalogues.
+
+`cachedDay` never fetches. `refreshRange` always performs the provider refresh, validates a complete `TideWeek`, then calls `saveCompleteRange`. No reachability check or retry scheduler is introduced.
 
 - [ ] **Step 4: Verify and commit**
 
@@ -869,7 +877,7 @@ git commit -m 'feat: add Almanac tide service orchestration'
 
 ---
 
-### Task 7: Add AlmanacViewModel, MapKit search, and live/UI-test dependencies
+### Task 7: Add AlmanacViewModel, MapKit search, and deterministic dependencies
 
 **Files:**
 - Create: `Triangulum/Features/Almanac/AlmanacLocationResolver.swift`
@@ -881,29 +889,29 @@ git commit -m 'feat: add Almanac tide service orchestration'
 
 **Interfaces:**
 - Consumes: `LocationManager`, `AppleSearchCompleter`, solar model, preferences, and `TideServing`.
-- Produces: all observable state/actions required by the Almanac views plus deterministic UI-test fixture mode.
+- Produces: all observable state/actions required by Almanac plus deterministic `-ui-testing` dependencies.
 
 - [ ] **Step 1: Write failing view-model tests**
 
-Inject `now = { fixedDate }` and fake location/tide dependencies. Cover:
+Inject a fixed `now` and fake location/tide dependencies. Cover:
 
 ```text
-launch restores location mode but resets selected date to destination-local today
-current GPS and fixed Almanac location never mutate Live LocationManager coordinates
-switching Sun/Tides preserves selected day and location
-changing fixed location clears station override
-current-location movement under 5 km reuses resolved placemark
-movement over 5 km re-resolves placemark
-manual station override survives current-location movement up to 25 km
-movement over 25 km clears override
-selected location without time zone is rejected after fallback reverse geocode fails
+launch restores location mode but selected date becomes destination-local today
+Almanac fixed location never mutates Live LocationManager coordinates
+switching Sun/Tides preserves selected day/location
+changing fixed location clears manual station override
+current-location movement < 5 km reuses placemark; > 5 km resolves again
+manual override survives movement <= 25 km and clears beyond 25 km
+remote place without a resolvable time zone is rejected
 unsupported tide region still computes SolarDay
-stale TideWeek is published before forced refresh
-refresh failure keeps stale week visible with warning
-older async selection response cannot overwrite a newer selection
+fresh cached TideDay publishes without refresh
+stale TideDay publishes before one refresh attempt
+refresh failure preserves cached TideDay with warning
+missing selected day triggers refresh of current rolling seven-day range
+older async response cannot overwrite a newer selection
 ```
 
-- [ ] **Step 2: Implement the MapKit location resolver without OSM**
+- [ ] **Step 2: Implement MapKit resolution by reusing existing Apple search behavior**
 
 ```swift
 protocol AlmanacLocationResolving {
@@ -912,9 +920,9 @@ protocol AlmanacLocationResolving {
 }
 ```
 
-Use `MKLocalSearch.Request(completion:)` for search selection. Read coordinate, display name, country/administrative area, and placemark time zone. If the first placemark has no zone, perform one reverse-geocode lookup for that coordinate; if still absent, return a stable Almanac location error. Do not use `OSMGeocoder` and do not substitute `TimeZone.current` for remote places.
+Use `MKLocalSearch.Request(completion:)`. Read coordinate, display name, country/administrative area, and placemark time zone. If absent, perform one reverse-geocode lookup; if still absent, return a stable Almanac location error. Do not use `OSMGeocoder` and do not substitute `TimeZone.current` for a remote place.
 
-- [ ] **Step 3: Implement feature-specific dependencies, not a general DI container**
+- [ ] **Step 3: Implement feature-local dependencies; `-ui-testing` alone selects deterministic Almanac fixtures**
 
 ```swift
 struct AlmanacDependencies {
@@ -923,14 +931,16 @@ struct AlmanacDependencies {
     let preferencesStore: AlmanacPreferencesStore
     let now: () -> Date
 
-    static func live() -> AlmanacDependencies
+    static func live(enabledProviders: Set<TideProvider> = TideProvider.enabled) -> AlmanacDependencies
     static func uiTestFixture() -> AlmanacDependencies
 }
 ```
 
-`live()` creates only clients whose cases are in `TideProvider.enabled`, with injected `.shared` `URLSession`, `TideDiskCache`, and resolvers. `uiTestFixture()` uses `AlmanacFixtureTideService` and fixed Vancouver data. Fixture mode is selected only when **both** `-ui-testing` and `-almanac-fixture` launch arguments are present.
+`live(enabledProviders:)` builds client dictionary entries only for that set, injects the same set into `TideService`, and uses `.shared` `URLSession`.
 
-- [ ] **Step 4: Implement the main-actor view model with cancellable Tasks**
+`uiTestFixture()` supplies fixed Vancouver location/time, fixed clock, and `AlmanacFixtureTideService`. In `ContentView`, the existing `-ui-testing` flag alone chooses `.uiTestFixture()` for Almanac. Do not add `-almanac-fixture`, and do not change `BaseUITest.makeApp()` merely to pass a second flag.
+
+- [ ] **Step 4: Implement main-actor state with cancellation plus a generation guard**
 
 ```swift
 @MainActor
@@ -943,9 +953,11 @@ final class AlmanacViewModel: ObservableObject {
     @Published var section: Section = .sun
     @Published private(set) var solarDay: SolarDay?
     @Published private(set) var stationContext: TideStationContext?
-    @Published private(set) var tideWeek: TideWeek?
+    @Published private(set) var tideDay: TideDay?
     @Published private(set) var tideIsStale = false
     @Published private(set) var tideWarning: TideLoadError?
+
+    private var requestGeneration = UUID()
 
     func selectDate(_ date: LocalDate)
     func moveWindow(byDays days: Int)
@@ -958,9 +970,9 @@ final class AlmanacViewModel: ObservableObject {
 }
 ```
 
-The visible strip starts at destination-local today and always contains seven consecutive dates. Previous/next moves the strip by seven days. A date change inside the loaded tide range performs no network call.
+On every location/station/range-changing action, cancel superseded tasks and replace `requestGeneration`. Capture the generation before each async operation and check it immediately before applying state, following the existing SatelliteManager token-checked result-application pattern.
 
-On first tide load: resolve station, publish cached week immediately when present, then call `refreshWeek` only when cache is stale or absent. Pull-to-refresh uses `forceRefresh: true`. Cancel prior location/tide Tasks before starting newer ones.
+For tide loading: resolve station, publish `cachedDay` immediately when available, stop on a fresh hit unless `forceRefresh`, otherwise call `refreshRange` for the current seven-day strip. If refresh succeeds, reload the selected day from cache. If it fails and a cached day exists, keep that day and publish a non-blocking warning.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -996,12 +1008,12 @@ git commit -m 'feat: add Almanac state and location flow'
 - Create: `TriangulumTests/AlmanacPresentationTests.swift`
 
 **Interfaces:**
-- Consumes: `AlmanacViewModel`, Cel design tokens/components, `SolarEventKind`, normalized tide events/samples.
-- Produces: complete Almanac screen ready for tab wiring.
+- Consumes: `AlmanacViewModel`, Cel components/tokens, `SolarEventKind`, and `TideDay`.
+- Produces: complete Almanac UI ready for top-level tab wiring.
 
-- [ ] **Step 1: Extract `renderHost` once and keep its current smoke-test semantics**
+- [ ] **Step 1: Extract the existing `renderHost` once and preserve smoke-test semantics**
 
-Move the existing private helper from `CelComponentRenderingTests.swift` into `SwiftUIRenderTestHelper.swift`:
+Move the private helper from `CelComponentRenderingTests.swift` into `SwiftUIRenderTestHelper.swift`:
 
 ```swift
 @MainActor
@@ -1011,35 +1023,24 @@ func renderHost<V: View>(
 ) -> (host: UIHostingController<V>, window: UIWindow)
 ```
 
-Keep the strong `UIWindow` lifetime behavior and update `CelComponentRenderingTests` to call the shared helper. Do not create a third window-retention implementation for Almanac.
+Keep the strong UIWindow lifetime behavior. Update the existing Cel suite to use it. Do not create a third window-retention implementation.
 
-SwiftUI's UIKit accessibility tree is not reliably materialized synchronously in these unit tests, as documented by the existing Cel suite, so keep `renderHost` as a crash/layout smoke seam. Test exact accessibility strings through pure formatting functions/properties and verify the actual accessible elements in Task 9's XCUITest.
+SwiftUI accessibility elements are not reliably materialized synchronously through UIKit in this test seam. Keep render tests as crash/layout coverage; assert exact accessibility copy through pure presentation helpers and the final XCUITest.
 
-Run the existing Cel rendering suite after the extraction.
+- [ ] **Step 2: Build shared shell, location sheet, and Sun content**
 
-- [ ] **Step 2: Build the shared Almanac shell, location sheet, and Sun section**
+`AlmanacView` shows location/mode/time zone, the rolling seven-day strip with previous/next/Today, `Sun | Tides`, and current section content.
 
-`AlmanacView` shows:
+`AlmanacLocationSheet` reuses `AppleSearchCompleter`, Current Location, one search field, suggestions, and last selected place. Add no favourites manager.
 
-```text
-location + mode + explicit destination time zone
-rolling seven-day strip + previous/next + Today
-Sun | Tides segmented picker
-section content
-```
+`AlmanacSunView` leads with sunrise/daylight/sunset, explanatory daylight track, typed morning/evening events, next-event countdown only for destination-local today, and explicit polar copy.
 
-`AlmanacLocationSheet` reuses `AppleSearchCompleter`, offers Current Location, one search field, suggestions, and the last selected fixed place. Add no favourites or saved-location manager.
+- [ ] **Step 3: Build the tide summary, linear chart, events, and station sheet**
 
-`AlmanacSunView` leads with sunrise/daylight/sunset, then the explanatory daylight track and typed `SolarEventKind` morning/evening rows. Today shows next-event countdown; another day does not. Polar copy comes from `SolarState`.
-
-- [ ] **Step 3: Build the tide summary, linear chart, event list, and station sheet**
-
-Add pure helpers that the presentation tests can assert directly:
+Add pure projection helpers:
 
 ```swift
-extension TideWeek {
-    func samples(on date: LocalDate, in timeZone: TimeZone) -> [TideSample]
-    func events(on date: LocalDate, in timeZone: TimeZone) -> [TideEvent]
+extension TideDay {
     func nextEvent(after instant: Date) -> TideEvent?
 }
 
@@ -1052,19 +1053,17 @@ extension TideChartView {
 }
 ```
 
-The chart must use only official source points:
+Chart only official points:
 
 ```swift
 Chart {
-    ForEach(samples, id: \.instant) { sample in
+    ForEach(day.hourlySamples, id: \.instant) { sample in
         LineMark(
             x: .value("Time", sample.instant),
             y: .value("Height", sample.heightMetres)
         )
-        // default/linear interpolation only
     }
-
-    ForEach(events, id: \.instant) { event in
+    ForEach(day.events, id: \.instant) { event in
         PointMark(
             x: .value("Time", event.instant),
             y: .value("Height", event.heightMetres)
@@ -1073,30 +1072,17 @@ Chart {
 }
 ```
 
-Do **not** copy `BarometerDetailView`'s `.interpolationMethod(.catmullRom)` or `AreaMark`. Exact high/low markers may sit between hourly line points by design.
+Do not copy `BarometerDetailView`'s Catmull-Rom interpolation or `AreaMark` fill.
 
-`AlmanacTidesView` shows next/first tide, countdown only for today, chart, chronological high/low rows, station distance/datum/provider/update state, cached/offline warning, and `Predictions are for planning only, not navigation.` Pull-to-refresh calls `loadTides(forceRefresh: true)`.
+`AlmanacTidesView` shows next/first tide, countdown only for today, chart, chronological events, station distance/datum/provider/update state, cached/offline warning, and planning-only warning. Pull-to-refresh calls `loadTides(forceRefresh: true)`.
 
-`TideStationSheet` lists at most eight `nearbyStations` plus `Use Nearest Station`.
+`TideStationSheet` lists at most eight alternatives plus **Use Nearest Station**.
 
-- [ ] **Step 4: Add rendering smoke tests and exact presentation/accessibility-copy tests**
+- [ ] **Step 4: Add render smoke and presentation/accessibility-copy tests**
 
-`AlmanacRenderingTests` uses the shared `renderHost` at narrow iPhone and iPad sizes and asserts only successful window attachment/layout.
+`AlmanacRenderingTests` uses shared `renderHost` at narrow iPhone and iPad sizes and asserts successful attachment/layout.
 
-`AlmanacPresentationTests` directly asserts:
-
-```text
-Sunrise / Sunset / polar copy
-next vs first tide labels
-high/low event names
-chart accessibility summary includes daily range and ordered events
-station distance formatting
-datum and attribution text
-fresh/cached/offline update labels
-planning-only warning
-```
-
-The final UI test in Task 9 proves those labels are exposed through the actual app accessibility hierarchy.
+`AlmanacPresentationTests` directly asserts Sunrise/Sunset/polar copy, SolarEventKind display names, next vs first tide labels, high/low labels, chart summary, station/datum/attribution text, cache-state formatting, and planning-only warning.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -1122,21 +1108,21 @@ git commit -m 'feat: add Almanac sun and tide views'
 
 ---
 
-### Task 9: Wire the fifth tab, remove duplicate Solar UI, add deterministic UI smoke, and run all gates
+### Task 9: Wire the fifth tab, remove duplicate Solar UI, document the new feature folder, and run all gates
 
 **Files:**
 - Modify: `Triangulum/Views/ContentView.swift`
 - Modify: `Triangulum/Views/FieldHubView.swift`
 - Modify: `Triangulum/Utilities/Log.swift`
 - Delete: `Triangulum/Views/SolarEventsView.swift`
-- Modify: `TriangulumUITests/BaseUITest.swift`
 - Modify: `TriangulumUITests/TriangulumUITests.swift`
+- Modify: `CLAUDE.md`
 
 **Interfaces:**
-- Consumes: complete Almanac feature and `AlmanacDependencies.uiTestFixture()`.
-- Produces: five-tab shipping shell, removal of duplicate Solar navigation, and deterministic end-to-end smoke coverage.
+- Consumes: complete Almanac feature and `.uiTestFixture()` selected by existing `-ui-testing` mode.
+- Produces: five-tab shipping shell, deterministic end-to-end smoke coverage, removal of duplicate Solar navigation, and documented `Features/Almanac` convention.
 
-- [ ] **Step 1: Make the shell and Almanac UI tests fail first**
+- [ ] **Step 1: Make shell and Almanac XCUITests fail first**
 
 Update the existing shell assertion to exactly:
 
@@ -1144,24 +1130,9 @@ Update the existing shell assertion to exactly:
 ["Live", "Field", "Almanac", "Footprint", "Settings"]
 ```
 
-Extend the shared UI-test helper without changing existing callers:
+Keep `BaseUITest.makeApp()` unchanged; it already supplies `-ui-testing`.
 
-```swift
-func makeApp(additionalArguments: [String] = []) -> XCUIApplication {
-    let app = XCUIApplication()
-    app.launchArguments.append("-ui-testing")
-    app.launchArguments.append(contentsOf: additionalArguments)
-    return app
-}
-```
-
-Add one Almanac smoke test launched with:
-
-```swift
-let app = makeApp(additionalArguments: ["-almanac-fixture"])
-```
-
-The test opens Almanac, verifies the fixed fixture location/date context, sees Sunrise/Sunset, switches to Tides, then verifies next tide, chart accessibility label, station, datum, provider attribution, and planning-only warning. Run only these UI tests and confirm they fail before tab wiring.
+Add one Almanac smoke test using plain `makeApp()`. It opens Almanac, verifies fixed fixture location/date context, Sunrise/Sunset, switches to Tides, and verifies tide summary, chart accessibility label, station, datum, provider attribution, and planning-only warning. Run these tests before wiring and expect failure because Almanac is not yet in the tab bar.
 
 - [ ] **Step 2: Add `ProductTab.almanac` and the fifth TabView item**
 
@@ -1169,18 +1140,25 @@ Keep `ProductTab` in `FieldHubView.swift` and add:
 
 ```swift
 case almanac
-
 case .almanac: "Almanac"
 case .almanac: "calendar"
 ```
 
-In `ContentView`, insert Almanac between Field and Footprint. Build dependencies once at Almanac construction time; do not create a global container.
+Insert Almanac between Field and Footprint. In the existing UI-test path, pass `.uiTestFixture()`; otherwise pass `.live()`. Build only this feature dependency value, not a global container.
 
-Remove the Live dashboard Solar `ConsoleTile`. Keep Level unchanged.
+Remove the Live Solar `ConsoleTile`; keep Level unchanged.
 
-- [ ] **Step 3: Remove the superseded Solar screen and add Almanac logging**
+- [ ] **Step 3: Remove the superseded Solar screen, add logging, and document `Features/`**
 
-Delete `Triangulum/Views/SolarEventsView.swift` after confirming `SolarDay` and all user-facing solar behavior now live under Almanac. Add one `.almanac` `Logger` category; do not add telemetry infrastructure.
+Delete `Triangulum/Views/SolarEventsView.swift` after confirming all solar behavior exists under Almanac. Add `Logger.almanac` only.
+
+Update `CLAUDE.md` project structure to document:
+
+```text
+Triangulum/Features/Almanac/  # location/date almanac, solar projection, tide providers/cache/UI
+```
+
+Explain that cohesive feature-local code may live under `Features/<FeatureName>` while existing sensor surfaces remain in `Views/Managers/Models/Utilities`. Do not reorganize existing files.
 
 - [ ] **Step 4: Run focused UI tests**
 
@@ -1191,9 +1169,9 @@ xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum \
   -only-testing:TriangulumUITests/TriangulumUITests/testAlmanacFixtureShowsSunAndTides
 ```
 
-Expected: both pass without location permission prompts or public network requests.
+Expected: both pass without location prompts or public network calls.
 
-- [ ] **Step 5: Run all unit, UI, build, and lint gates**
+- [ ] **Step 5: Run all quality gates**
 
 ```bash
 xcodebuild test -project Triangulum.xcodeproj -scheme Triangulum \
@@ -1219,7 +1197,7 @@ git diff --check
 git diff --stat main...HEAD
 ```
 
-Expected: unit/UI tests report zero failures (launch performance may skip), both simulator builds and the generic iOS build succeed, SwiftLint reports no errors, and `git diff --check` prints nothing.
+Expected: unit/UI tests report zero failures (launch performance may skip), iPhone/iPad/generic builds succeed, SwiftLint reports no errors, and `git diff --check` prints nothing.
 
 - [ ] **Step 6: Commit final wiring and complete the single-PR review checklist**
 
@@ -1227,8 +1205,8 @@ Expected: unit/UI tests report zero failures (launch performance may skip), both
 git add Triangulum/Views/ContentView.swift \
   Triangulum/Views/FieldHubView.swift \
   Triangulum/Utilities/Log.swift \
-  TriangulumUITests/BaseUITest.swift \
-  TriangulumUITests/TriangulumUITests.swift
+  TriangulumUITests/TriangulumUITests.swift \
+  CLAUDE.md
 git rm Triangulum/Views/SolarEventsView.swift
 git commit -m 'feat: ship Almanac sun and tide tab'
 ```
@@ -1236,30 +1214,42 @@ git commit -m 'feat: ship Almanac sun and tide tab'
 Confirm before marking this PR ready:
 
 ```text
-[ ] Four source contracts are recorded and TideProvider.enabled matches the verified contracts.
-[ ] Checked-in fixtures are slim and provenance URLs/dates are recorded.
-[ ] Weather and Almanac provider tests share one token-isolated URLProtocol helper.
+[ ] Four official source contracts are recorded; every enabled provider has readable non-empty canonical prediction fixtures.
+[ ] Checked-in fixtures are slim and loaded source-relative; no new bundle-resource plumbing exists.
+[ ] Weather and Almanac network tests share one token-isolated URLProtocol helper.
 [ ] Sun uses destination-local LocalDate and existing Astronomer.altAz for polar classification.
-[ ] Solar events use SolarEventKind rather than string labels.
-[ ] Tides use TideSourceKind for annual/hourly/hilo source caching.
-[ ] Sun remains available when tide coverage/provider is unavailable.
+[ ] Intentional Almanac dawn/dusk copy is pinned by SolarEventKind tests.
+[ ] Coverage and TideService share one injected enabledProviders value.
+[ ] Day-keyed cache reuses overlapping dates across rolling windows and uses 30-day prediction freshness.
+[ ] Complete stale TideDay remains visible when refresh fails.
+[ ] Selected-station time-zone enrichment is stored only in the cached station catalogue.
+[ ] TideSourceKind remains only for JMA/HKO annual-source cache files.
+[ ] Sun remains available when a tide provider is unavailable.
 [ ] Station selection enforces 250 km / eight-result limits and override reset rules.
-[ ] Fresh/stale cache, forced refresh, and partial-response protection pass.
-[ ] NOAA subordinate rows and explicit non-U.S. test rows are excluded.
-[ ] JMA uses bundled JapanTideStations.json; there is no HTML parser.
-[ ] JMA/HKO New Year ranges combine the correct two annual sources.
-[ ] Tide chart uses default/linear LineMark interpolation, PointMark highs/lows, and no AreaMark.
+[ ] Partial hourly/high-low provider responses never write normalized day cache entries.
+[ ] NOAA subordinate/non-U.S. rows are excluded.
+[ ] JMA/HKO station catalogues are compiled Swift data; there is no runtime HTML/JSON resource loader.
+[ ] JMA/HKO New Year ranges combine both annual sources.
+[ ] Tide chart uses default/linear LineMark + PointMark and no AreaMark.
 [ ] Cel and Almanac render tests share one UIWindow-retaining renderHost helper.
-[ ] The duplicate Solar tile and SolarEventsView are gone.
-[ ] The tab bar contains exactly Live, Field, Almanac, Footprint, Settings.
-[ ] UI fixture mode requires both -ui-testing and -almanac-fixture.
+[ ] Existing -ui-testing alone selects deterministic Almanac fixture dependencies.
+[ ] Solar tile and SolarEventsView are gone; tab bar is exactly Live, Field, Almanac, Footprint, Settings.
+[ ] CLAUDE.md documents the new Features/Almanac convention.
 [ ] No package, backend, SwiftData migration, reachability monitor, AsyncStream, or background scheduler was added.
 ```
+
+## Delivery Decisions and Risks
+
+- **Provider scope remains one PR.** The four-region coverage was explicitly approved for this task, and the project workflow requires one PR per task unless split delivery is approved. The provider seam still makes later maintenance isolated, but this implementation does not create four follow-up PRs for already-approved scope.
+- **Source-contract feasibility is a hard gate.** Task 1 must capture both required prediction forms for every enabled provider. A missing CHS/HKO/etc. contract blocks that provider before parser work begins.
+- **No new bundle-resource plumbing is assumed.** Test fixtures are loaded from the checked-out source tree via `#filePath`; production JMA/HKO station catalogues compile as Swift data.
+- **Cache overlap is explicitly tested.** The day-keyed normalized cache exists so a rolling Sep 2 window can reuse Sep 2–7 data fetched on Sep 1 instead of becoming a total cache miss.
+- Existing source-drift, station-coverage, datum, and provider-outage risks remain mitigated by strict fixture parsers, explicit station/datum copy, and stale-cache fallback.
 
 ## Execution Notes
 
 - Execute tasks in order; later tasks depend on earlier exact types.
-- Keep every task commit buildable or focused-test green; do not split this ticket across PRs.
-- When an official source format changes, update its source contract, slim canonical fixture, and parser test together before changing production parsing.
-- A provider that fails Task 1 remains represented by its `TideProvider` case but is removed from `TideProvider.enabled`; routing returns `.providerUnavailable` and no runtime client for that provider is wired into `AlmanacDependencies.live()`.
-- Do not broaden this task with performance work, persistence migration, marine safety data, or extra provider infrastructure.
+- Keep every task commit buildable or focused-test green; do not split this task across PRs.
+- When an official source changes, update its contract, slim canonical fixture, and parser test together before changing production parsing.
+- A provider that fails Task 1 remains represented by its enum case but is removed from the injected production enabled set; no runtime client is wired for it.
+- Do not broaden this task with marine observations, performance work, migrations, or additional provider infrastructure.
