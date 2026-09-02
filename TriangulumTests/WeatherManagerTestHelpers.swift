@@ -1,75 +1,11 @@
 import Foundation
 @testable import Triangulum
 
-final class MockWeatherURLProtocol: URLProtocol {
-    private static let tokenHeader = "X-Mock-Weather-Token"
-    private static let queue = DispatchQueue(label: "MockWeatherURLProtocol")
-    private static var responseProviders: [String: (URLRequest) throws -> (URLResponse, Data?)] = [:]
-
-    static func register(token: String, responseProvider: @escaping (URLRequest) throws -> (URLResponse, Data?)) {
-        queue.sync {
-            responseProviders[token] = responseProvider
-        }
-    }
-
-    static func unregister(token: String) {
-        queue.sync {
-            responseProviders.removeValue(forKey: token)
-        }
-    }
-
-    override static func canInit(with request: URLRequest) -> Bool {
-        true
-    }
-
-    override static func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        guard let token = request.value(forHTTPHeaderField: Self.tokenHeader) else {
-            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
-            return
-        }
-
-        let responseProvider = Self.queue.sync {
-            Self.responseProviders[token]
-        }
-
-        guard let responseProvider else {
-            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
-            return
-        }
-
-        do {
-            let (response, data) = try responseProvider(request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            if let data {
-                client?.urlProtocol(self, didLoad: data)
-            }
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
-    }
-
-    override func stopLoading() {}
-}
-
 enum WeatherTestHelper {
     static func createMockSession(
         responseProvider: @escaping (URLRequest) throws -> (URLResponse, Data?)
     ) -> (session: URLSession, cleanup: () -> Void) {
-        let token = UUID().uuidString
-        MockWeatherURLProtocol.register(token: token, responseProvider: responseProvider)
-
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockWeatherURLProtocol.self]
-        configuration.urlCache = nil
-        configuration.httpAdditionalHeaders = ["X-Mock-Weather-Token": token]
-        let session = URLSession(configuration: configuration)
-        let cleanup = { MockWeatherURLProtocol.unregister(token: token) }
-        return (session, cleanup)
+        TestURLSessionHelper.makeSession(responseProvider: responseProvider)
     }
 
     static func createValidLocationManager() -> LocationManager {
