@@ -7,12 +7,18 @@ import SwiftUI
 import MapKit
 
 /// Location picker for the Almanac: Current Location, one search field with
-/// `AppleSearchCompleter` suggestions, and the last selected fixed place.
+/// `AppleSearchCompleter` suggestions, and the last selected fixed place
+/// (the persisted last FIXED location — never a Current-mode GPS fix).
 /// Selecting a suggestion resolves it through `AlmanacLocationResolving`
 /// (the view-model-owned resolver contract) before handing the resolved
 /// location back. No favourites manager — the sheet stays a single picker.
 struct AlmanacLocationSheet: View {
+    /// The currently displayed Almanac location (a Current-mode fix or the
+    /// pinned fixed location), for mode detail and selected-state.
     let currentLocation: AlmanacLocation?
+    /// The last user-chosen FIXED location, offered as "Last selected place"
+    /// even while the Almanac follows the device in Current mode.
+    let lastFixedLocation: AlmanacLocation?
     let locationManager: LocationManager?
     @ObservedObject var completer: AppleSearchCompleter
     let resolver: any AlmanacLocationResolving
@@ -121,10 +127,15 @@ struct AlmanacLocationSheet: View {
 
     @ViewBuilder
     private var selectedPlaceSection: some View {
-        if let place = currentLocation, place.mode == .selected {
+        if let place = lastFixedLocation {
             VStack(alignment: .leading, spacing: CelSpace.xs) {
                 Text("LAST SELECTED PLACE").celEyebrow(size: 10)
                 Button {
+                    // Already pinned: dismissing keeps the strip where it is.
+                    // Otherwise the row is a shortcut back to the fixed place.
+                    if place != currentLocation {
+                        onSelectLocation(place)
+                    }
                     dismiss()
                 } label: {
                     rowLabel(
@@ -132,7 +143,7 @@ struct AlmanacLocationSheet: View {
                         tint: .celGold,
                         title: AlmanacText.placeLine(place),
                         detail: "Fixed destination — the date strip stays in its time zone.",
-                        isSelected: true
+                        isSelected: place == currentLocation
                     )
                 }
             }

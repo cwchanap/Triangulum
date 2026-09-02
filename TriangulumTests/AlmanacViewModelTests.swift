@@ -476,6 +476,57 @@ struct AlmanacViewModelTests {
         #expect(viewModel.tideWarning == nil)
     }
 
+    // MARK: - Selection changes clear stale tide state
+
+    /// Regression (C3): switching to a new selection clears the previous
+    /// selection's tide state synchronously, so a failed resolution for the
+    /// new location publishes a warning for it — never the old location's
+    /// predictions.
+    @Test func switchingToUnsupportedLocationClearsThePreviousSelectionsTideState() async {
+        let day = Self.tideDay(date: Self.todayLocal)
+        let harness = cachedTideHarness { _, _ in TideDaySnapshot(day: day, isStale: false) }
+        let viewModel = harness.viewModel
+
+        // Location A publishes a good tide day.
+        viewModel.selectLocation(Self.vancouver)
+        viewModel.section = .tides
+        await viewModel.loadTides()
+        #expect(viewModel.tideDay == day)
+        #expect(viewModel.stationContext != nil)
+
+        // Location B is an unsupported tide region: A's data must not stay
+        // visible under B.
+        harness.tideService.resolveResult = .failure(TideLoadError.unsupportedRegion)
+        viewModel.selectLocation(Self.paris)
+        await waitUntil { viewModel.tideWarning == .unsupportedRegion }
+
+        #expect(viewModel.tideDay == nil)
+        #expect(viewModel.stationContext == nil)
+        #expect(viewModel.tideWarning == .unsupportedRegion)
+    }
+
+    /// Regression (C3): a date change whose new day has no cache and fails
+    /// its refresh must not leave the previous date's day on screen.
+    @Test func failedRefreshForANewDateClearsThePreviousDatesDay() async {
+        let day = Self.tideDay(date: Self.todayLocal)
+        let harness = cachedTideHarness { _, _ in TideDaySnapshot(day: day, isStale: false) }
+        let viewModel = harness.viewModel
+
+        viewModel.selectLocation(Self.vancouver)
+        viewModel.section = .tides
+        await viewModel.loadTides()
+        #expect(viewModel.tideDay == day)
+
+        let laterDate = LocalDate(year: 2026, month: 9, day: 16)
+        harness.tideService.cachedHandler = { _, _ in nil }
+        harness.tideService.refreshHandler = { _, _ in throw TideLoadError.networkUnavailable }
+        viewModel.selectDate(laterDate)
+        await waitUntil { viewModel.tideWarning == .networkUnavailable }
+
+        #expect(viewModel.tideDay == nil)
+        #expect(viewModel.tideWarning == .networkUnavailable)
+    }
+
     // MARK: - Generation guard
 
     @Test func olderAsyncResponseCannotOverwriteNewerSelection() async {
@@ -563,5 +614,59 @@ struct AlmanacViewModelTests {
         try? await Task.sleep(nanoseconds: 200_000_000)
 
         #expect(viewModel.tideWarning == .unsupportedRegion)
+    }
+
+    // MARK: - Current mode never clobbers the persisted fixed location
+
+    /// Regression (I3): Current-mode GPS fixes are displayed but never
+    /// persisted as the last fixed location.
+    @Test func currentModeFixesNeverOverwriteThePersistedFixedLocation() async {
+        let harness = makeHarness(
+            preferences: AlmanacPreferences(mode: .selected, selectedLocation: Self.vancouver, stationOverride: nil)
+        )
+        let viewModel = harness.viewModel
+
+        viewModel.useCurrentLocation()
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        await waitUntil { harness.resolver.currentCoordinateCalls.count == 1 }
+
+        #expect(viewModel.location == Self.resolvedCurrent)
+        #expect(harness.store.load().mode == .current)
+        #expect(harness.store.load().selectedLocation == Self.vancouver,
+                "A Current-mode fix must not overwrite the persisted fixed location")
+
+        // Movement beyond 5 km resolves again; still never persisted.
+        harness.locationManager.longitude = -123.16
+        await waitUntil { harness.resolver.currentCoordinateCalls.count == 2 }
+        #expect(viewModel.lastFixedLocation == Self.vancouver)
+        #expect(harness.store.load().selectedLocation == Self.vancouver)
+    }
+
+    /// Regression (I3): the sheet derives its "last selected place" from the
+    /// persisted last FIXED place, which a Current-mode launch restores even
+    /// while the display follows the device.
+    @Test func currentModeRestoreKeepsTheLastFixedLocationForTheSheet() {
+        let harness = makeHarness(
+            preferences: AlmanacPreferences(mode: .current, selectedLocation: Self.vancouver, stationOverride: nil)
+        )
+        let viewModel = harness.viewModel
+
+        #expect(viewModel.location == nil, "Current mode pins no location")
+        #expect(viewModel.lastFixedLocation == Self.vancouver)
+    }
+
+    /// Regression (I3): selecting a fixed place stores it as the last fixed
+    /// location even when the app was following the device.
+    @Test func selectingAFixedPlaceUpdatesTheLastFixedLocation() {
+        let harness = makeHarness()
+        let viewModel = harness.viewModel
+
+        viewModel.selectLocation(Self.victoria)
+
+        #expect(viewModel.location == Self.victoria)
+        #expect(viewModel.lastFixedLocation == Self.victoria)
+        #expect(harness.store.load().selectedLocation == Self.victoria)
+        #expect(harness.store.load().mode == .selected)
     }
 }

@@ -136,6 +136,7 @@ struct AlmanacView: View {
             NavigationStack {
                 AlmanacLocationSheet(
                     currentLocation: viewModel.location,
+                    lastFixedLocation: viewModel.lastFixedLocation,
                     locationManager: locationManager,
                     completer: searchCompleter,
                     resolver: dependencies.locationResolver,
@@ -218,8 +219,8 @@ struct AlmanacView: View {
     /// Time-zone names and offsets are evaluated at the selected date's local
     /// noon so a destination DST transition never mislabels the strip's day.
     private func dateAnchor(in timeZone: TimeZone) -> Date {
-        guard let selectedDate = viewModel.selectedDate else { return Date() }
-        return (try? selectedDate.noon(in: timeZone)) ?? Date()
+        guard let selectedDate = viewModel.selectedDate else { return viewModel.currentDate }
+        return (try? selectedDate.noon(in: timeZone)) ?? viewModel.currentDate
     }
 
     // MARK: - Date strip
@@ -337,7 +338,7 @@ struct AlmanacView: View {
 
     private var destinationToday: LocalDate? {
         guard let timeZone = viewModel.location?.timeZone else { return nil }
-        return LocalDate(Date(), in: timeZone)
+        return viewModel.today(in: timeZone)
     }
 
     // MARK: - Section picker

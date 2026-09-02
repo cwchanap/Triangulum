@@ -87,7 +87,7 @@ freshness per plan).
 - `CHS/stations-vancouver.json` (Vancouver row, slimmed with
   `jq '[.[] | select(.code == "07735")]'`, 1026 bytes):
   `https://api-iwls.dfo-mpo.gc.ca/api/v1/stations`
-- `CHS/vancouver-hourly.json` (2026-03-01 00:00Z – 2026-03-02 00:00Z, 24 rows):
+- `CHS/vancouver-hourly.json` (2026-03-01 00:00Z – 2026-03-02 00:00Z, 25 rows):
   `https://api-iwls.dfo-mpo.gc.ca/api/v1/stations/5cebf1de3d0f4a073c4bb943/data?time-series-code=wlp&from=2026-03-01T00:00:00Z&to=2026-03-02T00:00:00Z&resolution=SIXTY_MINUTES`
 - `CHS/vancouver-hilo.json` (same window, 4 high/low events):
   `https://api-iwls.dfo-mpo.gc.ca/api/v1/stations/5cebf1de3d0f4a073c4bb943/data?time-series-code=wlp-hilo&from=2026-03-01T00:00:00Z&to=2026-03-02T00:00:00Z`
@@ -148,7 +148,7 @@ rate quota; poll politely, cache aggressively (30-day catalogue freshness).
 - `NOAA/stations-selection.json` (full catalogue → San Francisco reference row
   + first subordinate row via the plan's `python3` filter, 1201 bytes):
   `https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions`
-- `NOAA/san-francisco-hourly.json` (2026-03-01 → 2026-03-02, 25 rows):
+- `NOAA/san-francisco-hourly.json` (2026-03-01 → 2026-03-02, 48 rows):
   `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&application=Triangulum&station=9414290&begin_date=20260301&end_date=20260302&datum=MLLW&time_zone=gmt&units=metric&format=json&interval=h`
 - `NOAA/san-francisco-hilo.json` (2026-03-01 → 2026-03-02, 7 events):
   `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&application=Triangulum&station=9414290&begin_date=20260301&end_date=20260302&datum=MLLW&time_zone=gmt&units=metric&format=json&interval=hilo`

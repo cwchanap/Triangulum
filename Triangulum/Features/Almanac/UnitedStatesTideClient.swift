@@ -52,9 +52,12 @@ struct UnitedStatesTideClient: TideProviderClient {
                 // type "R" = reference/harmonic; "S" = subordinate. Rows in
                 // this catalogue support hourly predictions by definition
                 // (type=tidepredictions); valid coordinates are required for
-                // nearest-station selection.
+                // nearest-station selection; `state` is the mdapi
+                // jurisdiction signal — non-U.S. rows carry no valid U.S.
+                // state/jurisdiction and must not be retained.
                 station.type == "R"
                     && (station.referenceID ?? "").isEmpty
+                    && !(station.state ?? "").isEmpty
                     && (station.latitude ?? .nan).isFinite
                     && (station.longitude ?? .nan).isFinite
             }
@@ -78,7 +81,15 @@ struct UnitedStatesTideClient: TideProviderClient {
         let gmtDayFormatter = Self.makeGMTFormatter(dateFormat: "yyyyMMdd")
         let predictionTimeFormatter = Self.makeGMTFormatter(dateFormat: "yyyy-MM-dd HH:mm")
         let beginDate = gmtDayFormatter.string(from: try range.start.start(in: timeZone))
-        let endDate = gmtDayFormatter.string(from: try range.endInclusive.start(in: timeZone))
+        // datagetter's end date is an inclusive GMT calendar day, so the
+        // request must cover the range's final instant: the last local-day
+        // evening, endExclusive − 1s. The old derivation from the last local
+        // day's 00:00 (endInclusive.start) falls one GMT day short for every
+        // non-zero-offset station — in the west endExclusive lands at e.g.
+        // 07:00Z on the NEXT GMT day, whose whole local evening (through
+        // 06:59Z) was never requested.
+        let finalInstant = try range.endInclusive.endExclusive(in: timeZone).addingTimeInterval(-1)
+        let endDate = gmtDayFormatter.string(from: finalInstant)
 
         let hourlyURL = try Self.predictionsURL(
             station: station, beginDate: beginDate, endDate: endDate, interval: "h"
@@ -193,12 +204,14 @@ struct UnitedStatesTideClient: TideProviderClient {
         let type: String
         let latitude: Double?
         let longitude: Double?
+        let state: String?
 
         enum CodingKeys: String, CodingKey {
             case id, name, type
             case latitude = "lat"
             case longitude = "lng"
             case referenceID = "reference_id"
+            case state
         }
 
         let referenceID: String?
@@ -210,6 +223,7 @@ struct UnitedStatesTideClient: TideProviderClient {
             type = try container.decode(String.self, forKey: .type)
             latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
             longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+            state = try container.decodeIfPresent(String.self, forKey: .state)
             referenceID = try container.decodeIfPresent(String.self, forKey: .referenceID)
         }
     }

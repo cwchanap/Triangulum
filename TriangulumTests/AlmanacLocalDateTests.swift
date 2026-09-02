@@ -112,6 +112,75 @@ struct AlmanacLocalDateTests {
         #expect(throws: LocalDateError.invalidDate) {
             try LocalDate(year: 2026, month: 13, day: 1).noon(in: zone)
         }
+        // The DST-midnight tolerance must never paper over genuinely invalid
+        // dates, in a DST zone or not.
+        let santiago = TimeZone(identifier: "America/Santiago")!
+        #expect(throws: LocalDateError.invalidDate) {
+            try LocalDate(year: 2026, month: 2, day: 30).start(in: santiago)
+        }
+    }
+
+    // MARK: - DST transitions at midnight (America/Santiago)
+
+    /// America/Santiago moves its clocks at 24:00: on 2026-09-06 the 00:00
+    /// wall time is skipped (the day starts at 01:00) and on 2026-04-05 the
+    /// 00:00 wall time repeats. `start` must resolve both days to an instant
+    /// on the requested civil date instead of throwing.
+    @Test func santiagoSpringForwardDayStartResolvesToTheRealFirstInstant() throws {
+        let zone = TimeZone(identifier: "America/Santiago")!
+        let day = LocalDate(year: 2026, month: 9, day: 6)
+
+        let start = try day.start(in: zone)
+        let noon = try day.noon(in: zone)
+        let end = try day.endExclusive(in: zone)
+
+        // 00:00 does not exist: the day starts at 01:00 local and is 23 hours
+        // long, with noon 11 hours after the start.
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        #expect(calendar.component(.hour, from: start) == 1)
+        #expect(calendar.dateComponents([.year, .month, .day], from: start)
+            == DateComponents(year: 2026, month: 9, day: 6))
+        #expect(noon.timeIntervalSince(start) == 11 * 3600)
+        #expect(end.timeIntervalSince(start) == 23 * 3600)
+        #expect(calendar.dateComponents([.year, .month, .day], from: end)
+            == DateComponents(year: 2026, month: 9, day: 7))
+
+        // Rolling navigation across the transition day stays civil-date
+        // correct for every day of the window.
+        let range = try day.rollingSevenDays(in: zone)
+        let dates = try range.dates(in: zone)
+        #expect(dates.count == 7)
+        #expect(dates.last == LocalDate(year: 2026, month: 9, day: 12))
+    }
+
+    @Test func santiagoFallBackDayStaysOnTheCorrectCivilDates() throws {
+        let zone = TimeZone(identifier: "America/Santiago")!
+        let day = LocalDate(year: 2026, month: 4, day: 5)
+
+        let start = try day.start(in: zone)
+        let noon = try day.noon(in: zone)
+        let end = try day.endExclusive(in: zone)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        #expect(calendar.component(.hour, from: start) == 0)
+        #expect(calendar.dateComponents([.year, .month, .day], from: start)
+            == DateComponents(year: 2026, month: 4, day: 5))
+        // Both the start and noon are on the requested civil day (noon stays
+        // 12:00 wall time), and the day ends at the next day's midnight.
+        #expect(calendar.component(.hour, from: noon) == 12)
+        #expect(calendar.dateComponents([.year, .month, .day], from: noon)
+            == DateComponents(year: 2026, month: 4, day: 5))
+        #expect(calendar.dateComponents([.year, .month, .day], from: end)
+            == DateComponents(year: 2026, month: 4, day: 6))
+
+        // Foundation resolves the repeated midnight to its post-transition
+        // occurrence, so the resolved day spans 24 h; every instant still
+        // belongs to the intended civil dates.
+        #expect(end > noon)
+        let nextDay = try day.adding(days: 1, in: zone)
+        #expect(nextDay == LocalDate(year: 2026, month: 4, day: 6))
     }
 
     // MARK: - Ordering and Codable

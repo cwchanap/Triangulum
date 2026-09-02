@@ -11,7 +11,10 @@ import SwiftUI
 /// explicit polar copy for polar day/night.
 struct AlmanacSunView: View {
     @ObservedObject var viewModel: AlmanacViewModel
-    @State private var now = Date()
+    /// Render trigger only: every today/countdown judgment reads the view
+    /// model's injected clock, so the -ui-testing fixture stays deterministic
+    /// and this tick (at most once per minute) keeps production copy fresh.
+    @State private var minuteTick = 0
 
     /// Spec: countdown updates at most once per minute.
     private let minuteTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -72,17 +75,17 @@ struct AlmanacSunView: View {
             .padding(.top, CelSpace.sm)
             .padding(.bottom, CelSpace.lg)
         }
-        .onReceive(minuteTimer) { now = $0 }
+        .onReceive(minuteTimer) { _ in minuteTick += 1 }
     }
 
     @ViewBuilder
     private var sectionContent: some View {
         if let solarDay = viewModel.solarDay, let timeZone = viewModel.location?.timeZone {
             headlineCard(solarDay: solarDay, timeZone: timeZone)
-            if LocalDate(now, in: timeZone) == solarDay.date {
+            if viewModel.today(in: timeZone) == solarDay.date {
                 nextEventCard(solarDay: solarDay, timeZone: timeZone)
             }
-            DaylightTrackCard(solarDay: solarDay, timeZone: timeZone)
+            DaylightTrackCard(solarDay: solarDay, timeZone: timeZone, now: viewModel.currentDate)
             eventsCard(solarDay: solarDay, timeZone: timeZone, title: "Morning",
                        kinds: Self.morningKinds, emptyText: Self.emptyMorningText)
             eventsCard(solarDay: solarDay, timeZone: timeZone, title: "Evening",
@@ -142,14 +145,14 @@ struct AlmanacSunView: View {
     }
 
     private func dayStart(_ solarDay: SolarDay, in timeZone: TimeZone) -> Date {
-        (try? solarDay.date.start(in: timeZone)) ?? Date()
+        (try? solarDay.date.start(in: timeZone)) ?? viewModel.currentDate
     }
 
     // MARK: - Next event (destination-local today only)
 
     private func nextEventCard(solarDay: SolarDay, timeZone: TimeZone) -> some View {
         HStack(spacing: CelSpace.sm) {
-            if let next = solarDay.nextEvent(after: now) {
+            if let next = solarDay.nextEvent(after: viewModel.currentDate) {
                 Image(systemName: Self.icon(for: next.kind))
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(Self.accent(for: next.kind))
@@ -163,7 +166,7 @@ struct AlmanacSunView: View {
                         .foregroundStyle(Color.celTextDim)
                 }
                 Spacer()
-                Text(AlmanacText.countdownText(from: now, to: next.instant))
+                Text(AlmanacText.countdownText(from: viewModel.currentDate, to: next.instant))
                     .font(.celReadout(15))
                     .foregroundStyle(Color.celAmber)
             } else {
@@ -188,7 +191,7 @@ struct AlmanacSunView: View {
         let events: [SolarEvent] = kinds.compactMap { kind in
             solarDay.event(kind).map { SolarEvent(kind: kind, instant: $0) }
         }
-        let isToday = LocalDate(now, in: solarDay.timeZone) == solarDay.date
+        let isToday = viewModel.today(in: timeZone) == solarDay.date
 
         return VStack(alignment: .leading, spacing: 0) {
             Text(title.uppercased())
@@ -221,7 +224,7 @@ struct AlmanacSunView: View {
                             .monospacedDigit()
                             .foregroundStyle(Color.celText)
                     }
-                    .opacity(isToday && event.instant < now ? 0.45 : 1)
+                    .opacity(isToday && event.instant < viewModel.currentDate ? 0.45 : 1)
                 }
             }
         }
@@ -280,6 +283,9 @@ struct AlmanacSunView: View {
 private struct DaylightTrackCard: View {
     let solarDay: SolarDay
     let timeZone: TimeZone
+    /// Fallback anchor from the injected clock for the (unreachable for real
+    /// dates) invalid-local-day branch of `dayInterval`.
+    let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: CelSpace.sm) {
@@ -322,7 +328,7 @@ private struct DaylightTrackCard: View {
     }
 
     private var dayInterval: (start: Date, end: Date) {
-        let start = (try? solarDay.date.start(in: timeZone)) ?? Date()
+        let start = (try? solarDay.date.start(in: timeZone)) ?? now
         let end = (try? solarDay.date.endExclusive(in: timeZone)) ?? start.addingTimeInterval(86_400)
         return (start, end)
     }

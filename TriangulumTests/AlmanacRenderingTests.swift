@@ -114,9 +114,10 @@ struct AlmanacRenderingTests {
 
     @Test func sunSectionRendersWithDestinationLocalTodayCountdown() {
         let harness = makeHarness()
-        // The destination-local today (real clock, matching the view's own
-        // `now`) exercises the countdown/next-event branch.
-        let today = LocalDate(Date(), in: Self.vancouverTimeZone)
+        // The destination-local today per the injected fixture clock
+        // (matching the view's own today judgments) exercises the
+        // countdown/next-event branch.
+        let today = LocalDate(harness.viewModel.currentDate, in: Self.vancouverTimeZone)
         harness.viewModel.selectDate(today)
         #expect(harness.viewModel.solarDay != nil)
 
@@ -157,7 +158,7 @@ struct AlmanacRenderingTests {
         // Station-local today exercises the next-tide countdown and the
         // current-time rule; the station sheet source is the published
         // context.
-        let today = LocalDate(Date(), in: Self.vancouverTimeZone)
+        let today = LocalDate(harness.viewModel.currentDate, in: Self.vancouverTimeZone)
         harness.viewModel.selectDate(today)
         await waitUntil { harness.viewModel.tideDay?.localDate == today }
         #expect(harness.viewModel.tideDay != nil)
@@ -200,8 +201,10 @@ struct AlmanacRenderingTests {
     // MARK: - Location sheet
 
     @Test func locationSheetRendersCurrentAndLastSelectedRows() {
+        // Selected mode: the fixed place is both current and last-selected.
         let sheet = AlmanacLocationSheet(
             currentLocation: Self.vancouver,
+            lastFixedLocation: Self.vancouver,
             locationManager: nil,
             completer: AppleSearchCompleter(),
             resolver: AlmanacFixtureLocationResolver(),
@@ -214,6 +217,27 @@ struct AlmanacRenderingTests {
         withExtendedLifetime(window) {
             #expect(host.view.window != nil,
                     "Location sheet failed to attach to a window")
+        }
+    }
+
+    @Test func locationSheetRendersLastFixedPlaceWhileFollowingTheDevice() {
+        // Current mode (no fix yet): no current location, but the persisted
+        // last FIXED place still offers a row.
+        let sheet = AlmanacLocationSheet(
+            currentLocation: nil,
+            lastFixedLocation: Self.vancouver,
+            locationManager: nil,
+            completer: AppleSearchCompleter(),
+            resolver: AlmanacFixtureLocationResolver(),
+            onSelectLocation: { _ in },
+            onUseCurrentLocation: {}
+        )
+
+        let (host, window) = renderHost(sheet, size: CGSize(width: 320, height: 568))
+
+        withExtendedLifetime(window) {
+            #expect(host.view.window != nil,
+                    "Location sheet with only a last fixed place failed to attach")
         }
     }
 

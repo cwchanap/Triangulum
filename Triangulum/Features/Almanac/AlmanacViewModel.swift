@@ -31,8 +31,23 @@ final class AlmanacViewModel: ObservableObject {
     @Published private(set) var tideDay: TideDay?
     @Published private(set) var tideIsStale = false
     @Published private(set) var tideWarning: TideLoadError?
+    /// The last user-chosen FIXED location (never a Current-mode GPS fix), so
+    /// the location sheet can always offer it and `selectedLocation` keeps
+    /// meaning "the last valid fixed location" per spec.
+    @Published private(set) var lastFixedLocation: AlmanacLocation?
 
     private var requestGeneration = UUID()
+
+    /// The injected clock's current instant. Views anchor every "today" and
+    /// countdown judgment here — never `Date()` — so the -ui-testing fixture
+    /// clock drives deterministic copy and the date strip stays consistent
+    /// with the view model's own date math.
+    var currentDate: Date { now() }
+
+    /// Destination-local today for `timeZone`, from the injected clock.
+    func today(in timeZone: TimeZone) -> LocalDate {
+        LocalDate(currentDate, in: timeZone)
+    }
 
     private var locationMode: AlmanacLocationMode
     private var stationOverride: TideStationOverride?
@@ -65,8 +80,11 @@ final class AlmanacViewModel: ObservableObject {
         let preferences = preferencesStore.load()
         locationMode = preferences.mode
         stationOverride = preferences.stationOverride
+        lastFixedLocation = preferences.selectedLocation
         // Restore the persisted location mode and last fixed location; the
-        // selected date always restarts at destination-local today.
+        // selected date always restarts at destination-local today. In
+        // Current mode the last fixed location is offered (location sheet)
+        // but never pinned — the app follows the device instead.
         if let restored = preferences.selectedLocation, preferences.mode == .selected {
             location = restored
         }
@@ -98,10 +116,17 @@ final class AlmanacViewModel: ObservableObject {
 
     private func applyDateSelection(_ date: LocalDate?, movesWindow: Bool) {
         guard let date else { return }
+        let dateChanged = date != selectedDate
         selectedDate = date
         if movesWindow { windowStart = date }
         refreshVisibleDates()
         recomputeSolarDay()
+        if dateChanged {
+            // The published day belongs to the old date; never show it under
+            // the new selection (spec: failures preserve data only for the
+            // SAME selection).
+            resetTideState()
+        }
         reloadTidesIfNeeded()
     }
 
@@ -123,6 +148,9 @@ final class AlmanacViewModel: ObservableObject {
         locationMode = location.mode
         stationOverride = nil
         if location.mode == .selected {
+            // A search selection is a FIXED location: it becomes the last
+            // fixed place the sheet offers and the store persists.
+            lastFixedLocation = location
             stopCurrentLocationObservation()
         }
         persistPreferences()
@@ -134,13 +162,14 @@ final class AlmanacViewModel: ObservableObject {
             refreshVisibleDates()
         }
         recomputeSolarDay()
+        resetTideState()
         reloadTidesIfNeeded()
     }
 
     /// Switches to Current mode: observe the shared LocationManager and
     /// resolve the placemark on the first valid fix (and after ≥5 km moves).
     func useCurrentLocation() {
-        guard let locationManager else { return }
+        guard locationManager != nil else { return }
         locationMode = .current
         startCurrentLocationObservation()
         persistPreferences()
@@ -156,6 +185,7 @@ final class AlmanacViewModel: ObservableObject {
             anchorLongitude: location.longitude
         )
         persistPreferences()
+        resetTideState()
         reloadTidesIfNeeded()
     }
 
@@ -163,6 +193,7 @@ final class AlmanacViewModel: ObservableObject {
         guard stationOverride != nil else { return }
         stationOverride = nil
         persistPreferences()
+        resetTideState()
         reloadTidesIfNeeded()
     }
 
@@ -252,6 +283,10 @@ final class AlmanacViewModel: ObservableObject {
         }
         recomputeSolarDay()
         persistPreferences()
+        // A Current-mode fix is a NEW selection: clear the previous
+        // selection's tide state before loading (and never treat the fix as
+        // the persisted last fixed location).
+        resetTideState()
         reloadTidesIfNeeded()
     }
 
@@ -347,13 +382,28 @@ final class AlmanacViewModel: ObservableObject {
         (error as? TideLoadError) ?? .networkUnavailable
     }
 
+    /// Selection-changing actions clear the previous selection's tide state
+    /// synchronously, before the replacement load starts, so a resolution or
+    /// refresh failure for the new selection can never leave the old
+    /// selection's predictions on screen. Same-selection reloads (section
+    /// switches, pull-to-refresh, cache-first day reads) keep published data
+    /// visible per spec.
+    private func resetTideState() {
+        stationContext = nil
+        tideDay = nil
+        tideIsStale = false
+        tideWarning = nil
+    }
+
     // MARK: - Persistence
 
     private func persistPreferences() {
+        // `selectedLocation` always means the last FIXED location: a
+        // Current-mode GPS fix is displayed but never persisted over it.
         try? preferencesStore.save(
             AlmanacPreferences(
                 mode: locationMode,
-                selectedLocation: location,
+                selectedLocation: lastFixedLocation,
                 stationOverride: stationOverride
             )
         )
