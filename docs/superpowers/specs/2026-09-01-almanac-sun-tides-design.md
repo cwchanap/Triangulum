@@ -735,7 +735,7 @@ The implementation is complete when focused Almanac/existing solar tests pass, a
 
 Deliver the approved feature in **one PR**. Use incremental reviewable commits inside the PR, but do not split already-approved provider coverage into separate PRs unless scope is explicitly changed.
 
-The provider boundary still ensures later maintenance is isolated: each source owns one client/parser and fixture suite behind a closed switch. That maintenance property does not require fragmenting this feature delivery.
+The provider boundary still ensures later maintenance is isolated: each source owns one client/parser and fixture suite behind a closed switch. That maintenance property does not require fragmenting this feature delivery, and the providers are not identical mechanical additions: JMA/HKO introduce annual-source parsing/cache behavior while CHS/NOAA have distinct remote catalogue/prediction contracts.
 
 Suggested order:
 
