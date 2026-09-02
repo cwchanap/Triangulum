@@ -755,6 +755,10 @@ A region that fails the source-contract/fixture gate is visibly disabled in this
 
 ## Risks and mitigations
 
+### Delivery scope
+
+The feature intentionally includes four regional providers in one PR because that coverage was approved as one task and the project uses one PR per task unless a split is explicitly approved. The source-contract gate prevents speculative parser work, and the regional implementations remain isolated behind the closed client seam. JMA/HKO are not mechanically identical follow-ups because they introduce annual-source parsing/cache behavior; CHS/NOAA have different remote catalogue and prediction contracts.
+
 ### Source-contract feasibility
 
 A regional source may not expose or permit both required prediction forms. Task 1 is a hard gate: capture the real request/response pair before writing its client. A failed source is disabled before parser/UI work, not special-cased afterward.
