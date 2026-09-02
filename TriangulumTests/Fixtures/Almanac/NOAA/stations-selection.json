@@ -1,0 +1,48 @@
+{
+  "stations": [
+    {
+      "state": "CA",
+      "tidepredoffsets": {
+        "self": "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/9414290/tidepredoffsets.json"
+      },
+      "type": "R",
+      "timemeridian": 0,
+      "reference_id": "",
+      "timezonecorr": -8,
+      "id": "9414290",
+      "name": "SAN FRANCISCO (Golden Gate)",
+      "lat": 37.80630555555555,
+      "lng": -122.4658888888889,
+      "affiliations": "",
+      "portscode": "",
+      "products": null,
+      "disclaimers": null,
+      "notices": null,
+      "self": null,
+      "expand": null,
+      "tideType": ""
+    },
+    {
+      "state": "HI",
+      "tidepredoffsets": {
+        "self": "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/1610367/tidepredoffsets.json"
+      },
+      "type": "S",
+      "timemeridian": -150,
+      "reference_id": "1612340",
+      "timezonecorr": -10,
+      "id": "1610367",
+      "name": "Nonopapa, Niihau Island",
+      "lat": 21.87,
+      "lng": -160.235,
+      "affiliations": "",
+      "portscode": "",
+      "products": null,
+      "disclaimers": null,
+      "notices": null,
+      "self": null,
+      "expand": null,
+      "tideType": ""
+    }
+  ]
+}
