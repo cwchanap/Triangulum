@@ -7,71 +7,6 @@
 
 import SwiftUI
 
-// MARK: - SolarDay
-
-/// All solar event times for a given calendar day and observer location.
-/// Times are nil when the Sun never reaches that altitude (polar day/night).
-struct SolarDay {
-    let date: Date
-    let latitude: Double
-    let longitude: Double
-
-    // Morning (Sun rising through each threshold)
-    let astronomicalDawn: Date?    // Sun at -18° rising  — sky turns from black to deep blue
-    let nauticalDawn: Date?        // Sun at -12° rising  — horizon faintly visible
-    let civilDawn: Date?           // Sun at  -6° rising  — blue hour begins
-    let sunrise: Date?             // Sun at -0.833° rising — golden hour begins
-    let morningGoldenEnd: Date?    // Sun at  +6° rising  — golden hour ends
-
-    // Evening (Sun setting through each threshold)
-    let eveningGoldenStart: Date?  // Sun at  +6° setting — golden hour begins
-    let sunset: Date?              // Sun at -0.833° setting — golden hour ends
-    let civilDusk: Date?           // Sun at  -6° setting — blue hour ends
-    let nauticalDusk: Date?        // Sun at -12° setting
-    let astronomicalDusk: Date?    // Sun at -18° setting — sky fully dark
-
-    init(date: Date, latitude: Double, longitude: Double) {
-        self.date = date
-        self.latitude = latitude
-        self.longitude = longitude
-
-        let solarCrossing = ConstellationMapView.Astronomer.solarCrossing
-        astronomicalDawn = solarCrossing(-18.0, true, date, latitude, longitude)
-        nauticalDawn = solarCrossing(-12.0, true, date, latitude, longitude)
-        civilDawn = solarCrossing(-6.0, true, date, latitude, longitude)
-        sunrise = solarCrossing(-0.833, true, date, latitude, longitude)
-        morningGoldenEnd = solarCrossing(6.0, true, date, latitude, longitude)
-        eveningGoldenStart = solarCrossing(6.0, false, date, latitude, longitude)
-        sunset = solarCrossing(-0.833, false, date, latitude, longitude)
-        civilDusk = solarCrossing(-6.0, false, date, latitude, longitude)
-        nauticalDusk = solarCrossing(-12.0, false, date, latitude, longitude)
-        astronomicalDusk = solarCrossing(-18.0, false, date, latitude, longitude)
-    }
-
-    /// All non-nil events sorted chronologically.
-    var allEvents: [(label: String, time: Date)] {
-        let raw: [(String, Date?)] = [
-            ("Astronomical twilight", astronomicalDawn),
-            ("Nautical twilight", nauticalDawn),
-            ("Blue hour begins", civilDawn),
-            ("Sunrise", sunrise),
-            ("Golden hour ends", morningGoldenEnd),
-            ("Golden hour begins", eveningGoldenStart),
-            ("Sunset", sunset),
-            ("Blue hour ends", civilDusk),
-            ("Nautical twilight ends", nauticalDusk),
-            ("Astronomical twilight ends", astronomicalDusk)
-        ]
-        return raw.compactMap { label, time in time.map { (label, $0) } }
-               .sorted { $0.time < $1.time }
-    }
-
-    /// The first event after `now`, or nil if all events are in the past.
-    func nextEvent(after now: Date) -> (label: String, time: Date)? {
-        allEvents.first { $0.time > now }
-    }
-}
-
 // MARK: - SolarEventsView
 
 struct SolarEventsView: View {
@@ -95,6 +30,12 @@ struct SolarEventsView: View {
         return f
     }()
 
+    // Morning (Sun rising through each threshold) / evening, in display order.
+    private static let morningKinds: [SolarEventKind] =
+        [.astronomicalDawn, .nauticalDawn, .civilDawn, .sunrise, .morningGoldenEnd]
+    private static let eveningKinds: [SolarEventKind] =
+        [.eveningGoldenStart, .sunset, .civilDusk, .nauticalDusk, .astronomicalDusk]
+
     private var hasUsableLocation: Bool {
         locationManager.hasValidLocation
     }
@@ -103,12 +44,17 @@ struct SolarEventsView: View {
         Calendar.current.isDateInToday(selectedDate)
     }
 
+    // Temporary device-local bridge until Task 9 removes this screen.
+    private var solarDay: SolarDay? {
+        guard hasUsableLocation else { return nil }
+        return try? SolarDay(date: LocalDate(selectedDate, in: .current),
+                             timeZone: .current,
+                             latitude: locationManager.latitude,
+                             longitude: locationManager.longitude)
+    }
+
     var body: some View {
-        let solarDay = hasUsableLocation
-            ? SolarDay(date: selectedDate,
-                       latitude: locationManager.latitude,
-                       longitude: locationManager.longitude)
-            : nil
+        let solarDay = solarDay
 
         ScrollView {
             VStack(spacing: 0) {
@@ -184,85 +130,57 @@ struct SolarEventsView: View {
         .background(Color.celSurfaceTop.opacity(0.85))
     }
 
-    private func morningSection(solarDay: SolarDay) -> some View {
-        let hasMorningEvents = solarDay.astronomicalDawn != nil || solarDay.nauticalDawn != nil
-            || solarDay.civilDawn != nil || solarDay.sunrise != nil || solarDay.morningGoldenEnd != nil
-        return sectionCard(title: "MORNING") {
-            if hasMorningEvents {
-                if let t = solarDay.astronomicalDawn {
-                    SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celText, isPast: isToday && t < now)
-                }
-                if let t = solarDay.nauticalDawn {
-                    SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celText, isPast: isToday && t < now)
-                }
-                if let t = solarDay.civilDawn {
-                    SolarEventRow(icon: "circle.lefthalf.filled", label: "Blue hour begins",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celCyan, isPast: isToday && t < now)
-                }
-                if let t = solarDay.sunrise {
-                    SolarEventRow(icon: "sunrise.fill", label: "Sunrise · Golden hour",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celAmber, isPast: isToday && t < now)
-                }
-                if let t = solarDay.morningGoldenEnd {
-                    SolarEventRow(icon: "sun.max.fill", label: "Golden hour ends",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celAmber, isPast: isToday && t < now,
-                                  showDivider: false)
-                }
-            } else {
-                Text("Sun does not rise at this location today.")
+    private func section(solarDay: SolarDay, title: String, kinds: [SolarEventKind], emptyMessage: String) -> some View {
+        let events: [SolarEvent] = kinds.compactMap { kind in
+            solarDay.event(kind).map { SolarEvent(kind: kind, instant: $0) }
+        }
+        return sectionCard(title: title) {
+            if events.isEmpty {
+                Text(emptyMessage)
                     .font(.subheadline)
                     .foregroundColor(.celTextDim)
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(Array(events.enumerated()), id: \.offset) { index, event in
+                    SolarEventRow(icon: Self.icon(for: event.kind),
+                                  label: event.kind.displayName,
+                                  time: Self.timeFormatter.string(from: event.instant),
+                                  accent: Self.accent(for: event.kind),
+                                  isPast: isToday && event.instant < now,
+                                  showDivider: index < events.count - 1)
+                }
             }
         }
     }
 
+    private func morningSection(solarDay: SolarDay) -> some View {
+        section(solarDay: solarDay, title: "MORNING", kinds: Self.morningKinds,
+                emptyMessage: "Sun does not rise at this location today.")
+    }
+
     private func eveningSection(solarDay: SolarDay) -> some View {
-        let hasEveningEvents = solarDay.eveningGoldenStart != nil || solarDay.sunset != nil
-            || solarDay.civilDusk != nil || solarDay.nauticalDusk != nil || solarDay.astronomicalDusk != nil
-        return sectionCard(title: "EVENING") {
-            if hasEveningEvents {
-                if let t = solarDay.eveningGoldenStart {
-                    SolarEventRow(icon: "sun.max.fill", label: "Golden hour begins",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celAmber, isPast: isToday && t < now)
-                }
-                if let t = solarDay.sunset {
-                    SolarEventRow(icon: "sunset.fill", label: "Sunset · Blue hour",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celAmber, isPast: isToday && t < now)
-                }
-                if let t = solarDay.civilDusk {
-                    SolarEventRow(icon: "circle.righthalf.filled", label: "Blue hour ends",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celCyan, isPast: isToday && t < now)
-                }
-                if let t = solarDay.nauticalDusk {
-                    SolarEventRow(icon: "moon.fill", label: "Nautical twilight",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celText, isPast: isToday && t < now)
-                }
-                if let t = solarDay.astronomicalDusk {
-                    SolarEventRow(icon: "moon.stars.fill", label: "Astronomical twilight",
-                                  time: Self.timeFormatter.string(from: t),
-                                  accent: .celText, isPast: isToday && t < now,
-                                  showDivider: false)
-                }
-            } else {
-                Text("Sun does not set at this location today.")
-                    .font(.subheadline)
-                    .foregroundColor(.celTextDim)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        section(solarDay: solarDay, title: "EVENING", kinds: Self.eveningKinds,
+                emptyMessage: "Sun does not set at this location today.")
+    }
+
+    private static func icon(for kind: SolarEventKind) -> String {
+        switch kind {
+        case .astronomicalDawn, .astronomicalDusk: "moon.stars.fill"
+        case .nauticalDawn, .nauticalDusk: "moon.fill"
+        case .civilDawn: "circle.lefthalf.filled"
+        case .civilDusk: "circle.righthalf.filled"
+        case .sunrise: "sunrise.fill"
+        case .sunset: "sunset.fill"
+        case .morningGoldenEnd, .eveningGoldenStart: "sun.max.fill"
+        }
+    }
+
+    private static func accent(for kind: SolarEventKind) -> Color {
+        switch kind {
+        case .sunrise, .sunset, .morningGoldenEnd, .eveningGoldenStart: .celAmber
+        case .civilDawn, .civilDusk: .celCyan
+        case .astronomicalDawn, .astronomicalDusk, .nauticalDawn, .nauticalDusk: .celText
         }
     }
 
@@ -347,9 +265,9 @@ private struct SolarCountdownCard: View {
             Image(systemName: "timer")
                 .font(.title3)
             if let next = solarDay.nextEvent(after: now) {
-                let interval = next.time.timeIntervalSince(now)
+                let interval = next.instant.timeIntervalSince(now)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(next.label)
+                    Text(next.kind.displayName)
                         .font(.subheadline.weight(.semibold))
                     if interval > 0 {
                         let hours = Int(interval) / 3600

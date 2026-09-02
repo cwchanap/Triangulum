@@ -1,31 +1,29 @@
 import Foundation
 
 extension ConstellationMapView.Astronomer {
-    /// Returns the time on `date`'s calendar day when the Sun crosses `altitudeDeg`.
+    /// Returns the instant when the Sun crosses `altitudeDeg` on `localDate`
+    /// in `timeZone` — the destination's calendar day, not the device's.
     /// - Parameters:
     ///   - altitudeDeg: Target altitude (negative = below horizon). e.g. -0.833 for sunrise.
     ///   - rising: true = morning crossing, false = evening crossing.
-    ///   - date: Any moment on the target calendar day (local calendar used).
+    ///   - localDate: Destination-local calendar day.
+    ///   - timeZone: Destination time zone used to resolve `localDate`.
     ///   - latDeg: Observer latitude in degrees.
     ///   - lonDeg: Observer longitude in degrees.
     /// - Returns: nil if the Sun never reaches this altitude on this date (polar day/night).
     static func solarCrossing(
         altitudeDeg: Double,
         rising: Bool,
-        date: Date,
+        localDate: LocalDate,
+        timeZone: TimeZone,
         latDeg: Double,
         lonDeg: Double
     ) -> Date? {
         let rad = Double.pi / 180.0
         let latRad = latDeg * rad
 
-        // Use local calendar noon as reference (Sun's Dec changes slowly; good approx for the day)
-        var comps = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        comps.hour = 12
-        comps.minute = 0
-        comps.second = 0
-        comps.nanosecond = 0
-        guard let localNoon = Calendar.current.date(from: comps) else { return nil }
+        // Use destination-local noon as reference (Sun's Dec changes slowly; good approx for the day)
+        guard let localNoon = try? localDate.noon(in: timeZone) else { return nil }
 
         let sunEq = sunEquatorial(date: localNoon)
         let decRad = sunEq.decDeg * rad
