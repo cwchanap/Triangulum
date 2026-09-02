@@ -485,7 +485,7 @@ schema mismatch -> miss
 catalogue fresh for 30 days; stale catalogue still readable
 catalogue timezone enrichment survives reload
 partial provider result never reaches saveCompleteRange
-TideSourceKind annual/hourly/hilo paths are distinct
+TideSourceKind produces distinct annual/hourly/hilo source paths
 ```
 
 The Sep 1/Sep 2 overlap test is the regression for the old rolling-range cache-key defect.
@@ -1240,7 +1240,7 @@ Confirm before marking this PR ready:
 
 ## Delivery Decisions and Risks
 
-- **Provider scope remains one PR.** The four-region coverage was explicitly approved for this task, and the project workflow requires one PR per task unless split delivery is approved. The provider seam still makes later maintenance isolated, but this implementation does not create four follow-up PRs for already-approved scope.
+- **Provider scope remains one PR.** The four-region coverage was explicitly approved for this task, and the project workflow requires one PR per task unless split delivery is approved. The provider seam still makes later maintenance isolated, but this implementation does not create four follow-up PRs for already-approved scope. The formats are also not mechanically identical: JMA/HKO own annual-source parsing/caching and NOAA/CHS have distinct station/prediction contracts.
 - **Source-contract feasibility is a hard gate.** Task 1 must capture both required prediction forms for every enabled provider. A missing CHS/HKO/etc. contract blocks that provider before parser work begins.
 - **No new bundle-resource plumbing is assumed.** Test fixtures are loaded from the checked-out source tree via `#filePath`; production JMA/HKO station catalogues compile as Swift data.
 - **Cache overlap is explicitly tested.** The day-keyed normalized cache exists so a rolling Sep 2 window can reuse Sep 2–7 data fetched on Sep 1 instead of becoming a total cache miss.
