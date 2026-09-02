@@ -1,0 +1,37 @@
+[
+  {
+    "code": "07735",
+    "id": "5cebf1de3d0f4a073c4bb943",
+    "latitude": 49.2863,
+    "longitude": -123.0997,
+    "officialName": "Vancouver",
+    "operating": true,
+    "timeSeries": [
+      {
+        "code": "wlo",
+        "id": "5cebf1de3d0f4a073c4bb93d",
+        "nameEn": "Water level official value",
+        "nameFr": "Niveau d'eau, valeur officielle",
+        "owner": "CHS-SHC",
+        "phenomenonId": "5ce598df487b84486892821c"
+      },
+      {
+        "code": "wlp",
+        "id": "5cebf1de3d0f4a073c4bb93f",
+        "nameEn": "Water level predictions",
+        "nameFr": "Prédictions de niveaux d'eau",
+        "owner": "CHS-SHC",
+        "phenomenonId": "5ce598df487b84486892821c"
+      },
+      {
+        "code": "wlp-hilo",
+        "id": "5d9dd7b933a9f593161c3e55",
+        "nameEn": "High and Low Tide Predictions",
+        "nameFr": "Prédictions de pleines et basses mers",
+        "owner": "CHS-SHC",
+        "phenomenonId": "5ce598df487b84486892821c"
+      }
+    ],
+    "type": "PERMANENT"
+  }
+]
