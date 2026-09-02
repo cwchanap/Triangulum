@@ -48,12 +48,23 @@ struct AlmanacDependencies {
     }
 
     /// Deterministic dependencies for UI tests: fixed Vancouver location and
-    /// September 2026 clock, no network, no sensors.
+    /// September 2026 clock, no network, no sensors. The fixed Vancouver
+    /// selection is persisted before the view model loads, so a fresh
+    /// `-ui-testing` launch restores the same place/date the smoke test
+    /// asserts — no GPS fix, permission prompt, or extra launch flag needed.
     static func uiTestFixture() -> AlmanacDependencies {
-        AlmanacDependencies(
+        let store = AlmanacPreferencesStore()
+        try? store.save(
+            AlmanacPreferences(
+                mode: .selected,
+                selectedLocation: AlmanacFixtureLocationResolver.vancouver,
+                stationOverride: nil
+            )
+        )
+        return AlmanacDependencies(
             tideService: AlmanacFixtureTideService(),
             locationResolver: AlmanacFixtureLocationResolver(),
-            preferencesStore: AlmanacPreferencesStore(),
+            preferencesStore: store,
             now: { AlmanacFixtureTideService.fixedNow }
         )
     }

@@ -35,6 +35,10 @@ struct ContentView: View {
     @AppStorage("showGyroscopeWidget") private var showGyroscopeWidget = true
     @AppStorage("showMagnetometerWidget") private var showMagnetometerWidget = true
     private let isRunningUITests = ProcessInfo.processInfo.arguments.contains("-ui-testing")
+    /// Feature-local Almanac dependencies: the deterministic fixture under
+    /// `-ui-testing`, the production value otherwise. Constructed once per
+    /// launch — no global container.
+    private let almanacDependencies: AlmanacDependencies
 
     init() {
         let isUITesting = ProcessInfo.processInfo.arguments.contains("-ui-testing")
@@ -43,6 +47,7 @@ struct ContentView: View {
         _barometerManager = StateObject(wrappedValue: BarometerManager(locationManager: locationManager))
         _weatherManager = StateObject(wrappedValue: WeatherManager(locationManager: locationManager, skipMonitoring: isUITesting))
         _satelliteManager = StateObject(wrappedValue: SatelliteManager(locationManager: locationManager))
+        almanacDependencies = isUITesting ? .uiTestFixture() : .live()
     }
 
     var body: some View {
@@ -63,6 +68,15 @@ struct ContentView: View {
                 Label(ProductTab.field.title, systemImage: ProductTab.field.symbolName)
             }
             .tag(ProductTab.field)
+
+            NavigationStack {
+                AlmanacView(locationManager: locationManager,
+                            dependencies: almanacDependencies)
+            }
+            .tabItem {
+                Label(ProductTab.almanac.title, systemImage: ProductTab.almanac.symbolName)
+            }
+            .tag(ProductTab.almanac)
 
             FootprintView(snapshotManager: snapshotManager)
                 .tabItem {
@@ -260,9 +274,6 @@ struct ContentView: View {
     private var utilityStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
-                ConsoleTile(icon: "sun.max.fill", label: "Solar", tint: .celAmber) {
-                    SolarEventsView(locationManager: locationManager)
-                }
                 ConsoleTile(icon: "level", label: "Level", tint: .celGreen) {
                     LevelPageView(barometerManager: barometerManager)
                 }
