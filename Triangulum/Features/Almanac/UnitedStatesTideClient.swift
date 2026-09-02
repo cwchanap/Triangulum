@@ -29,21 +29,16 @@ struct UnitedStatesTideClient: TideProviderClient {
         "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions"
     private static let datagetterURLString = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
 
-    private static let gmtDayFormatter: DateFormatter = {
+    /// `DateFormatter` is not thread-safe for concurrent use, and these
+    /// value-type clients can be used concurrently, so formatters are
+    /// built per `loadPredictions` call instead of shared statics.
+    private static func makeGMTFormatter(dateFormat: String) -> DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyyMMdd"
+        formatter.dateFormat = dateFormat
         return formatter
-    }()
-
-    private static let predictionTimeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter
-    }()
+    }
 
     init(session: URLSession) {
         self.session = session
@@ -80,8 +75,10 @@ struct UnitedStatesTideClient: TideProviderClient {
 
     func loadPredictions(station: TideStation, range: LocalDateRange) async throws -> TideWeek {
         let timeZone = station.timeZone ?? Self.fallbackTimeZone
-        let beginDate = Self.gmtDayFormatter.string(from: try range.start.start(in: timeZone))
-        let endDate = Self.gmtDayFormatter.string(from: try range.endInclusive.start(in: timeZone))
+        let gmtDayFormatter = Self.makeGMTFormatter(dateFormat: "yyyyMMdd")
+        let predictionTimeFormatter = Self.makeGMTFormatter(dateFormat: "yyyy-MM-dd HH:mm")
+        let beginDate = gmtDayFormatter.string(from: try range.start.start(in: timeZone))
+        let endDate = gmtDayFormatter.string(from: try range.endInclusive.start(in: timeZone))
 
         let hourlyURL = try Self.predictionsURL(
             station: station, beginDate: beginDate, endDate: endDate, interval: "h"
@@ -99,7 +96,7 @@ struct UnitedStatesTideClient: TideProviderClient {
         let windowEnd = try range.endInclusive.endExclusive(in: timeZone)
 
         let hourlySamples = try hourlyRows.map { row -> TideSample in
-            guard let instant = Self.predictionTimeFormatter.date(from: row.time) else {
+            guard let instant = predictionTimeFormatter.date(from: row.time) else {
                 throw TideLoadError.invalidProviderResponse
             }
             return TideSample(instant: instant, heightMetres: row.height)
@@ -109,7 +106,7 @@ struct UnitedStatesTideClient: TideProviderClient {
         guard !hourlySamples.isEmpty else { throw TideLoadError.noPredictions }
 
         let events = try hiloRows.map { row -> TideEvent in
-            guard let instant = Self.predictionTimeFormatter.date(from: row.time) else {
+            guard let instant = predictionTimeFormatter.date(from: row.time) else {
                 throw TideLoadError.invalidProviderResponse
             }
             // The API types events as "H" / "L".

@@ -111,38 +111,48 @@ struct HongKongTideClient: TideProviderClient {
         var hourlyByDate: [LocalDate: [Double?]] = [:]
         var hiloByDate: [LocalDate: [HLTPair]] = [:]
         for year in years {
-            let hourlyText = try await annualSource(
+            let hourly = try await annualSource(
                 station: station, year: year, kind: .hourly, dataType: "HHOT"
-            )
-            for (date, heights) in try Self.parseHourlyCSV(hourlyText, year: year) {
+            ) {
+                try Self.parseHourlyCSV($0, year: year)
+            }
+            for (date, heights) in hourly {
                 hourlyByDate[date] = heights
             }
 
-            let hiloText = try await annualSource(
+            let hilo = try await annualSource(
                 station: station, year: year, kind: .hilo, dataType: "HLT"
-            )
-            for (date, pairs) in try Self.parseHighLowCSV(hiloText, year: year) {
+            ) {
+                try Self.parseHighLowCSV($0, year: year)
+            }
+            for (date, pairs) in hilo {
                 hiloByDate[date] = pairs
             }
         }
         return AnnualSources(hourlyByDate: hourlyByDate, hiloByDate: hiloByDate)
     }
 
-    private func annualSource(
-        station: TideStation, year: Int, kind: TideSourceKind, dataType: String
-    ) async throws -> String {
-        let data: Data
+    private func annualSource<T>(
+        station: TideStation, year: Int, kind: TideSourceKind, dataType: String,
+        parse: (String) throws -> T
+    ) async throws -> T {
         if let cached = try await cache.loadSource(
             provider: .hongKongHKO, stationID: station.id, year: year, kind: kind
         ) {
-            data = cached
-        } else {
-            let url = try Self.opendataURL(dataType: dataType, station: station.providerStationCode, year: year)
-            data = try await Self.fetchData(from: url, session: session)
-            try await cache.saveSource(
-                data, provider: .hongKongHKO, stationID: station.id, year: year, kind: kind
-            )
+            return try parse(Self.utf8Text(cached))
         }
+        let url = try Self.opendataURL(dataType: dataType, station: station.providerStationCode, year: year)
+        let data = try await Self.fetchData(from: url, session: session)
+        // Parse/validate before saving: a garbage 200 (captive portal, proxy
+        // error page) must never poison the source cache until expiry.
+        let parsed = try parse(Self.utf8Text(data))
+        try await cache.saveSource(
+            data, provider: .hongKongHKO, stationID: station.id, year: year, kind: kind
+        )
+        return parsed
+    }
+
+    private static func utf8Text(_ data: Data) throws -> String {
         guard let text = String(data: data, encoding: .utf8) else {
             throw TideLoadError.invalidProviderResponse
         }

@@ -102,6 +102,9 @@ struct JapanTideClient: TideProviderClient {
     // MARK: - Annual source (cached)
 
     private func annualRecords(station: TideStation, year: Int) async throws -> [AnnualRecord] {
+        // Parse/validate before saving: a garbage 200 (captive portal, proxy
+        // error page) must never poison the source cache until expiry.
+        var freshlyFetched = false
         let data: Data
         if let cached = try await cache.loadSource(
             provider: .japanJMA, stationID: station.id, year: year, kind: .annual
@@ -110,14 +113,18 @@ struct JapanTideClient: TideProviderClient {
         } else {
             let url = try Self.annualURL(station: station, year: year)
             data = try await Self.fetchData(from: url, session: session)
-            try await cache.saveSource(
-                data, provider: .japanJMA, stationID: station.id, year: year, kind: .annual
-            )
+            freshlyFetched = true
         }
         guard let text = String(data: data, encoding: .utf8) else {
             throw TideLoadError.invalidProviderResponse
         }
-        return try Self.parseAnnualFile(text, expectedStationSymbol: station.providerStationCode)
+        let records = try Self.parseAnnualFile(text, expectedStationSymbol: station.providerStationCode)
+        if freshlyFetched {
+            try await cache.saveSource(
+                data, provider: .japanJMA, stationID: station.id, year: year, kind: .annual
+            )
+        }
+        return records
     }
 
     /// `https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/{YEAR}/{STATION}.txt`
