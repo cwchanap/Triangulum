@@ -322,7 +322,11 @@ final class AlmanacViewModel: ObservableObject {
         _ = try await tideService.refreshRange(station: context.selected, range: range)
         guard requestGeneration == generation else { return }
 
-        if try await publishCachedDay(station: context.selected, date: date, generation: generation) == nil {
+        let publishedAfterRefresh = try await publishCachedDay(station: context.selected, date: date, generation: generation)
+        // The cache read above suspends; a newer request may have superseded
+        // this load (and published its own warning) while it was in flight.
+        guard requestGeneration == generation else { return }
+        if publishedAfterRefresh == nil {
             tideDay = nil
             tideIsStale = false
         }

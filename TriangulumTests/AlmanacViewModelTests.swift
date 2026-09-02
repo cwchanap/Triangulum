@@ -510,4 +510,58 @@ struct AlmanacViewModelTests {
         #expect(viewModel.selectedDate == laterDate)
         #expect(viewModel.tideDay?.localDate == laterDate)
     }
+
+    /// Regression: a superseded load that completes after its post-refresh
+    /// cache read must not clear the state (e.g. the warning) a newer load
+    /// published while it was in flight. The tail of `performTideLoad` runs
+    /// after `publishCachedDay`'s own internal guard, so it needs its own
+    /// generation check immediately before applying.
+    @Test func olderGenerationLatePostRefreshCompletionCannotClearNewerWarning() async {
+        let harness = makeHarness(
+            preferences: AlmanacPreferences(mode: .selected, selectedLocation: Self.vancouver, stationOverride: nil)
+        )
+        harness.tideService.cachedHandler = { _, _ in nil }
+        harness.tideService.refreshHandler = { station, range in
+            TideWeek(
+                station: station,
+                localDateRange: range,
+                hourlySamples: [],
+                events: [],
+                fetchedAt: Self.now,
+                sourceAttribution: "test"
+            )
+        }
+        // Staged gates: the first stalls the load's initial cache read; the
+        // second, armed only after the first opens, stalls the same load's
+        // post-refresh cache read while it still holds the current generation.
+        let initialReadGate = Gate()
+        let postRefreshReadGate = Gate()
+        harness.tideService.cachedGate = initialReadGate
+        harness.tideService.cachedGateBarrier = 3
+        let viewModel = harness.viewModel
+
+        viewModel.selectLocation(Self.vancouver)
+        viewModel.section = .tides
+        await waitUntil { harness.tideService.cachedRequests.count == 1 }
+
+        // Release the first read; the load refreshes and stalls again in the
+        // post-refresh cache read, still holding the current generation.
+        harness.tideService.cachedGate = postRefreshReadGate
+        initialReadGate.open()
+        await waitUntil { harness.tideService.cachedRequests.count == 2 }
+
+        // A newer selection supersedes the stalled load; its station resolve
+        // fails fast (Paris is an unsupported tide region) and publishes its
+        // own warning while the older load is still in flight.
+        harness.tideService.resolveResult = .failure(TideLoadError.unsupportedRegion)
+        viewModel.selectLocation(Self.paris)
+        await waitUntil { viewModel.tideWarning == .unsupportedRegion }
+
+        // The stale load's post-refresh read now completes; without a guard
+        // after it, its tail would clear the newer warning.
+        postRefreshReadGate.open()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        #expect(viewModel.tideWarning == .unsupportedRegion)
+    }
 }
