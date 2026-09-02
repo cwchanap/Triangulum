@@ -13,36 +13,15 @@
 //  can actually observe the logic. A window-attachment assertion here only
 //  proves "no layout crash".
 //
+//  The `renderHost` helper lives in `SwiftUIRenderTestHelper.swift`, shared
+//  with the Almanac rendering suite (no third window-retention
+//  implementation).
+//
 
 import Testing
 import SwiftUI
 import UIKit
 @testable import Triangulum
-
-// MARK: - Render host
-
-/// Wraps a SwiftUI view in a UIHostingController installed in a live UIWindow
-/// and forces layout, causing SwiftUI to evaluate `body`.
-///
-/// Returns both the hosting controller and the owning `UIWindow`. The caller
-/// MUST hold the returned window for the lifetime of its assertions: a
-/// `UIWindow` created locally is only kept alive by `UIApplication`'s
-/// undocumented key-window retention, which is unreliable (especially under
-/// `UIScene`) and can let `host.view.window` become `nil` mid-test. Keeping a
-/// strong reference guarantees the window survives until the test finishes.
-@MainActor
-private func renderHost<V: View>(
-    _ view: V,
-    size: CGSize = CGSize(width: 320, height: 568)
-) -> (host: UIHostingController<V>, window: UIWindow) {
-    let host = UIHostingController(rootView: view)
-    host.view.frame = CGRect(origin: .zero, size: size)
-    let window = UIWindow(frame: CGRect(origin: .zero, size: size))
-    window.rootViewController = host
-    window.makeKeyAndVisible()
-    host.view.layoutIfNeeded()
-    return (host, window)
-}
 
 @MainActor
 @Suite
