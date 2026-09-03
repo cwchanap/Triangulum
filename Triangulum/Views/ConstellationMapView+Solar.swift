@@ -47,6 +47,21 @@ extension ConstellationMapView.Astronomer {
         let transitDate = localNoon.addingTimeInterval(transitOffset * 3600)
 
         // Rising = transit − H, Setting = transit + H
-        return transitDate.addingTimeInterval((rising ? -hourAngleHours : hourAngleHours) * 3600)
+        let crossing = transitDate.addingTimeInterval((rising ? -hourAngleHours : hourAngleHours) * 3600)
+
+        // The local-noon reference is an approximation; the Sun's declination
+        // changes across the day and the transit offset can shift the actual
+        // crossing onto an adjacent civil day. Near high-latitude transition
+        // dates this is more than a few minutes: e.g. a sunset that lands just
+        // past local midnight would be attached to `localDate` and formatted
+        // as that day's sunset (the UI shows only `HH:mm`). A crossing outside
+        // the requested civil day is not this day's event — return nil so the
+        // caller treats it as absent rather than mislabeling it with the day.
+        guard let dayStart = try? localDate.start(in: timeZone),
+              let dayEnd = try? localDate.endExclusive(in: timeZone),
+              crossing >= dayStart, crossing < dayEnd else {
+            return nil
+        }
+        return crossing
     }
 }

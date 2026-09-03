@@ -215,6 +215,123 @@ struct HongKongTideClientTests {
         }
     }
 
+    /// Builds an HHOT body covering Jan 1–5 2026, with the cell at
+    /// `(day, hourColumn)` replaced by `badCell`. Hour columns are 2…25
+    /// (01…24). Used to inject a single malformed height while the rest of
+    /// the source stays valid.
+    private static func hourly2026WithBadCell(day: Int, hourColumn: Int, badCell: String) -> Data {
+        let header = "MM,DD,01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24\n"
+        var rows = [header]
+        for d in 1...5 {
+            var cells = [String(format: "01,%02d", d)]
+            for hour in 1...24 {
+                let column = 1 + hour // 2…25
+                if d == day && column == hourColumn {
+                    cells.append(badCell)
+                } else {
+                    cells.append(String(format: "%.2f", 0.90 + Double(hour) * 0.01))
+                }
+            }
+            rows.append(cells.joined(separator: ",") + "\n")
+        }
+        return Data(rows.joined().utf8)
+    }
+
+    /// A non-empty HHOT height that cannot parse (e.g. "oops") must be
+    /// rejected as a malformed source rather than silently treated as a
+    /// missing value — otherwise the range can still succeed on the
+    /// remaining samples and the bad file gets cached as validated,
+    /// dropping the bad point on every future read.
+    @Test func rejectsNonEmptyUnparseableHHOTHeightCell() async throws {
+        let taiPoKau2026HiloFixture = try fixture("HKO/tai-po-kau-2026-hilo.csv")
+        let badHourly = Self.hourly2026WithBadCell(day: 1, hourColumn: 5, badCell: "oops")
+        let (session, _, cleanup) = makeSession(routes: [
+            Self.hourlyURL2026: .success((200, badHourly)),
+            Self.hiloURL2026: .success((200, taiPoKau2026HiloFixture))
+        ])
+        defer { cleanup() }
+        let client = HongKongTideClient(session: session, cache: try makeCache())
+
+        do {
+            _ = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+            Issue.record("Expected a malformed-HHOT rejection")
+        } catch {
+            #expect((error as? TideLoadError) == .invalidProviderResponse)
+        }
+    }
+
+    /// `Double("nan")` and `Double("inf")` parse successfully, so an
+    /// explicit finite check is required to reject them before caching.
+    @Test func rejectsNonFiniteHHOTHeightCell() async throws {
+        let taiPoKau2026HiloFixture = try fixture("HKO/tai-po-kau-2026-hilo.csv")
+        for badCell in ["nan", "inf", "-inf"] {
+            let badHourly = Self.hourly2026WithBadCell(day: 2, hourColumn: 10, badCell: badCell)
+            let (session, _, cleanup) = makeSession(routes: [
+                Self.hourlyURL2026: .success((200, badHourly)),
+                Self.hiloURL2026: .success((200, taiPoKau2026HiloFixture))
+            ])
+            defer { cleanup() }
+            let client = HongKongTideClient(session: session, cache: try makeCache())
+
+            do {
+                _ = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+                Issue.record("Expected a non-finite HHOT rejection for \(badCell)")
+            } catch {
+                #expect((error as? TideLoadError) == .invalidProviderResponse,
+                        "Expected invalidProviderResponse for HHOT height \(badCell)")
+            }
+        }
+    }
+
+    /// Mirrors the HHOT contract on the HLT side: a non-finite height
+    /// (nan/inf) must be rejected before the annual source is cached.
+    @Test func rejectsNonFiniteHLTheightCell() async throws {
+        let taiPoKau2026HourlyFixture = try fixture("HKO/tai-po-kau-2026-hourly.csv")
+        for badHeight in ["nan", "inf"] {
+            // Jan 1 row, first pair height replaced with the bad value.
+            let text = "\u{feff}Month,Date,Time,Height(m),Time,Height(m),Time,Height(m),Time,Height(m)\n"
+                + "01,01,0313,\(badHeight),0925,1.39,1150,1.31,1734,2.26\n"
+                + "01,02,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+                + "01,03,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+                + "01,04,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+                + "01,05,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            let (session, _, cleanup) = makeSession(routes: [
+                Self.hourlyURL2026: .success((200, taiPoKau2026HourlyFixture)),
+                Self.hiloURL2026: .success((200, Data(text.utf8)))
+            ])
+            defer { cleanup() }
+            let client = HongKongTideClient(session: session, cache: try makeCache())
+
+            do {
+                _ = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+                Issue.record("Expected a non-finite HLT rejection for \(badHeight)")
+            } catch {
+                #expect((error as? TideLoadError) == .invalidProviderResponse,
+                        "Expected invalidProviderResponse for HLT height \(badHeight)")
+            }
+        }
+    }
+
+    /// Empty HHOT cells remain intentionally-missing values (nil), not
+    /// malformed — the regression must not break the empty-cell contract.
+    @Test func emptyHHOTCellsRemainMissingValues() async throws {
+        let taiPoKau2026HiloFixture = try fixture("HKO/tai-po-kau-2026-hilo.csv")
+        // Jan 1, hour 12 cell empty; all other cells valid.
+        let badHourly = Self.hourly2026WithBadCell(day: 1, hourColumn: 13, badCell: "")
+        let (session, _, cleanup) = makeSession(routes: [
+            Self.hourlyURL2026: .success((200, badHourly)),
+            Self.hiloURL2026: .success((200, taiPoKau2026HiloFixture))
+        ])
+        defer { cleanup() }
+        let client = HongKongTideClient(session: session, cache: try makeCache())
+
+        let week = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+        // The empty hour-12 cell on Jan 1 is dropped (nil), not a rejection.
+        let jan1Noon = try hkt(2026, 1, 1, 12)
+        #expect(!week.hourlySamples.contains { $0.instant == jan1Noon },
+                "The empty HHOT cell should be missing, not a malformed rejection")
+    }
+
     @Test func newYearRangeReadsBothYearsForBothSourceKinds() async throws {
 
         let (session, recorder, cleanup) = makeSession(routes: [
