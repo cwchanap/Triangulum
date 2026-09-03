@@ -61,6 +61,8 @@ final class AlmanacViewModel: ObservableObject {
     private var tideTask: Task<Void, Never>?
     private var placemarkTask: Task<Void, Never>?
     private var locationObservation: AnyCancellable?
+    private var authObservation: AnyCancellable?
+    private var availabilityObservation: AnyCancellable?
     private var pendingCoordinate: CLLocationCoordinate2D?
     private var coordinateProcessingScheduled = false
     /// Last placemark-resolved current coordinate; movement under 5 km reuses
@@ -68,6 +70,15 @@ final class AlmanacViewModel: ObservableObject {
     /// latitude/longitude deliveries are coalesced and only the latest fix
     /// processes (see `scheduleCoordinateProcessing`).
     private var lastResolvedCoordinate: CLLocationCoordinate2D?
+    /// True until the first placemark resolves after entering Current mode.
+    /// The first fix of a new Current-mode session resets the calendar to the
+    /// new destination's `today`; later ≥5 km fixes preserve the user's
+    /// chosen date. Without this, switching to Current from an already-fixed
+    /// location keeps the old destination's `selectedDate`/`windowStart` — a
+    /// cross-time-zone date-boundary bug (e.g. select Tokyo, then switch to
+    /// Current in Vancouver and Sun/Tides compute for Vancouver using
+    /// Tokyo's calendar date).
+    private var currentModeAwaitingFirstFix = false
 
     private let tideService: any TideServing
     private let locationResolver: any AlmanacLocationResolving
@@ -158,6 +169,9 @@ final class AlmanacViewModel: ObservableObject {
             // fixed place the sheet offers and the store persists.
             lastFixedLocation = location
             stopCurrentLocationObservation()
+            // Leaving Current mode ends the session; a later re-entry via
+            // `useCurrentLocation` sets this flag again.
+            currentModeAwaitingFirstFix = false
         }
         persistPreferences()
 
@@ -177,6 +191,10 @@ final class AlmanacViewModel: ObservableObject {
     func useCurrentLocation() {
         guard locationManager != nil else { return }
         locationMode = .current
+        // Mark the start of a new Current-mode session so the first fix
+        // resets the calendar to the new destination's today (see
+        // `currentModeAwaitingFirstFix`).
+        currentModeAwaitingFirstFix = true
         startCurrentLocationObservation()
         persistPreferences()
     }
@@ -208,25 +226,120 @@ final class AlmanacViewModel: ObservableObject {
     private func startCurrentLocationObservation() {
         guard let locationManager else { return }
         stopCurrentLocationObservation()
+        // Observe the coordinate AND authorization/availability so a revoked
+        // permission (or services-off transition) invalidates the Current-mode
+        // display instead of keep showing the last cached fix. `LocationManager`
+        // keeps its last lat/long when permission becomes denied/restricted, so
+        // observing the coordinate alone would replay a stale GPS fix
+        // indefinitely; `AlmanacView` only surfaces the denied-state remediation
+        // when `location == nil`, so the stale fix would also hide that
+        // remediation. The actual authorization/availability is read fresh from
+        // the locationManager in the handler (rather than trusting Combine's
+        // delivered value) to avoid any replay/timing gap between the
+        // subscription's delivered value and the real current state.
         locationObservation = Publishers.CombineLatest(
             locationManager.$latitude,
             locationManager.$longitude
         )
         .sink { [weak self] latitude, longitude in
             Task { @MainActor [weak self] in
-                self?.scheduleCoordinateProcessing(latitude: latitude, longitude: longitude)
+                self?.currentLocationObservationDidChange(
+                    latitude: latitude,
+                    longitude: longitude
+                )
             }
         }
-        // The subscription delivers the current values immediately; the
-        // placemark resolve runs through the same coalesced path.
+        // Also observe authorization/availability changes so a revocation
+        // while already in Current mode (no coordinate change) still
+        // invalidates the display.
+        authObservation = locationManager.$authorizationStatus
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.currentLocationObservationDidChange(
+                        latitude: self?.locationManager?.latitude ?? 0,
+                        longitude: self?.locationManager?.longitude ?? 0
+                    )
+                }
+            }
+        availabilityObservation = locationManager.$isAvailable
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.currentLocationObservationDidChange(
+                        latitude: self?.locationManager?.latitude ?? 0,
+                        longitude: self?.locationManager?.longitude ?? 0
+                    )
+                }
+            }
     }
 
     private func stopCurrentLocationObservation() {
         locationObservation = nil
+        authObservation = nil
+        availabilityObservation = nil
         placemarkTask?.cancel()
         // Invalidate any in-flight resolution so a late result can never
         // overwrite a manual selection or mode switch.
         placemarkGeneration = UUID()
+        // NOTE: `currentModeAwaitingFirstFix` is NOT cleared here. This is
+        // called from `startCurrentLocationObservation` (inside
+        // `useCurrentLocation`), which runs right after the flag is set to
+        // true; clearing it here would defeat the mode-transition tracking.
+        // The flag is cleared by `selectLocation` (leaving Current mode) and
+        // by `applyResolvedCurrentLocation` (first fix consumed).
+    }
+
+    /// Routes a Current-mode observation tick: invalidate the display when
+    /// permission is revoked (denied/restricted), otherwise forward a real
+    /// (non-(0,0)) fix to the coalesced placemark-resolution path. Reads
+    /// authorization/availability fresh from the locationManager so the
+    /// decision always reflects the real current state, not a stale Combine
+    /// delivery.
+    private func currentLocationObservationDidChange(
+        latitude: Double,
+        longitude: Double
+    ) {
+        guard locationMode == .current else { return }
+        let authorization = locationManager?.authorizationStatus ?? .notDetermined
+        let isAvailable = locationManager?.isAvailable ?? false
+        // Permission revoked or services off: the stored coordinate is no
+        // longer a usable fix. Clear the Current-mode display so AlmanacView
+        // surfaces its denied/restricted remediation (it only shows when
+        // `location == nil`) instead of a stale GPS coordinate. `notDetermined`
+        // is not a revocation — the user may still grant access — so fixes
+        // are still processed in that state (and in tests, which inject
+        // coordinates before authorization is resolved).
+        if authorization == .denied || authorization == .restricted || !isAvailable {
+            invalidateCurrentLocationDisplay()
+            return
+        }
+        // (0,0) is LocationManager's unfixed default, not a real fix.
+        guard latitude != 0 || longitude != 0 else { return }
+        scheduleCoordinateProcessing(latitude: latitude, longitude: longitude)
+    }
+
+    /// Clears the Current-mode display when the fix becomes invalid
+    /// (permission revoked or location services off). `lastFixedLocation` is
+    /// preserved so the location sheet still offers the last chosen place,
+    /// and the observation stays live so re-granting permission resumes
+    /// following the device. In-flight placemark/tide work is cancelled and
+    /// superseded so a late result can never repopulate the cleared display.
+    private func invalidateCurrentLocationDisplay() {
+        guard locationMode == .current else { return }
+        placemarkTask?.cancel()
+        placemarkGeneration = UUID()
+        tideTask?.cancel()
+        requestGeneration = UUID()
+        lastResolvedCoordinate = nil
+        // The next fix after re-authorization starts a fresh session: reset
+        // the calendar to the new destination's today rather than reusing
+        // the invalidated display's date.
+        currentModeAwaitingFirstFix = true
+        location = nil
+        selectedDate = nil
+        windowStart = nil
+        visibleDates = []
+        recomputeSolarDay()
+        resetTideState()
     }
 
     /// Coalesces the paired latitude/longitude deliveries so one user-visible
@@ -246,6 +359,15 @@ final class AlmanacViewModel: ObservableObject {
     private func currentLocationDidChange(to coordinate: CLLocationCoordinate2D) {
         // (0, 0) is LocationManager's unfixed default, not a real fix.
         guard coordinate.latitude != 0 || coordinate.longitude != 0 else { return }
+        // Defense-in-depth: re-check authorization/availability at the
+        // resolution boundary. `currentLocationObservationDidChange` already
+        // gates on this, but the coalesced Task is async and a revocation
+        // can arrive between the gate and this execution. Without this
+        // check, a denied/restricted state could still resolve a stale
+        // coordinate.
+        let authorization = locationManager?.authorizationStatus ?? .notDetermined
+        let isAvailable = locationManager?.isAvailable ?? false
+        guard authorization != .denied, authorization != .restricted, isAvailable else { return }
 
         // Override retention (Current mode): survive ordinary movement, clear
         // beyond 25 km from the anchor where it was selected.
@@ -286,10 +408,18 @@ final class AlmanacViewModel: ObservableObject {
     }
 
     private func applyResolvedCurrentLocation(_ resolved: AlmanacLocation) {
-        let firstFix = location == nil
+        // Reset the calendar on the first fix of a new Current-mode session
+        // (mode transition into Current, or the first fix after an
+        // invalidation/re-grant), OR when no display is set yet. Later ≥5 km
+        // fixes preserve the user's chosen date. Without the mode-transition
+        // flag, switching to Current from an already-fixed location kept the
+        // old destination's `selectedDate`/`windowStart` — a cross-time-zone
+        // date-boundary bug.
+        let shouldResetCalendar = currentModeAwaitingFirstFix || location == nil
+        currentModeAwaitingFirstFix = false
         location = resolved
         locationMode = .current
-        if firstFix, let timeZone = resolved.timeZone {
+        if shouldResetCalendar, let timeZone = resolved.timeZone {
             let today = LocalDate(now(), in: timeZone)
             selectedDate = today
             windowStart = today

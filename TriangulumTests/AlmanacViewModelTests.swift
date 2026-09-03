@@ -59,6 +59,19 @@ struct AlmanacViewModelTests {
         administrativeArea: "Île-de-France"
     )
 
+    /// Tokyo is UTC+9: at the injected `now` (2026-09-15 02:00 UTC) Tokyo's
+    /// calendar date is Sep 15 while Vancouver's is Sep 14 — used to verify
+    /// the Current-mode calendar reset across a date boundary.
+    private static let tokyo = AlmanacLocation(
+        mode: .selected,
+        latitude: 35.6762,
+        longitude: 139.6503,
+        displayName: "Tokyo",
+        timeZoneIdentifier: "Asia/Tokyo",
+        countryCode: "JP",
+        administrativeArea: "Tokyo"
+    )
+
     private static let resolvedCurrent = AlmanacLocation(
         mode: .current,
         latitude: 49.0,
@@ -157,13 +170,20 @@ struct AlmanacViewModelTests {
     ) -> Harness {
         let (defaults, suiteName) = makeDefaults()
         try? AlmanacPreferencesStore(defaults: defaults).save(preferences)
+        // The shared live manager is observed only in Current mode, where the
+        // view model now gates on authorization/availability. Reflect a
+        // valid, authorized state so Current-mode tests process injected
+        // coordinates; denied/revoked tests mutate these directly.
+        let locationManager = LocationManager(skipAvailabilityCheck: true)
+        locationManager.isAvailable = true
+        locationManager.authorizationStatus = .authorizedWhenInUse
         return Harness(
             store: AlmanacPreferencesStore(defaults: defaults),
             defaults: defaults,
             suiteName: suiteName,
             tideService: FakeTideService(resolveResult: resolveResult),
             resolver: FakeLocationResolver(result: resolverLocation),
-            locationManager: LocationManager(skipAvailabilityCheck: true)
+            locationManager: locationManager
         )
     }
 
@@ -686,5 +706,158 @@ struct AlmanacViewModelTests {
         #expect(viewModel.lastFixedLocation == Self.victoria)
         #expect(harness.store.load().selectedLocation == Self.victoria)
         #expect(harness.store.load().mode == .selected)
+    }
+
+    // MARK: - Current-mode authorization gating (P1)
+
+    /// Regression: `LocationManager` keeps its last lat/long when permission
+    /// becomes denied/restricted, so without an authorization gate Current
+    /// mode would resolve and keep showing a stale GPS coordinate, and
+    /// `AlmanacView` (which only surfaces the denied remediation when
+    /// `location == nil`) would hide the denied state. Denied permission
+    /// must invalidate the Current-mode display so the denied remediation
+    /// surfaces. (The `CLLocationManager` delegate fires asynchronously and
+    /// can override a pre-observation `.denied` setting, so the test sets
+    /// `.denied` after the observation starts to test the invalidation
+    /// path deterministically.)
+    @Test func deniedPermissionInvalidatesTheCurrentModeDisplay() async {
+        let harness = makeHarness()
+        let viewModel = harness.viewModel
+
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+
+        // Deny permission while in Current mode. The display must clear so
+        // the denied remediation surfaces, rather than showing a stale fix.
+        harness.locationManager.authorizationStatus = .denied
+        await waitUntil { viewModel.location == nil }
+
+        #expect(viewModel.location == nil,
+                "Denied permission must clear the stale GPS display")
+        #expect(viewModel.selectedDate == nil)
+        #expect(viewModel.solarDay == nil)
+        #expect(viewModel.tideDay == nil)
+    }
+
+    /// Regression: revoking permission while already in Current mode (with a
+    /// live fix on screen) must clear the display so the denied remediation
+    /// surfaces, rather than leaving the stale GPS coordinate visible.
+    @Test func revokingPermissionWhileInCurrentModeClearsTheDisplay() async {
+        let harness = makeHarness()
+        let viewModel = harness.viewModel
+
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+        #expect(viewModel.location != nil)
+
+        // Revoke permission while already following the device.
+        harness.locationManager.authorizationStatus = .denied
+        await waitUntil { viewModel.location == nil }
+
+        #expect(viewModel.location == nil,
+                "Revoked permission must clear the stale GPS display")
+        #expect(viewModel.selectedDate == nil)
+        #expect(viewModel.solarDay == nil)
+        #expect(viewModel.tideDay == nil)
+    }
+
+    /// Regression: revoking permission preserves `lastFixedLocation` so the
+    /// location sheet still offers the last chosen place after the
+    /// Current-mode display is cleared.
+    @Test func revokingPermissionPreservesTheLastFixedLocationForTheSheet() async {
+        let harness = makeHarness(
+            preferences: AlmanacPreferences(mode: .selected, selectedLocation: Self.vancouver, stationOverride: nil)
+        )
+        let viewModel = harness.viewModel
+        #expect(viewModel.location == Self.vancouver)
+        #expect(viewModel.lastFixedLocation == Self.vancouver)
+
+        viewModel.useCurrentLocation()
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+
+        harness.locationManager.authorizationStatus = .denied
+        await waitUntil { viewModel.location == nil }
+
+        #expect(viewModel.location == nil)
+        #expect(viewModel.lastFixedLocation == Self.vancouver,
+                "The sheet must still offer the last fixed place after revocation")
+    }
+
+    /// Regression: a restricted authorization status (parental controls,
+    /// MDM) is treated identically to denied — the display is invalidated.
+    @Test func restrictedPermissionInvalidatesTheCurrentModeDisplay() async {
+        let harness = makeHarness()
+        let viewModel = harness.viewModel
+
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+
+        harness.locationManager.authorizationStatus = .restricted
+        await waitUntil { viewModel.location == nil }
+
+        #expect(viewModel.location == nil)
+    }
+
+    // MARK: - Current-mode calendar reset on first fix (P1)
+
+    /// Regression: switching to Current mode from an already-fixed location
+    /// must reset the calendar to the new Current destination's today. Without
+    /// the mode-transition flag, the first GPS placemark kept the old
+    /// destination's `selectedDate`/`windowStart`, so selecting Tokyo and then
+    /// switching to Current in Vancouver computed Sun/Tides for Vancouver
+    /// using Tokyo's calendar date (a cross-time-zone date-boundary bug).
+    @Test func switchingToCurrentFromAFixedLocationResetsCalendarToCurrentDestinationToday() async {
+        let harness = makeHarness()  // resolverLocation = resolvedCurrent (Vancouver)
+        let viewModel = harness.viewModel
+
+        viewModel.selectLocation(Self.tokyo)
+        // Tokyo (UTC+9) today at the injected instant is Sep 15.
+        #expect(viewModel.selectedDate == LocalDate(year: 2026, month: 9, day: 15),
+                "Tokyo today at the injected instant is Sep 15")
+        #expect(viewModel.location == Self.tokyo)
+
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+
+        // Vancouver (UTC-7) today at the injected instant is Sep 14. The first
+        // Current-mode fix resets to Vancouver's today, not Tokyo's Sep 15.
+        #expect(viewModel.location == Self.resolvedCurrent)
+        #expect(viewModel.selectedDate == Self.todayLocal,
+                "First Current-mode fix should reset to Vancouver today (Sep 14), not keep Tokyo's Sep 15")
+    }
+
+    /// Companion: later ≥5 km fixes after the first Current-mode fix preserve
+    /// the user's chosen date (the reset is first-fix only, not every fix).
+    @Test func laterCurrentModeFixesPreserveTheChosenDate() async {
+        let harness = makeHarness()
+        let viewModel = harness.viewModel
+
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+        #expect(viewModel.selectedDate == Self.todayLocal)
+
+        // User picks a different day.
+        let chosen = LocalDate(year: 2026, month: 9, day: 20)
+        viewModel.selectDate(chosen)
+        #expect(viewModel.selectedDate == chosen)
+
+        // A ≥5 km move resolves again; the chosen date is preserved (not reset
+        // to today).
+        harness.locationManager.longitude = -123.16
+        await waitUntil { harness.resolver.currentCoordinateCalls.count == 2 }
+        #expect(viewModel.selectedDate == chosen,
+                "Later Current-mode fixes must preserve the user's chosen date")
     }
 }

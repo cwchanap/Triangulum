@@ -150,6 +150,76 @@ struct SolarEventsTests {
 
         #expect(sunrise < goldenEnd)
     }
+
+    // MARK: - Civil-day bounds (high-latitude transition regression)
+
+    /// Regression: the local-noon reference is an approximation, so a
+    /// crossing can land on an adjacent civil day near polar transition
+    /// dates. `solarCrossing` must never return a crossing outside the
+    /// requested civil day — otherwise `SolarDay(date:)` attaches it to that
+    /// date while the UI formats only `HH:mm`, mislabeling e.g. an Aug 26
+    /// 00:10 sunset as Aug 25's sunset.
+    @Test func crossingNeverFallsOutsideTheRequestedCivilDay() throws {
+        // Cases spanning mid-latitudes and high-latitude transition dates
+        // where the bug first appears.
+        struct CrossingCase {
+            let date: LocalDate
+            let timeZone: TimeZone
+            let lat: Double
+            let lon: Double
+        }
+        let cases: [CrossingCase] = [
+            CrossingCase(date: LocalDate(year: 2026, month: 8, day: 25),
+                         timeZone: TimeZone(identifier: "Arctic/Longyearbyen")!,
+                         lat: 78.2232, lon: 15.65),
+            CrossingCase(date: LocalDate(year: 2026, month: 8, day: 26),
+                         timeZone: TimeZone(identifier: "Arctic/Longyearbyen")!,
+                         lat: 78.2232, lon: 15.65),
+            // Utqiagvik around the sun's return in early August.
+            CrossingCase(date: LocalDate(year: 2026, month: 8, day: 2),
+                         timeZone: TimeZone(identifier: "America/Anchorage")!,
+                         lat: 71.2906, lon: -156.7886),
+            CrossingCase(date: LocalDate(year: 2026, month: 3, day: 3),
+                         timeZone: pacific, lat: sfLat, lon: sfLon)
+        ]
+        for c in cases {
+            let dayStart = try c.date.start(in: c.timeZone)
+            let dayEnd = try c.date.endExclusive(in: c.timeZone)
+            for altitude in [-18.0, -12.0, -6.0, -0.833, 6.0] {
+                for rising in [true, false] {
+                    guard let crossing = solarCrossing(altitude, rising: rising,
+                                                       localDate: c.date, timeZone: c.timeZone,
+                                                       latDeg: c.lat, lonDeg: c.lon) else { continue }
+                    #expect(crossing >= dayStart && crossing < dayEnd,
+                            "Crossing \(crossing) for \(c.date) lat\(c.lat) alt\(altitude) rising\(rising) outside civil day [\(dayStart), \(dayEnd))")
+                }
+            }
+        }
+    }
+
+    /// Longyearbyen on 2026-08-25: the review's exact scenario. Whatever the
+    /// astronomy resolves to, the sunset crossing for Aug 25 must not be a
+    /// time on Aug 26 — it is either within Aug 25 or absent (nil).
+    @Test func longyearbyenSunsetStaysWithinAug25OrIsAbsent() throws {
+        let zone = TimeZone(identifier: "Arctic/Longyearbyen")!
+        let date = LocalDate(year: 2026, month: 8, day: 25)
+        let dayStart = try date.start(in: zone)
+        let dayEnd = try date.endExclusive(in: zone)
+
+        let sunset = solarCrossing(-0.833, rising: false, localDate: date,
+                                   timeZone: zone, latDeg: 78.2232, lonDeg: 15.65)
+        if let sunset {
+            #expect(sunset >= dayStart && sunset < dayEnd,
+                    "Longyearbyen Aug 25 2026 sunset \(sunset) must fall within the civil day, not on Aug 26")
+        }
+        // The sunrise, if present, must likewise stay within Aug 25.
+        let sunrise = solarCrossing(-0.833, rising: true, localDate: date,
+                                    timeZone: zone, latDeg: 78.2232, lonDeg: 15.65)
+        if let sunrise {
+            #expect(sunrise >= dayStart && sunrise < dayEnd,
+                    "Longyearbyen Aug 25 2026 sunrise \(sunrise) must fall within the civil day")
+        }
+    }
 }
 
 // MARK: - SolarDay Tests

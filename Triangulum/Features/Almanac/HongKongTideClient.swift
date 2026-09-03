@@ -259,15 +259,35 @@ struct HongKongTideClient: TideProviderClient {
                   let day = Int(row[1].trimmingCharacters(in: .whitespaces)) else {
                 throw TideLoadError.invalidProviderResponse
             }
-            let heights = (2..<26).map { column -> Double? in
-                let cell = row[column].trimmingCharacters(in: .whitespaces)
-                return cell.isEmpty ? nil : Double(cell)
+            // An empty cell is an intentionally missing published value; a
+            // non-empty cell that cannot parse (or is non-finite) is a
+            // malformed source. Without this, a value like "oops" would
+            // silently become nil exactly like an empty cell, the range could
+            // still succeed on the remaining samples, and `annualSource`
+            // would cache this file as validated — dropping the bad point on
+            // every future read.
+            var heights: [Double?] = []
+            for column in 2..<26 {
+                try heights.append(parseHeightCell(row[column]))
             }
             byDate[LocalDate(year: year, month: month, day: day)] = heights
         }
         // A source with no data rows at all is malformed, not merely empty.
         guard !byDate.isEmpty else { throw TideLoadError.invalidProviderResponse }
         return byDate
+    }
+
+    /// Parses a tide-height CSV cell: empty → nil (intentionally missing
+    /// published value), non-empty and unparseable or non-finite → throws.
+    /// Shared by HHOT and HLT so both sources reject malformed heights
+    /// before the annual source is cached.
+    private static func parseHeightCell(_ cell: String) throws -> Double? {
+        let trimmed = cell.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return nil }
+        guard let value = Double(trimmed), value.isFinite else {
+            throw TideLoadError.invalidProviderResponse
+        }
+        return value
     }
 
     /// HLT: header `Month,Date,Time,Height(m)×4`, one row per day with up to
@@ -291,11 +311,14 @@ struct HongKongTideClient: TideProviderClient {
                 let heightCell = row[3 + pairIndex * 2].trimmingCharacters(in: .whitespaces)
                 guard !timeCell.isEmpty, !heightCell.isEmpty else { break }
                 // HHMM digits: 0116 is 01:16, i.e. 76 minutes, not 116.
+                // Height must be finite (Double("nan")/Double("inf") parse)
+                // so a non-finite HLT height is rejected before caching,
+                // mirroring the HHOT contract.
                 guard timeCell.count == 4,
                       let hour = Int(timeCell.prefix(2)),
                       let minute = Int(timeCell.suffix(2)),
                       (0...23).contains(hour), (0...59).contains(minute),
-                      let height = Double(heightCell) else {
+                      let height = Double(heightCell), height.isFinite else {
                     throw TideLoadError.invalidProviderResponse
                 }
                 pairs.append(HLTPair(minutes: hour * 60 + minute, heightMetres: height))
