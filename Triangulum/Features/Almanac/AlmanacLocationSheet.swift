@@ -27,6 +27,7 @@ struct AlmanacLocationSheet: View {
 
     @State private var searchText = ""
     @State private var isResolving = false
+    @State private var resolutionTask: Task<Void, Never>?
     @State private var resolutionErrorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
@@ -49,11 +50,17 @@ struct AlmanacLocationSheet: View {
             // owned by the Almanac screen across presentations.
             searchText = ""
             resolutionErrorMessage = nil
+            isResolving = false
             completer.queryFragment = ""
         }
         .onChange(of: searchText) { _, text in
             completer.queryFragment = text
             resolutionErrorMessage = nil
+        }
+        .onDisappear {
+            // A dismissed sheet's in-flight resolution must never change the
+            // Almanac destination afterwards.
+            resolutionTask?.cancel()
         }
         .overlay {
             if isResolving {
@@ -261,11 +268,14 @@ struct AlmanacLocationSheet: View {
     private func select(_ completion: MKLocalSearchCompletion) {
         guard !isResolving else { return }
         isResolving = true
-        Task {
+        resolutionTask = Task {
             do {
                 let location = try await resolver.resolveSearchCompletion(completion)
+                guard !Task.isCancelled else { return }
                 onSelectLocation(location)
                 dismiss()
+            } catch is CancellationError {
+                return
             } catch AlmanacLocationError.lookupFailed {
                 resolutionErrorMessage = Self.lookupFailedText
             } catch AlmanacLocationError.timeZoneUnavailable {

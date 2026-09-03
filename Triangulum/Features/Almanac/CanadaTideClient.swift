@@ -97,14 +97,18 @@ struct CanadaTideClient: TideProviderClient {
         let eventKinds: [TideEventKind]
         if let alternating = TideClientSupport.alternatingEventKinds(values: eventValues) {
             eventKinds = alternating
-        } else if let only = eventValues.first {
+        } else if eventValues.isEmpty {
+            throw TideLoadError.noPredictions
+        } else if eventValues.count == 1 {
             eventKinds = [TideClientSupport.singleEventKind(
-                value: only,
-                hourlyMinimum: hourlySamples.map(\.heightMetres).min() ?? only,
-                hourlyMaximum: hourlySamples.map(\.heightMetres).max() ?? only
+                value: eventValues[0],
+                hourlyMinimum: hourlySamples.map(\.heightMetres).min() ?? eventValues[0],
+                hourlyMaximum: hourlySamples.map(\.heightMetres).max() ?? eventValues[0]
             )]
         } else {
-            throw TideLoadError.noPredictions
+            // Multiple non-alternating events cannot be labeled reliably;
+            // never let the zip below silently drop rows.
+            throw TideLoadError.invalidProviderResponse
         }
         let events = try zip(hiloRows, eventKinds).map { row, kind -> TideEvent in
             guard let instant = Self.iso8601UTC.date(from: row.eventDate) else {

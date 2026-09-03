@@ -36,8 +36,15 @@ struct TideProviderTests {
 
     // MARK: - Provider gate
 
-    @Test func allFourVerifiedProvidersAreEnabled() {
-        #expect(TideProvider.enabled == Set(TideProvider.allCases))
+    @Test func productionEnablementIsTheApprovedProviderGate() {
+        // Source contracts are recorded for all four providers, but CHS
+        // production enablement depends on compatible licensing and approved
+        // distribution (docs/almanac-tide-source-contracts.md), so it is
+        // excluded from unconditional production enablement. Its enum case
+        // stays distinguishable from unsupported geography.
+        #expect(TideProvider.enabled == [.unitedStatesNOAA, .japanJMA, .hongKongHKO])
+        #expect(TideProvider.allCases.contains(.canadaCHS))
+        #expect(!TideProvider.enabled.contains(.canadaCHS))
     }
 
     @Test func attributionNamesOfficialSources() {

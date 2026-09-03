@@ -55,9 +55,27 @@ struct TideServiceTests {
     }
 
     /// Mutable clock so catalogue/day freshness boundaries are deterministic.
-    private final class Clock {
-        var current: Date
-        init(_ current: Date) { self.current = current }
+    /// Locked because the `now:` closure escapes into the cache actor while
+    /// tests mutate `current` (RequestRecorder pattern).
+    private final class Clock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: Date
+
+        init(_ current: Date) { self.stored = current }
+
+        var current: Date {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return stored
+            }
+            set {
+                lock.lock()
+                defer { lock.unlock() }
+                stored = newValue
+            }
+        }
+
         func date() -> Date { current }
     }
 
@@ -187,7 +205,10 @@ struct TideServiceTests {
         let resolver = FakeTimeZoneResolver()
         let service = TideService(
             enabledProviders: [.japanJMA],
-            clients: [.japanJMA: jmaClient],
+            chsClient: FakeTideClient(provider: .canadaCHS),
+            noaaClient: FakeTideClient(provider: .unitedStatesNOAA),
+            jmaClient: jmaClient,
+            hkoClient: FakeTideClient(provider: .hongKongHKO),
             cache: makeCache(),
             timeZoneResolver: resolver
         )
@@ -207,24 +228,33 @@ struct TideServiceTests {
         let chsClient = FakeTideClient(provider: .canadaCHS)
         let service = TideService(
             enabledProviders: [.unitedStatesNOAA],
-            clients: [.unitedStatesNOAA: FakeTideClient(provider: .unitedStatesNOAA)],
+            chsClient: chsClient,
+            noaaClient: FakeTideClient(provider: .unitedStatesNOAA),
+            jmaClient: FakeTideClient(provider: .japanJMA),
+            hkoClient: FakeTideClient(provider: .hongKongHKO),
             cache: makeCache(),
             timeZoneResolver: FakeTimeZoneResolver()
         )
 
-        // The static enum is only the production default and stays untouched.
-        #expect(TideProvider.enabled == [.canadaCHS, .unitedStatesNOAA, .japanJMA, .hongKongHKO])
+        // The static enum is only the production default and stays untouched
+        // (CHS awaits licence-compatible distribution approval).
+        #expect(TideProvider.enabled == [.unitedStatesNOAA, .japanJMA, .hongKongHKO])
 
         await #expect(throws: TideLoadError.providerUnavailable) {
             try await service.resolveStation(for: vancouverLocation(), override: nil)
         }
+        // The CHS client is injected but never dispatched: Canada coverage
+        // throws at the enabled gate before any catalogue work.
         #expect(chsClient.catalogFetchCount == 0)
     }
 
     @Test func unsupportedRegionRemainsDistinct() async throws {
         let service = TideService(
             enabledProviders: [.canadaCHS, .unitedStatesNOAA, .japanJMA, .hongKongHKO],
-            clients: [:],
+            chsClient: FakeTideClient(provider: .canadaCHS),
+            noaaClient: FakeTideClient(provider: .unitedStatesNOAA),
+            jmaClient: FakeTideClient(provider: .japanJMA),
+            hkoClient: FakeTideClient(provider: .hongKongHKO),
             cache: makeCache(),
             timeZoneResolver: FakeTimeZoneResolver()
         )
@@ -242,7 +272,7 @@ struct TideServiceTests {
         let cache = makeCache(clock: clock)
         try await cache.saveCatalog(provider: .canadaCHS, stations: catalog, fetchedAt: clock.current)
         let chsClient = FakeTideClient(provider: .canadaCHS)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         let context = try await service.resolveStation(for: vancouverLocation(), override: nil)
 
@@ -256,7 +286,7 @@ struct TideServiceTests {
         let clock = Clock(Self.fetchedAt)
         let cache = makeCache(clock: clock)
         try await cache.saveCatalog(provider: .canadaCHS, stations: tenStationCatalog(), fetchedAt: clock.current)
-        let service = makeService(clients: [.canadaCHS: FakeTideClient(provider: .canadaCHS)], cache: cache)
+        let service = makeService(chs: FakeTideClient(provider: .canadaCHS), cache: cache)
         let location = vancouverLocation()
 
         let overridden = try await service.resolveStation(
@@ -285,7 +315,7 @@ struct TideServiceTests {
         let unresolved = station(id: "07735", latitude: 49.2827, timeZoneIdentifier: nil)
         let chsClient = FakeTideClient(provider: .canadaCHS, catalog: [unresolved])
         let resolver = FakeTimeZoneResolver()
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache, timeZoneResolver: resolver)
+        let service = makeService(chs: chsClient, cache: cache, timeZoneResolver: resolver)
 
         let first = try await service.resolveStation(for: vancouverLocation(), override: nil)
         #expect(first.timeZone == Self.vancouver)
@@ -316,7 +346,7 @@ struct TideServiceTests {
             week: try septemberWeek(station: unresolved, fetchedAt: clock.current)
         )
         let resolver = FakeTimeZoneResolver()
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache, timeZoneResolver: resolver)
+        let service = makeService(chs: chsClient, cache: cache, timeZoneResolver: resolver)
 
         let context = try await service.resolveStation(for: vancouverLocation(), override: nil)
 
@@ -353,13 +383,14 @@ struct TideServiceTests {
             sourceAttribution: week.sourceAttribution
         )
         let chsClient = FakeTideClient(provider: .canadaCHS, week: poisoned)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         await #expect(throws: TideLoadError.invalidProviderResponse) {
             try await service.refreshRange(station: vancouver, range: Self.septemberRange)
         }
         let snapshot = try await cache.loadDay(
-            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3)
+            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3),
+            timeZone: Self.vancouver
         )
         #expect(snapshot == nil)
     }
@@ -379,13 +410,14 @@ struct TideServiceTests {
             sourceAttribution: week.sourceAttribution
         )
         let chsClient = FakeTideClient(provider: .canadaCHS, week: poisoned)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         await #expect(throws: TideLoadError.invalidProviderResponse) {
             try await service.refreshRange(station: vancouver, range: Self.septemberRange)
         }
         let snapshot = try await cache.loadDay(
-            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3)
+            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3),
+            timeZone: Self.vancouver
         )
         #expect(snapshot == nil)
     }
@@ -398,13 +430,14 @@ struct TideServiceTests {
         let other = station(id: "OTHER", latitude: 49.2827)
         let otherWeek = try septemberWeek(station: other, fetchedAt: clock.current)
         let chsClient = FakeTideClient(provider: .canadaCHS, week: otherWeek)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         await #expect(throws: TideLoadError.invalidProviderResponse) {
             try await service.refreshRange(station: vancouver, range: Self.septemberRange)
         }
         let snapshot = try await cache.loadDay(
-            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3)
+            provider: .canadaCHS, stationID: "07735", date: LocalDate(year: 2026, month: 9, day: 3),
+            timeZone: Self.vancouver
         )
         #expect(snapshot == nil)
     }
@@ -423,7 +456,7 @@ struct TideServiceTests {
 
         let chsClient = FakeTideClient(provider: .canadaCHS, catalog: [enriched])
         let resolver = FakeTimeZoneResolver()
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache, timeZoneResolver: resolver)
+        let service = makeService(chs: chsClient, cache: cache, timeZoneResolver: resolver)
 
         let context = try await service.resolveStation(for: vancouverLocation(), override: nil)
 
@@ -444,7 +477,7 @@ struct TideServiceTests {
         let vancouver = station(id: "07735", latitude: 49.2827)
         try await cache.saveCompleteRange(septemberWeek(station: vancouver, fetchedAt: clock.current), in: Self.vancouver)
         let chsClient = FakeTideClient(provider: .canadaCHS)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         let snapshot = try await service.cachedDay(
             station: vancouver,
@@ -465,7 +498,7 @@ struct TideServiceTests {
         try await cache.saveCompleteRange(septemberWeek(station: vancouver, fetchedAt: clock.current), in: Self.vancouver)
         clock.current = clock.current.addingTimeInterval(40 * 24 * 60 * 60)
         let chsClient = FakeTideClient(provider: .canadaCHS)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         let snapshot = try await service.cachedDay(
             station: vancouver,
@@ -486,7 +519,7 @@ struct TideServiceTests {
             provider: .canadaCHS,
             week: try septemberWeek(station: vancouver, fetchedAt: clock.current)
         )
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         _ = try await service.refreshRange(station: vancouver, range: Self.septemberRange)
 
@@ -510,7 +543,7 @@ struct TideServiceTests {
         let vancouver = station(id: "07735", latitude: 49.2827)
         let week = try septemberWeek(station: vancouver, fetchedAt: clock.current)
         let chsClient = FakeTideClient(provider: .canadaCHS, week: week)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         let refreshed = try await service.refreshRange(station: vancouver, range: Self.septemberRange)
 
@@ -532,7 +565,7 @@ struct TideServiceTests {
             provider: .canadaCHS,
             week: try septemberWeek(station: vancouver, fetchedAt: clock.current)
         )
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
         _ = try await service.refreshRange(station: vancouver, range: Self.septemberRange)
 
         clock.current = clock.current.addingTimeInterval(40 * 24 * 60 * 60)
@@ -567,7 +600,7 @@ struct TideServiceTests {
             sourceAttribution: partial.sourceAttribution
         )
         let chsClient = FakeTideClient(provider: .canadaCHS, week: partialWeek)
-        let service = makeService(clients: [.canadaCHS: chsClient], cache: cache)
+        let service = makeService(chs: chsClient, cache: cache)
 
         await #expect(throws: TideLoadError.noPredictions) {
             try await service.refreshRange(station: vancouver, range: Self.septemberRange)
@@ -612,7 +645,10 @@ struct TideServiceTests {
         let tokyo = try #require(JapanTideStations.all.first { $0.providerStationCode == "TK" })
         let jmaService = TideService(
             enabledProviders: [.japanJMA],
-            clients: [.japanJMA: JapanTideClient(session: jmaSession, cache: cache)],
+            chsClient: FakeTideClient(provider: .canadaCHS),
+            noaaClient: FakeTideClient(provider: .unitedStatesNOAA),
+            jmaClient: JapanTideClient(session: jmaSession, cache: cache),
+            hkoClient: FakeTideClient(provider: .hongKongHKO),
             cache: cache,
             timeZoneResolver: resolver
         )
@@ -622,10 +658,12 @@ struct TideServiceTests {
         #expect(requestedURLs.contains { $0.hasSuffix("/2026/TK.txt") })
         #expect(requestedURLs.contains { $0.hasSuffix("/2027/TK.txt") })
         let jmaDec31 = try await cache.loadDay(
-            provider: .japanJMA, stationID: "TK", date: LocalDate(year: 2026, month: 12, day: 31)
+            provider: .japanJMA, stationID: "TK", date: LocalDate(year: 2026, month: 12, day: 31),
+            timeZone: TimeZone(identifier: "Asia/Tokyo")!
         )
         let jmaJan1 = try await cache.loadDay(
-            provider: .japanJMA, stationID: "TK", date: LocalDate(year: 2027, month: 1, day: 1)
+            provider: .japanJMA, stationID: "TK", date: LocalDate(year: 2027, month: 1, day: 1),
+            timeZone: TimeZone(identifier: "Asia/Tokyo")!
         )
         #expect(jmaDec31?.day.hourlySamples.count == 23) // hours 1…23; hour 24 lands on Jan 1
         #expect(jmaDec31?.day.events.isEmpty == false)
@@ -657,7 +695,10 @@ struct TideServiceTests {
         let taiPoKau = try #require(HongKongTideStations.all.first { $0.providerStationCode == "TPK" })
         let hkoService = TideService(
             enabledProviders: [.hongKongHKO],
-            clients: [.hongKongHKO: HongKongTideClient(session: hkoSession, cache: cache)],
+            chsClient: FakeTideClient(provider: .canadaCHS),
+            noaaClient: FakeTideClient(provider: .unitedStatesNOAA),
+            jmaClient: FakeTideClient(provider: .japanJMA),
+            hkoClient: HongKongTideClient(session: hkoSession, cache: cache),
             cache: cache,
             timeZoneResolver: resolver
         )
@@ -666,10 +707,12 @@ struct TideServiceTests {
         #expect(hkoRecorder.urls.map(\.absoluteString).contains { $0.contains("year=2026") })
         #expect(hkoRecorder.urls.map(\.absoluteString).contains { $0.contains("year=2027") })
         let hkoDec31 = try await cache.loadDay(
-            provider: .hongKongHKO, stationID: "TPK", date: LocalDate(year: 2026, month: 12, day: 31)
+            provider: .hongKongHKO, stationID: "TPK", date: LocalDate(year: 2026, month: 12, day: 31),
+            timeZone: TimeZone(identifier: "Asia/Hong_Kong")!
         )
         let hkoJan1 = try await cache.loadDay(
-            provider: .hongKongHKO, stationID: "TPK", date: LocalDate(year: 2027, month: 1, day: 1)
+            provider: .hongKongHKO, stationID: "TPK", date: LocalDate(year: 2027, month: 1, day: 1),
+            timeZone: TimeZone(identifier: "Asia/Hong_Kong")!
         )
         #expect(hkoDec31?.day.hourlySamples.isEmpty == false)
         #expect(hkoDec31?.day.events.isEmpty == false)
@@ -683,13 +726,26 @@ struct TideServiceTests {
     // MARK: - Test support
 
     private func makeService(
-        clients: [TideProvider: any TideProviderClient],
+        chs: (any TideProviderClient)? = nil,
+        noaa: (any TideProviderClient)? = nil,
+        jma: (any TideProviderClient)? = nil,
+        hko: (any TideProviderClient)? = nil,
         cache: TideDiskCache,
         timeZoneResolver: FakeTimeZoneResolver = FakeTimeZoneResolver()
     ) -> TideService {
-        TideService(
-            enabledProviders: Set(clients.keys),
-            clients: clients,
+        // Enabled set derived from the injected clients, mirroring the old
+        // dict-key derivation; untyped slots get inert fakes.
+        var enabled: Set<TideProvider> = []
+        if chs != nil { enabled.insert(.canadaCHS) }
+        if noaa != nil { enabled.insert(.unitedStatesNOAA) }
+        if jma != nil { enabled.insert(.japanJMA) }
+        if hko != nil { enabled.insert(.hongKongHKO) }
+        return TideService(
+            enabledProviders: enabled,
+            chsClient: chs ?? FakeTideClient(provider: .canadaCHS),
+            noaaClient: noaa ?? FakeTideClient(provider: .unitedStatesNOAA),
+            jmaClient: jma ?? FakeTideClient(provider: .japanJMA),
+            hkoClient: hko ?? FakeTideClient(provider: .hongKongHKO),
             cache: cache,
             timeZoneResolver: timeZoneResolver
         )

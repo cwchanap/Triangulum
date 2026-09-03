@@ -311,20 +311,20 @@ struct HongKongTideClient: TideProviderClient {
 
     /// HLT rows are unlabeled; tides alternate, so kinds come from the
     /// day's first pair. A lone event is judged against the day's hourly
-    /// range.
+    /// range; any other unmatched shape is rejected rather than mislabeled.
     private static func eventKinds(pairs: [HLTPair], hourlyHeights: [Double?]) throws -> [TideEventKind] {
         let values = pairs.map(\.heightMetres)
         if let alternating = TideClientSupport.alternatingEventKinds(values: values) {
             return alternating
         }
-        if let only = values.first {
-            let known = hourlyHeights.compactMap { $0 }
-            return [TideClientSupport.singleEventKind(
-                value: only,
-                hourlyMinimum: known.min() ?? only,
-                hourlyMaximum: known.max() ?? only
-            )]
+        guard values.count == 1, let only = values.first else {
+            throw TideLoadError.invalidProviderResponse
         }
-        throw TideLoadError.invalidProviderResponse
+        let known = hourlyHeights.compactMap { $0 }
+        return [TideClientSupport.singleEventKind(
+            value: only,
+            hourlyMinimum: known.min() ?? only,
+            hourlyMaximum: known.max() ?? only
+        )]
     }
 }

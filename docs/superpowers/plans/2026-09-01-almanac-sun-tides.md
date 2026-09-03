@@ -564,7 +564,14 @@ struct TideStationSelector {
 }
 ```
 
-Filter `supportsHourlyCurve`, calculate distance with `CLLocation`, reject automatic matches beyond 250 km, and return at most eight sorted alternatives.
+Filter to stations that explicitly support **both** prediction inputs — hourly
+samples and exact high/low events. This is enforced as a catalogue-admission
+invariant so stations lacking either input are excluded before distance-based
+matching: CHS rows are admitted only when their `timeSeries` contains both
+`wlp` and `wlp-hilo`, and JMA/HKO/NOAA sources supply both forms for every
+station by construction (the `supportsHourlyCurve` filter is the selector-side
+guard of that invariant). Then calculate distance with `CLLocation`, reject
+automatic matches beyond 250 km, and return at most eight sorted alternatives.
 
 - [ ] **Step 4: Implement an actor-backed file cache following the existing TLE fresh→stale→refresh behavior, not the TLE storage class**
 
@@ -845,14 +852,19 @@ init(
 )
 ```
 
-Construct `TideCoverageResolver(enabledProviders: enabledProviders)` from the same value. Client dispatch must guard the injected set, not `TideProvider.enabled` directly:
+Construct `TideCoverageResolver(enabledProviders: enabledProviders)` from the same value. Client dispatch uses typed client parameters with an exhaustive switch over `TideProvider` — each provider maps directly to its client, so a newly added provider requires compiler-enforced handling — and the injected set gates the selected case, never `TideProvider.enabled` directly:
 
 ```swift
 private func client(for provider: TideProvider) throws -> any TideProviderClient {
-    guard enabledProviders.contains(provider), let client = clients[provider] else {
+    guard enabledProviders.contains(provider) else {
         throw TideLoadError.providerUnavailable
     }
-    return client
+    switch provider {
+    case .canadaCHS: return chsClient
+    case .unitedStatesNOAA: return noaaClient
+    case .japanJMA: return jmaClient
+    case .hongKongHKO: return hkoClient
+    }
 }
 ```
 
@@ -1082,7 +1094,7 @@ Do not copy `BarometerDetailView`'s Catmull-Rom interpolation or `AreaMark` fill
 
 `AlmanacRenderingTests` uses shared `renderHost` at narrow iPhone and iPad sizes and asserts successful attachment/layout.
 
-`AlmanacPresentationTests` directly asserts Sunrise/Sunset/polar copy, SolarEventKind display names, next vs first tide labels, high/low labels, chart summary, station/datum/attribution text, cache-state formatting, and planning-only warning.
+`AlmanacPresentationTests` directly asserts Sunrise/Sunset/polar copy, SolarEventKind display names, next vs first tide labels, high/low labels, chart summary, station/datum/attribution text, cache-state formatting, and planning-only warning. It also pins the provider-specific legal disclosure strings verbatim: the CHS derivative-product notice (`TideProvider.attributionNotice`), the JMA source and edited-processing notice, and the HKO DATA.GOV.HK source identification acknowledging the Government of the HKSAR, the relevant organisation (the Hong Kong Observatory), and DATA.GOV.HK.
 
 - [ ] **Step 5: Verify and commit**
 

@@ -420,14 +420,24 @@ Official references:
 
 ## Coverage and station selection
 
-`TideCoverageResolver` uses resolved country/administrative metadata:
+`TideCoverageResolver` routes by normalized metadata in a fixed,
+deterministic order — the Hong Kong predicate runs before any broader China
+routing:
 
-- Canada → CHS
-- United States → NOAA
-- Japan → JMA
-- Hong Kong → HKO
+1. `countryCode` normalized (uppercased) to `"HK"` → HKO
+2. otherwise `administrativeArea` case-insensitively containing
+   `"Hong Kong"` → HKO (geocoders may return a `CN` country code for Hong
+   Kong places)
+3. otherwise `CA` / `US` / `JP` → CHS / NOAA / JMA
 
-Apply a narrow Hong Kong geographic fallback before broader China routing because geocoders may return `CN`. Outside these regions, Sun remains functional and Tides shows unsupported region.
+Accepted Hong Kong metadata is therefore either an explicit `HK` country
+code or a Hong Kong administrative area under any country code, with the
+explicit `HK` check taking precedence; mainland China (e.g. a `CN` Guangdong
+placemark with no Hong Kong administrative area) has no supported provider
+and routes to unsupported region. Tests cover `HK`, `CN` carrying Hong Kong
+administrative metadata, and unrelated `CN` locations.
+
+Outside these regions, Sun remains functional and Tides shows unsupported region.
 
 For an eligible region:
 

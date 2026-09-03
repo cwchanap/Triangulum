@@ -37,6 +37,11 @@ final class AlmanacViewModel: ObservableObject {
     @Published private(set) var lastFixedLocation: AlmanacLocation?
 
     private var requestGeneration = UUID()
+    /// Placemark resolutions track their own generation: starting one must
+    /// not invalidate an in-flight tide load (and vice versa). Selection- and
+    /// mode-changing paths still invalidate resolutions via
+    /// `stopCurrentLocationObservation`.
+    private var placemarkGeneration = UUID()
 
     /// The injected clock's current instant. Views anchor every "today" and
     /// countdown judgment here — never `Date()` — so the -ui-testing fixture
@@ -59,8 +64,9 @@ final class AlmanacViewModel: ObservableObject {
     private var pendingCoordinate: CLLocationCoordinate2D?
     private var coordinateProcessingScheduled = false
     /// Last placemark-resolved current coordinate; movement under 5 km reuses
-    /// the placemark. `ponytail:` unordered rapid GPS fixes could apply
-    /// out of order; real fixes are seconds apart, coalesce if that bites.
+    /// the placemark. Rapid GPS fixes can arrive out of order, so paired
+    /// latitude/longitude deliveries are coalesced and only the latest fix
+    /// processes (see `scheduleCoordinateProcessing`).
     private var lastResolvedCoordinate: CLLocationCoordinate2D?
 
     private let tideService: any TideServing
@@ -218,6 +224,9 @@ final class AlmanacViewModel: ObservableObject {
     private func stopCurrentLocationObservation() {
         locationObservation = nil
         placemarkTask?.cancel()
+        // Invalidate any in-flight resolution so a late result can never
+        // overwrite a manual selection or mode switch.
+        placemarkGeneration = UUID()
     }
 
     /// Coalesces the paired latitude/longitude deliveries so one user-visible
@@ -256,17 +265,22 @@ final class AlmanacViewModel: ObservableObject {
         lastResolvedCoordinate = coordinate
 
         placemarkTask?.cancel()
-        requestGeneration = UUID()
-        let generation = requestGeneration
+        placemarkGeneration = UUID()
+        let generation = placemarkGeneration
         placemarkTask = Task { [weak self] in
             guard let self else { return }
             do {
                 let resolved = try await self.locationResolver.resolveCurrentCoordinate(coordinate)
-                guard self.requestGeneration == generation else { return }
+                guard self.placemarkGeneration == generation else { return }
                 self.applyResolvedCurrentLocation(resolved)
             } catch {
                 // Keep the previous placemark context; movement under
                 // resolution failure is retried on the next ≥5 km move.
+                guard self.placemarkGeneration == generation else { return }
+                // The failed resolve invalidated nothing on the tide side,
+                // but make sure the Tides section still has data for the
+                // previous placemark (no-op unless a reload is warranted).
+                self.reloadTidesIfNeeded()
             }
         }
     }

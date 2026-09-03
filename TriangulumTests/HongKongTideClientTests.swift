@@ -289,12 +289,12 @@ struct HongKongTideClientTests {
     /// would re-poison every call until source expiry.
     @Test func garbage200IsNotCachedAndLaterGoodFetchRecovers() async throws {
         let cache = try makeCache()
-        var serveGarbage = true
+        let serveGarbage = TestToggle(true)
         let recorder = RequestRecorder()
         let (session, cleanup) = TestURLSessionHelper.makeSession { request in
             let url = try #require(request.url)
             recorder.record(url)
-            let data = serveGarbage
+            let data = serveGarbage.isOn
                 ? Data("<html>captive portal</html>".utf8)
                 : try AlmanacFixtureLoader.data(
                     url.absoluteString == Self.hourlyURL2026
@@ -320,7 +320,7 @@ struct HongKongTideClientTests {
         ) == nil)
 
         // Once the provider recovers, a later good fetch succeeds and is cached.
-        serveGarbage = false
+        serveGarbage.set(false)
         let week = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
         #expect(week.hourlySamples.count == 119)
         #expect(recorder.urls == [

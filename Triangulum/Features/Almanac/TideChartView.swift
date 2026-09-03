@@ -63,7 +63,9 @@ struct TideChartView: View {
             parts.append("Tide chart for \(AlmanacText.fullDateText(firstInstant, in: timeZone)).")
         }
 
-        let heights = samples.map(\.heightMetres)
+        // The range covers every rendered chart point: hourly samples AND
+        // the exact high/low event markers.
+        let heights = samples.map(\.heightMetres) + events.map(\.heightMetres)
         if let low = heights.min(), let high = heights.max() {
             parts.append(String(format: "Heights from %.1f to %.1f metres.", low, high))
         }

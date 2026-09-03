@@ -18,8 +18,13 @@ enum TideProvider: String, CaseIterable, Codable, Hashable {
     case japanJMA
     case hongKongHKO
 
+    /// Production default. NOAA, JMA, and HKO are unconditionally approved;
+    /// CHS production enablement depends on compatible licensing and approved
+    /// distribution of this derivative product (see
+    /// `docs/almanac-tide-source-contracts.md`), so it is excluded until
+    /// confirmed — its case stays distinguishable from unsupported geography
+    /// and Canada coverage reports `.providerUnavailable` meanwhile.
     static let enabled: Set<Self> = [
-        .canadaCHS,
         .unitedStatesNOAA,
         .japanJMA,
         .hongKongHKO

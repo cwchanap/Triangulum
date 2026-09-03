@@ -34,13 +34,16 @@ struct StoredTideCatalog: Codable {
 /// `Application Support/Almanac/Tides/`):
 ///
 ///     catalogs/v1/<provider>.json
-///     days/v1/<provider>/<station>/<yyyy-mm-dd>.json
+///     days/v1/<provider>/<station>/<time-zone-identifier>/<yyyy-mm-dd>.json
 ///     sources/jma/<station>/<year>.txt
 ///     sources/hko/<station>/<year>-hourly.csv
 ///     sources/hko/<station>/<year>-hilo.csv
 ///
-/// Days are keyed by local date alone, so a seven-day fetch overlaps with the
-/// previous fetch's window instead of duplicating it under a range key.
+/// Days are keyed by local date within the partition time zone (the zone's
+/// stable identifier is part of the path), so the same local date in
+/// different zones never reuses the other zone's entries, and a seven-day
+/// fetch overlaps with the previous fetch's window instead of duplicating it
+/// under a range key.
 actor TideDiskCache {
     static let schemaVersion = 1
     static let predictionFreshness: TimeInterval = 30 * 24 * 60 * 60
@@ -59,8 +62,10 @@ actor TideDiskCache {
 
     // MARK: - Days
 
-    func loadDay(provider: TideProvider, stationID: String, date: LocalDate) throws -> CachedDay? {
-        guard let data = try? Data(contentsOf: dayURL(provider: provider, stationID: stationID, date: date)),
+    func loadDay(provider: TideProvider, stationID: String, date: LocalDate, timeZone: TimeZone) throws -> CachedDay? {
+        guard let data = try? Data(
+            contentsOf: dayURL(provider: provider, stationID: stationID, date: date, timeZone: timeZone)
+        ),
               let stored = try? JSONDecoder().decode(StoredTideDay.self, from: data),
               stored.schemaVersion == Self.schemaVersion else {
             return nil // missing, corrupt, or schema-mismatched: a clean miss
@@ -98,7 +103,10 @@ actor TideDiskCache {
                 sourceAttribution: week.sourceAttribution
             )
             let data = try JSONEncoder().encode(StoredTideDay(schemaVersion: Self.schemaVersion, day: day))
-            encoded.append((dayURL(provider: week.station.provider, stationID: week.station.id, date: date), data))
+            encoded.append((
+                dayURL(provider: week.station.provider, stationID: week.station.id, date: date, timeZone: timeZone),
+                data
+            ))
         }
         for entry in encoded {
             try writeAtomically(entry.data, to: entry.url)
@@ -155,10 +163,19 @@ actor TideDiskCache {
 
     // MARK: - Paths
 
-    private func dayURL(provider: TideProvider, stationID: String, date: LocalDate) -> URL {
+    /// Day-cache identity: (provider, station, partition time zone, local
+    /// date) — the same local date partitions instants differently per zone.
+    private func dayURL(provider: TideProvider, stationID: String, date: LocalDate, timeZone: TimeZone) -> URL {
         rootURL
-            .appendingPathComponent("days/v1/\(provider.rawValue)/\(stationID)", isDirectory: true)
+            .appendingPathComponent(
+                "days/v1/\(provider.rawValue)/\(stationID)/\(Self.zoneKey(timeZone))",
+                isDirectory: true
+            )
             .appendingPathComponent("\(dateKey(date)).json")
+    }
+
+    private static func zoneKey(_ timeZone: TimeZone) -> String {
+        timeZone.identifier.replacingOccurrences(of: "/", with: "_")
     }
 
     private func dateKey(_ date: LocalDate) -> String {
