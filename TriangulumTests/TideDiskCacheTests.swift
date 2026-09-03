@@ -12,9 +12,27 @@ struct TideDiskCacheTests {
     // MARK: - Fixtures
 
     /// Mutable clock so freshness boundaries are exercised deterministically.
-    private final class Clock {
-        var current: Date
-        init(_ current: Date) { self.current = current }
+    /// Locked because the `now:` closure escapes into the cache actor while
+    /// tests mutate `current` (RequestRecorder pattern).
+    private final class Clock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: Date
+
+        init(_ current: Date) { self.stored = current }
+
+        var current: Date {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return stored
+            }
+            set {
+                lock.lock()
+                defer { lock.unlock() }
+                stored = newValue
+            }
+        }
+
         func date() -> Date { current }
     }
 
@@ -84,7 +102,9 @@ struct TideDiskCacheTests {
     }
 
     private func loadDay(_ date: LocalDate, from cache: TideDiskCache) async throws -> TideDiskCache.CachedDay? {
-        try await cache.loadDay(provider: .canadaCHS, stationID: "07735", date: date)
+        try await cache.loadDay(
+            provider: .canadaCHS, stationID: "07735", date: date, timeZone: Self.vancouver
+        )
     }
 
     private static let thirtyDays: TimeInterval = TideDiskCache.predictionFreshness
@@ -135,7 +155,7 @@ struct TideDiskCacheTests {
         #expect(!cached.isStale)
 
         // Exactly seven day-keyed files exist — no rolling-range keys.
-        let stationDirectory = root.appendingPathComponent("days/v1/canadaCHS/07735")
+        let stationDirectory = root.appendingPathComponent("days/v1/canadaCHS/07735/America_Vancouver")
         let fileNames = try FileManager.default.contentsOfDirectory(atPath: stationDirectory.path).sorted()
         #expect(fileNames == (1...7).map { String(format: "2026-09-%02d.json", $0) })
     }
@@ -152,7 +172,7 @@ struct TideDiskCacheTests {
         let fileManager = FileManager.default
         for dayNumber in 1...7 {
             let url = root.appendingPathComponent(
-                "days/v1/canadaCHS/07735/\(String(format: "2026-09-%02d", dayNumber)).json"
+                "days/v1/canadaCHS/07735/America_Vancouver/\(String(format: "2026-09-%02d", dayNumber)).json"
             )
             #expect(fileManager.fileExists(atPath: url.path), "missing day file \(url.lastPathComponent)")
         }
@@ -178,6 +198,28 @@ struct TideDiskCacheTests {
         let day5 = try #require(loaded5)
         let sep5Low = TideEvent(kind: .low, instant: try sep5.noon(in: timeZone), heightMetres: 0.7)
         #expect(day5.day.events == [sep5Low])
+    }
+
+    /// Day-cache identity includes the partition time zone: the same local
+    /// date saved under Vancouver must not be readable under Tokyo.
+    @Test func daysForDifferentTimeZonesDoNotReuseEachOthersEntries() async throws {
+        let root = makeRoot()
+        let cache = TideDiskCache(rootURL: root)
+        try await cache.saveCompleteRange(
+            try septemberWeek(fetchedAt: utcDate(2026, 9, 1)),
+            in: Self.vancouver
+        )
+
+        let tokyoEntry = try await cache.loadDay(
+            provider: .canadaCHS,
+            stationID: "07735",
+            date: LocalDate(year: 2026, month: 9, day: 3),
+            timeZone: TimeZone(identifier: "Asia/Tokyo")!
+        )
+        #expect(tokyoEntry == nil, "a Tokyo-partitioned read must not hit the Vancouver entry")
+
+        let vancouverEntry = try await loadDay(LocalDate(year: 2026, month: 9, day: 3), from: cache)
+        #expect(vancouverEntry != nil)
     }
 
     @Test func weekWithSamplesOutsideRangeThrowsAndWritesNoDayFiles() async throws {
@@ -215,7 +257,7 @@ struct TideDiskCacheTests {
         try await cache.saveCompleteRange(septemberWeek(fetchedAt: utcDate(2026, 9, 1)), in: Self.vancouver)
 
         let date = LocalDate(year: 2026, month: 9, day: 1)
-        let url = root.appendingPathComponent("days/v1/canadaCHS/07735/2026-09-01.json")
+        let url = root.appendingPathComponent("days/v1/canadaCHS/07735/America_Vancouver/2026-09-01.json")
         let mismatched = try JSONEncoder().encode(
             StoredTideDay(
                 schemaVersion: TideDiskCache.schemaVersion + 1,

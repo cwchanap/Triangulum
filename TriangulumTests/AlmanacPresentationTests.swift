@@ -156,8 +156,8 @@ struct AlmanacPresentationTests {
 
     @Test func summaryLeadsWithNextTideOnlyForToday() {
         let day = fixtureDay()
-        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: true) == "Next tide")
-        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: false) == "First tide")
+        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: true, now: localDate(2026, 9, 15, 9)) == "Next tide")
+        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: false, now: localDate(2026, 9, 15, 9)) == "First tide")
     }
 
     @Test func summaryChoosesTheNextEventTodayAndTheFirstEventOtherwise() {
@@ -171,9 +171,9 @@ struct AlmanacPresentationTests {
         #expect(next?.instant == localDate(2026, 9, 15, 12))
         #expect(AlmanacText.countdownText(from: nineAM, to: next!.instant) == "in 3h 00m")
 
-        // After today's last event nothing remains.
+        // After today's last event nothing remains, and the headline says so.
         #expect(AlmanacTidesView.summaryEvent(day: day, isToday: true, now: localDate(2026, 9, 15, 23)) == nil)
-        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: true) == "Next tide")
+        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: true, now: localDate(2026, 9, 15, 23)) == "No more events today")
 
         // Another date: the first event leads regardless of the current time.
         let midnight = localDate(2026, 9, 15, 0, 30)
@@ -191,8 +191,10 @@ struct AlmanacPresentationTests {
             fetchedAt: localDate(2026, 9, 15, 12),
             sourceAttribution: "test"
         )
-        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: true) == "No more events today")
-        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: false) == "No predicted events")
+        // Nothing was published for the day — "no more events today" would
+        // imply events existed and passed, so both dates say no predictions.
+        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: true, now: localDate(2026, 9, 15, 23)) == "No predicted events")
+        #expect(AlmanacTidesView.summaryTitle(day: day, isToday: false, now: localDate(2026, 9, 15, 9)) == "No predicted events")
         #expect(AlmanacTidesView.summaryEvent(day: day, isToday: true, now: Date()) == nil)
     }
 
@@ -245,6 +247,17 @@ struct AlmanacPresentationTests {
         #expect(summary == "")
     }
 
+    @Test func chartSummaryRangeCoversEventHeightsWithoutSamples() {
+        // The accessibility range must cover every rendered point — including
+        // a day whose exact events carry the only heights.
+        let summary = TideChartView.accessibilitySummary(
+            samples: [],
+            events: [TideEvent(kind: .high, instant: localDate(2026, 9, 15, 6), heightMetres: 4.0)],
+            timeZone: vancouverTimeZone
+        )
+        #expect(summary == "Tide chart for September 15, 2026. Heights from 4.0 to 4.0 metres. High water 4.0 metres at 06:00.")
+    }
+
     // MARK: - Station / datum / attribution text
 
     @Test func stationLineAndDistanceCopy() {
@@ -282,10 +295,15 @@ struct AlmanacPresentationTests {
                 + "product does not constitute an endorsement or an approval of this product by the "
                 + "Canadian Hydrographic Service, the Department of Fisheries and Oceans or His Majesty "
                 + "the King in Right of Canada.")
-        #expect(TideProvider.japanJMA.attributionNotice?.contains("Source: Japan Meteorological Agency website") == true)
-        #expect(TideProvider.japanJMA.attributionNotice?.contains("not presented as if created by the Government of Japan") == true)
-        #expect(TideProvider.hongKongHKO.attributionNotice?.contains("Government of the Hong Kong Special Administrative Region") == true)
-        #expect(TideProvider.hongKongHKO.attributionNotice?.contains("DATA.GOV.HK") == true)
+        #expect(TideProvider.japanJMA.attributionNotice == "Source: Japan Meteorological Agency website "
+            + "(https://ds.data.jma.go.jp/gmd/kaiyou/db/tide/suisan/readme.html). "
+            + "The predictions are edited and processed for display in this app and are not "
+            + "presented as if created by the Government of Japan.")
+        #expect(TideProvider.hongKongHKO.attributionNotice == "Source: tide data of the Hong Kong Observatory, "
+            + "a department of the Government of the Hong Kong Special Administrative Region, "
+            + "obtained through DATA.GOV.HK (https://data.gov.hk). The Government of the HKSAR "
+            + "and the Hong Kong Observatory own the intellectual property rights in the data "
+            + "and all copies.")
         #expect(TideProvider.unitedStatesNOAA.attributionNotice == nil)
     }
 

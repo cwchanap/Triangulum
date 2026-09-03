@@ -285,12 +285,12 @@ struct JapanTideClientTests {
     /// for that station/year until source expiry.
     @Test func garbage200IsNotCachedAndLaterGoodFetchRecovers() async throws {
         let cache = try makeCache()
-        var serveGarbage = true
+        let serveGarbage = TestToggle(true)
         let recorder = RequestRecorder()
         let (session, cleanup) = TestURLSessionHelper.makeSession { request in
             let url = try #require(request.url)
             recorder.record(url)
-            let data = serveGarbage
+            let data = serveGarbage.isOn
                 ? Data("<html>captive portal</html>".utf8)
                 : try AlmanacFixtureLoader.data("JMA/tokyo-2026.txt")
             return TestURLSessionHelper.httpResponse(url: url, statusCode: 200, data: data)
@@ -315,7 +315,7 @@ struct JapanTideClientTests {
         #expect(poisoned == nil)
 
         // Once the provider recovers, a later good fetch succeeds and is cached.
-        serveGarbage = false
+        serveGarbage.set(false)
         let week = try await client.loadPredictions(station: try tokyo(), range: range)
         #expect(week.hourlySamples.count == 47)
         #expect(recorder.urls == [

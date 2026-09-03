@@ -4,7 +4,12 @@ Verified live on **2026-09-01** by executing every recorded capture URL and
 checking in only the named slim fixtures under
 `TriangulumTests/Fixtures/Almanac/`. All four providers satisfy the
 source-contract gate (both prediction forms captured, non-empty, direct iOS
-use permitted) and all four are listed in `TideProvider.enabled`.
+use permitted). NOAA, JMA, and HKO are enabled in `TideProvider.enabled`;
+CHS production enablement depends on compatible licensing and approved
+distribution of this derivative product, so CHS is excluded from the
+production default until that is confirmed — its enum case remains
+distinguishable from unsupported geography, and Canada coverage reports
+`.providerUnavailable` meanwhile.
 
 ---
 
@@ -76,9 +81,10 @@ values as-is (chart datum) and never converts datums.
 **Request limits:** The `time-series-definitions` endpoint reports
 `allowedPeriodInDays: 7` for `wlp` (up to 31 days when combined with
 `resolution=SIXTY_MINUTES`) and `allowedPeriodInDays: 366` for `wlp-hilo`.
-Data windows must not exceed the allowed period per request. No published
-per-client rate quota; poll politely, cache aggressively (30-day catalogue
-freshness per plan).
+Data windows must not exceed the allowed period per request. IWLS applies
+per-client rate limits of three requests per second and 30 requests per
+minute; clients must throttle or adjust their request rate after receiving
+HTTP 429 responses. Cache aggressively (30-day catalogue freshness per plan).
 
 **Fixture capture date:** 2026-09-01
 

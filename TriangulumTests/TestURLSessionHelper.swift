@@ -94,13 +94,35 @@ final class RequestRecorder: @unchecked Sendable {
 
     func record(_ url: URL) {
         lock.lock()
-        requested.append(url)
         defer { lock.unlock() }
+        requested.append(url)
     }
 
     var urls: [URL] {
         lock.lock()
         defer { lock.unlock() }
         return requested
+    }
+}
+
+/// Locked mutable boolean for handler closures that run on the URL session's
+/// delegate queue while the test body mutates the flag (same pattern as
+/// `RequestRecorder`).
+final class TestToggle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Bool
+
+    init(_ value: Bool) { self.value = value }
+
+    var isOn: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func set(_ newValue: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        value = newValue
     }
 }

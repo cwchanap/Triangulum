@@ -111,13 +111,31 @@ struct AlmanacViewModelTests {
     }
 
     @MainActor
-    private struct Harness {
+    private final class Harness {
         let store: AlmanacPreferencesStore
         let defaults: UserDefaults
         let suiteName: String
         let tideService: FakeTideService
         let resolver: FakeLocationResolver
         let locationManager: LocationManager
+
+        init(store: AlmanacPreferencesStore,
+             defaults: UserDefaults,
+             suiteName: String,
+             tideService: FakeTideService,
+             resolver: FakeLocationResolver,
+             locationManager: LocationManager) {
+            self.store = store
+            self.defaults = defaults
+            self.suiteName = suiteName
+            self.tideService = tideService
+            self.resolver = resolver
+            self.locationManager = locationManager
+        }
+
+        /// The generated suite is removed when the harness deinits (end of
+        /// each test) so persistent domains never leak across runs.
+        deinit { defaults.removePersistentDomain(forName: suiteName) }
 
         var viewModel: AlmanacViewModel {
             AlmanacViewModel(

@@ -36,10 +36,15 @@ struct AlmanacTidesView: View {
     }
 
     /// Summary headline: the next event leads only for the station-local
-    /// today; other dates lead with the day's first event instead.
-    static func summaryTitle(day: TideDay, isToday: Bool) -> String {
+    /// today; other dates lead with the day's first event instead. A day
+    /// with no published events says so regardless of date; "no more events
+    /// today" is reserved for a today whose published events have all passed.
+    static func summaryTitle(day: TideDay, isToday: Bool, now: Date) -> String {
         if day.events.isEmpty {
-            return isToday ? noMoreEventsTodayText : noPredictionsText
+            return noPredictionsText
+        }
+        if isToday, day.nextEvent(after: now) == nil {
+            return noMoreEventsTodayText
         }
         return isToday ? "Next tide" : "First tide"
     }
@@ -171,7 +176,8 @@ struct AlmanacTidesView: View {
         let event = Self.summaryEvent(day: day, isToday: isToday, now: viewModel.currentDate)
 
         return VStack(alignment: .leading, spacing: CelSpace.sm) {
-            InstrumentHeader(icon: "water.waves", title: Self.summaryTitle(day: day, isToday: isToday),
+            InstrumentHeader(icon: "water.waves",
+                             title: Self.summaryTitle(day: day, isToday: isToday, now: viewModel.currentDate),
                              tint: .celCyan) {
                 // A day without exact events already puts its long title in
                 // the header; the trailing date stays only for event days.
@@ -207,9 +213,9 @@ struct AlmanacTidesView: View {
                     .font(.celTiny)
                     .foregroundStyle(Color.celTextFaint)
             } else {
-                Text(isToday
-                     ? "All of today's predicted high and low waters have passed."
-                     : "No exact high or low waters were published for this date.")
+                Text(day.events.isEmpty
+                     ? "No exact high or low waters were published for this date."
+                     : "All of today's predicted high and low waters have passed.")
                     .font(.celLabel)
                     .foregroundStyle(Color.celTextDim)
                     .fixedSize(horizontal: false, vertical: true)

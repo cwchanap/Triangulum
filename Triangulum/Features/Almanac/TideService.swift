@@ -33,15 +33,20 @@ protocol TideServing {
 /// Orchestrates coverage, station selection, catalogue caching, time-zone
 /// enrichment, and cache-first day loading across the enabled providers.
 ///
-/// `enabledProviders` is one injected value driving both coverage resolution
-/// and client dispatch — `TideProvider.enabled` is only the production
-/// default, never consulted directly. There is deliberately no reachability
-/// check or retry scheduler: `cachedDay` never fetches, `refreshRange` always
-/// does, and the view model decides when to call each.
+/// `enabledProviders` is one injected value driving coverage resolution and
+/// gating client dispatch — `TideProvider.enabled` is only the production
+/// default, never consulted directly. Dispatch itself is a typed, exhaustive
+/// switch over `TideProvider`, so a newly added provider case is
+/// compiler-enforced to map to its client. There is deliberately no
+/// reachability check or retry scheduler: `cachedDay` never fetches,
+/// `refreshRange` always does, and the view model decides when to call each.
 struct TideService: TideServing {
 
     private let enabledProviders: Set<TideProvider>
-    private let clients: [TideProvider: any TideProviderClient]
+    private let chsClient: any TideProviderClient
+    private let noaaClient: any TideProviderClient
+    private let jmaClient: any TideProviderClient
+    private let hkoClient: any TideProviderClient
     private let cache: TideDiskCache
     private let timeZoneResolver: any TideStationTimeZoneResolving
     private let coverageResolver: TideCoverageResolver
@@ -49,22 +54,36 @@ struct TideService: TideServing {
 
     init(
         enabledProviders: Set<TideProvider> = TideProvider.enabled,
-        clients: [TideProvider: any TideProviderClient],
+        chsClient: any TideProviderClient,
+        noaaClient: any TideProviderClient,
+        jmaClient: any TideProviderClient,
+        hkoClient: any TideProviderClient,
         cache: TideDiskCache,
         timeZoneResolver: any TideStationTimeZoneResolving
     ) {
         self.enabledProviders = enabledProviders
-        self.clients = clients
+        self.chsClient = chsClient
+        self.noaaClient = noaaClient
+        self.jmaClient = jmaClient
+        self.hkoClient = hkoClient
         self.cache = cache
         self.timeZoneResolver = timeZoneResolver
         self.coverageResolver = TideCoverageResolver(enabledProviders: enabledProviders)
     }
 
+    /// Exhaustive typed dispatch: each provider case maps directly to its
+    /// client (adding a provider is a compile error until handled), and the
+    /// injected `enabledProviders` set gates the selected case.
     private func client(for provider: TideProvider) throws -> any TideProviderClient {
-        guard enabledProviders.contains(provider), let client = clients[provider] else {
+        guard enabledProviders.contains(provider) else {
             throw TideLoadError.providerUnavailable
         }
-        return client
+        switch provider {
+        case .canadaCHS: return chsClient
+        case .unitedStatesNOAA: return noaaClient
+        case .japanJMA: return jmaClient
+        case .hongKongHKO: return hkoClient
+        }
     }
 
     // MARK: - Station resolution
@@ -181,9 +200,17 @@ struct TideService: TideServing {
 
     /// Cache-only: never fetches. Fresh or stale, a stored day is returned
     /// with its `isStale` flag; refreshing is the caller's explicit move.
+    /// The day-cache identity includes the partition time zone, so a station
+    /// without a resolved zone has no deterministic partition to read.
     func cachedDay(station: TideStation, date: LocalDate) async throws -> TideDaySnapshot? {
-        try await cache.loadDay(provider: station.provider, stationID: station.id, date: date)
-            .map { TideDaySnapshot(day: $0.day, isStale: $0.isStale) }
+        guard let timeZone = station.timeZone else { return nil }
+        return try await cache.loadDay(
+            provider: station.provider,
+            stationID: station.id,
+            date: date,
+            timeZone: timeZone
+        )
+        .map { TideDaySnapshot(day: $0.day, isStale: $0.isStale) }
     }
 
     /// Always performs the provider refresh, validates the complete-response

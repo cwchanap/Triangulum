@@ -18,7 +18,7 @@ import Foundation
 @testable import Triangulum
 
 @MainActor
-@Suite
+@Suite(.serialized) // shared renderHost window-state mutations must not race
 struct AlmanacRenderingTests {
 
     private static let vancouverTimeZone = TimeZone(identifier: "America/Vancouver")!
@@ -48,9 +48,31 @@ struct AlmanacRenderingTests {
     /// Deterministic harness: fixture tide service + fixture resolver +
     /// isolated preferences pre-seeded with the fixed Vancouver selection, so
     /// the view model restores a known place/date without GPS or network.
-    private func makeHarness() -> (dependencies: AlmanacDependencies,
-                                   viewModel: AlmanacViewModel,
-                                   locationManager: LocationManager) {
+    /// The suite's persistent domain is removed when the harness deinits
+    /// (end of each test) so suites never leak across runs.
+    private final class Harness {
+        let suiteName: String
+        private let defaults: UserDefaults
+        let dependencies: AlmanacDependencies
+        let viewModel: AlmanacViewModel
+        let locationManager: LocationManager
+
+        init(suiteName: String,
+             defaults: UserDefaults,
+             dependencies: AlmanacDependencies,
+             viewModel: AlmanacViewModel,
+             locationManager: LocationManager) {
+            self.suiteName = suiteName
+            self.defaults = defaults
+            self.dependencies = dependencies
+            self.viewModel = viewModel
+            self.locationManager = locationManager
+        }
+
+        deinit { defaults.removePersistentDomain(forName: suiteName) }
+    }
+
+    private func makeHarness() -> Harness {
         let suiteName = "test.almanac.rendering.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         let store = AlmanacPreferencesStore(defaults: defaults)
@@ -65,7 +87,13 @@ struct AlmanacRenderingTests {
         )
         let locationManager = LocationManager(skipAvailabilityCheck: true)
         let viewModel = AlmanacViewModel(dependencies: dependencies, locationManager: locationManager)
-        return (dependencies, viewModel, locationManager)
+        return Harness(
+            suiteName: suiteName,
+            defaults: defaults,
+            dependencies: dependencies,
+            viewModel: viewModel,
+            locationManager: locationManager
+        )
     }
 
     /// Polls until `condition` holds so generation-guarded async state (the
@@ -150,7 +178,7 @@ struct AlmanacRenderingTests {
         }
     }
 
-    @Test func tidesSectionRendersTodaySummaryWithChartAndSheets() async {
+    @Test func tidesSectionRendersTodaySummaryWithChartAndSheets() async throws {
         let harness = makeHarness()
         harness.viewModel.section = .tides
         await waitUntil { harness.viewModel.tideDay != nil }
@@ -171,7 +199,7 @@ struct AlmanacRenderingTests {
                     "Tides section for today failed to attach to a window")
         }
 
-        let context = harness.viewModel.stationContext!
+        let context = try #require(harness.viewModel.stationContext)
         let sheet = TideStationSheet(
             selectedStation: context.selected,
             alternatives: context.nearbyStations,

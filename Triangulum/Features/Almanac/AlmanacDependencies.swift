@@ -16,28 +16,20 @@ struct AlmanacDependencies {
     let preferencesStore: AlmanacPreferencesStore
     let now: () -> Date
 
-    /// Production wiring. `enabledProviders` drives both the coverage model
-    /// and client construction (Ruling A: one shared `TideDiskCache` threads
-    /// into `TideService` AND the annual-source clients).
+    /// Production wiring. `enabledProviders` drives the coverage model and
+    /// gates dispatch; clients are cheap to construct, so every provider gets
+    /// one unconditionally and the enabled set decides which are ever used
+    /// (Ruling A: one shared `TideDiskCache` threads into `TideService` AND
+    /// the annual-source clients).
     static func live(enabledProviders: Set<TideProvider> = TideProvider.enabled) -> AlmanacDependencies {
         let cache = TideDiskCache(rootURL: cacheRootURL)
-        var clients: [TideProvider: any TideProviderClient] = [:]
-        if enabledProviders.contains(.canadaCHS) {
-            clients[.canadaCHS] = CanadaTideClient(session: .shared)
-        }
-        if enabledProviders.contains(.unitedStatesNOAA) {
-            clients[.unitedStatesNOAA] = UnitedStatesTideClient(session: .shared)
-        }
-        if enabledProviders.contains(.japanJMA) {
-            clients[.japanJMA] = JapanTideClient(session: .shared, cache: cache)
-        }
-        if enabledProviders.contains(.hongKongHKO) {
-            clients[.hongKongHKO] = HongKongTideClient(session: .shared, cache: cache)
-        }
         return AlmanacDependencies(
             tideService: TideService(
                 enabledProviders: enabledProviders,
-                clients: clients,
+                chsClient: CanadaTideClient(session: .shared),
+                noaaClient: UnitedStatesTideClient(session: .shared),
+                jmaClient: JapanTideClient(session: .shared, cache: cache),
+                hkoClient: HongKongTideClient(session: .shared, cache: cache),
                 cache: cache,
                 timeZoneResolver: TideStationTimeZoneResolver()
             ),
