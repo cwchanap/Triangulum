@@ -225,6 +225,29 @@ struct SolarEventsTests {
                     "Longyearbyen Aug 25 2026 sunrise \(sunrise) must fall within the civil day")
         }
     }
+
+    /// Regression (P1): Longyearbyen on 2026-03-20 (vernal equinox). At 78°N
+    /// the noon-based `cosH` for a -12° rising (nautical dawn) crossing lands
+    /// just outside [-1, 1] (≈ -1.014) because the equinox declination isn't
+    /// exactly 0° at local noon, so the feasibility guard previously returned
+    /// nil before the full-day scan could find the real ~00:21 local nautical
+    /// dawn. The infeasible-approximation path must fall back to the day scan
+    /// instead of dropping the event.
+    @Test func longyearbyenMar20NauticalDawnIsNotDroppedByNoonFeasibility() throws {
+        let zone = TimeZone(identifier: "Arctic/Longyearbyen")!
+        let date = LocalDate(year: 2026, month: 3, day: 20)
+        let dayStart = try date.start(in: zone)
+        let dayEnd = try date.endExclusive(in: zone)
+
+        let nauticalDawn = solarCrossing(-12.0, rising: true, localDate: date,
+                                         timeZone: zone, latDeg: 78.2232, lonDeg: 15.65)
+        #expect(nauticalDawn != nil,
+                "Longyearbyen Mar 20 2026 has a real nautical dawn; the noon cosH feasibility guard must not drop it as nil")
+        if let nauticalDawn {
+            #expect(nauticalDawn >= dayStart && nauticalDawn < dayEnd,
+                    "Longyearbyen Mar 20 2026 nautical dawn \(nauticalDawn) must fall within the civil day")
+        }
+    }
 }
 
 // MARK: - SolarDay Tests
