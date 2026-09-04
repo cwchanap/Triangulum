@@ -237,8 +237,11 @@ struct TideServiceTests {
         )
 
         // The static enum is only the production default and stays untouched
-        // (CHS awaits licence-compatible distribution approval).
-        #expect(TideProvider.enabled == [.unitedStatesNOAA, .japanJMA, .hongKongHKO])
+        // by this injection. All four providers are enabled in production
+        // (CHS included: Triangulum is non-commercial, satisfying the CHS
+        // licence); this test injects a narrower set to prove the gate
+        // mechanism works without editing the static default.
+        #expect(TideProvider.enabled == [.canadaCHS, .unitedStatesNOAA, .japanJMA, .hongKongHKO])
 
         await #expect(throws: TideLoadError.providerUnavailable) {
             try await service.resolveStation(for: vancouverLocation(), override: nil)

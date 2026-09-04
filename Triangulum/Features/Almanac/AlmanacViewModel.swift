@@ -392,6 +392,13 @@ final class AlmanacViewModel: ObservableObject {
     private func currentLocationDidChange(to coordinate: CLLocationCoordinate2D) {
         // (0, 0) is LocationManager's unfixed default, not a real fix.
         guard coordinate.latitude != 0 || coordinate.longitude != 0 else { return }
+        // Defense-in-depth: re-check locationMode at the resolution boundary.
+        // `currentLocationObservationDidChange` already gates on this, but the
+        // coalesced Task is async and a `selectLocation` switch to `.selected`
+        // can arrive between the gate and this execution. Without this check,
+        // queued Current-mode work could resolve a coordinate after the user
+        // has already picked a different destination.
+        guard locationMode == .current else { return }
         // Defense-in-depth: re-check authorization/availability at the
         // resolution boundary. `currentLocationObservationDidChange` already
         // gates on this, but the coalesced Task is async and a revocation
