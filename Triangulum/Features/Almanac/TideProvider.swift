@@ -18,13 +18,17 @@ enum TideProvider: String, CaseIterable, Codable, Hashable {
     case japanJMA
     case hongKongHKO
 
-    /// Production default. NOAA, JMA, and HKO are unconditionally approved;
-    /// CHS production enablement depends on compatible licensing and approved
-    /// distribution of this derivative product (see
-    /// `docs/almanac-tide-source-contracts.md`), so it is excluded until
-    /// confirmed — its case stays distinguishable from unsupported geography
-    /// and Canada coverage reports `.providerUnavailable` meanwhile.
+    /// Production default. All four providers are enabled: NOAA, JMA, and HKO
+    /// unconditionally; CHS is enabled because Triangulum is distributed free
+    /// of charge for non-commercial use, which satisfies the CHS website
+    /// licence agreement's prohibition on derivative products made for sale
+    /// or profit (see `docs/almanac-tide-source-contracts.md`). The required
+    /// derivative-product notice is carried in `attributionNotice` and
+    /// displayed on the tide station card. If distribution ever becomes
+    /// commercial, remove `.canadaCHS` here and Canada coverage will report
+    /// `.providerUnavailable` without any further change.
     static let enabled: Set<Self> = [
+        .canadaCHS,
         .unitedStatesNOAA,
         .japanJMA,
         .hongKongHKO

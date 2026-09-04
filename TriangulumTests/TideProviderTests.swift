@@ -37,14 +37,15 @@ struct TideProviderTests {
     // MARK: - Provider gate
 
     @Test func productionEnablementIsTheApprovedProviderGate() {
-        // Source contracts are recorded for all four providers, but CHS
-        // production enablement depends on compatible licensing and approved
-        // distribution (docs/almanac-tide-source-contracts.md), so it is
-        // excluded from unconditional production enablement. Its enum case
-        // stays distinguishable from unsupported geography.
-        #expect(TideProvider.enabled == [.unitedStatesNOAA, .japanJMA, .hongKongHKO])
+        // All four providers with recorded source contracts are enabled in
+        // the production default (docs/almanac-tide-source-contracts.md).
+        // CHS is enabled because Triangulum is distributed free of charge for
+        // non-commercial use, satisfying the CHS licence's prohibition on
+        // derivative products made for sale or profit. The enum case stays
+        // distinguishable from unsupported geography regardless.
+        #expect(TideProvider.enabled == [.canadaCHS, .unitedStatesNOAA, .japanJMA, .hongKongHKO])
         #expect(TideProvider.allCases.contains(.canadaCHS))
-        #expect(!TideProvider.enabled.contains(.canadaCHS))
+        #expect(TideProvider.enabled.contains(.canadaCHS))
     }
 
     @Test func attributionNamesOfficialSources() {

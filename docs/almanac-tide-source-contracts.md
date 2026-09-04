@@ -4,12 +4,14 @@ Verified live on **2026-09-01** by executing every recorded capture URL and
 checking in only the named slim fixtures under
 `TriangulumTests/Fixtures/Almanac/`. All four providers satisfy the
 source-contract gate (both prediction forms captured, non-empty, direct iOS
-use permitted). NOAA, JMA, and HKO are enabled in `TideProvider.enabled`;
-CHS production enablement depends on compatible licensing and approved
-distribution of this derivative product, so CHS is excluded from the
-production default until that is confirmed — its enum case remains
-distinguishable from unsupported geography, and Canada coverage reports
-`.providerUnavailable` meanwhile.
+use permitted) and all four are enabled in `TideProvider.enabled`. CHS
+enablement rests on Triangulum being distributed free of charge for
+non-commercial use, which satisfies the CHS website licence agreement's
+prohibition on derivative products made for sale or profit; the required
+derivative-product notice is carried in `TideProvider.attributionNotice` for
+`.canadaCHS` and displayed on the tide station card. If distribution ever
+becomes commercial, remove `.canadaCHS` from `TideProvider.enabled` and
+Canada coverage will report `.providerUnavailable` with no further change.
 
 ---
 
