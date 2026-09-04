@@ -40,9 +40,27 @@ extension ConstellationMapView.Astronomer {
         // Hour angle for the target altitude: cos(H) = (sin(h) - sin(lat)·sin(dec)) / (cos(lat)·cos(dec))
         let sinH = sin(altitudeDeg * rad)
         let cosHdenom = cos(latRad) * cos(decRad)
-        guard abs(cosHdenom) > 1e-6 else { return nil }
-        let cosH = (sinH - sin(latRad) * sin(decRad)) / cosHdenom
-        guard cosH >= -1.0 && cosH <= 1.0 else { return nil }
+        let cosHFeasible = abs(cosHdenom) > 1e-6
+        let cosH = cosHFeasible ? (sinH - sin(latRad) * sin(decRad)) / cosHdenom : 0
+        let noonApproximationFeasible = cosHFeasible && cosH >= -1.0 && cosH <= 1.0
+        guard noonApproximationFeasible else {
+            // The noon-based hour-angle approximation is infeasible — either a
+            // degenerate denominator (cos(lat)·cos(dec) ≈ 0, near the poles) or
+            // cosH slightly outside [-1, 1] near polar transition dates where
+            // declination drifts enough across the hours between noon and the
+            // crossing to push the approximation past the trigonometric limit.
+            // That does NOT mean no crossing exists: the real altitude path may
+            // still cross the target later/earlier in the civil day. Fall back
+            // to a full-day altitude-path scan instead of dropping the event.
+            return scanDayForSolarCrossing(
+                altitudeDeg: altitudeDeg,
+                rising: rising,
+                dayStart: dayStart,
+                dayEnd: dayEnd,
+                latDeg: latDeg,
+                lonDeg: lonDeg
+            )
+        }
         let hourAngleHours = acos(cosH) * 12.0 / Double.pi
 
         // Solar transit: when hour angle = 0 → LST = RA_sun
