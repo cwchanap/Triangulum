@@ -197,10 +197,13 @@ struct SolarEventsTests {
         }
     }
 
-    /// Longyearbyen on 2026-08-25: the review's exact scenario. Whatever the
-    /// astronomy resolves to, the sunset crossing for Aug 25 must not be a
-    /// time on Aug 26 — it is either within Aug 25 or absent (nil).
-    @Test func longyearbyenSunsetStaysWithinAug25OrIsAbsent() throws {
+    /// Longyearbyen on 2026-08-25: the review's exact scenario. The local-noon
+    /// approximation puts the post-transit sunset at ~00:10 Aug 26, but
+    /// Longyearbyen actually has a late Aug-25 sunset (~23:55 local). The
+    /// crossing must be refined within the civil day rather than clamped to
+    /// nil, so the UI shows a real sunset and daylight duration on a day that
+    /// has one.
+    @Test func longyearbyenAug25HasAnInDaySunset() throws {
         let zone = TimeZone(identifier: "Arctic/Longyearbyen")!
         let date = LocalDate(year: 2026, month: 8, day: 25)
         let dayStart = try date.start(in: zone)
@@ -208,6 +211,8 @@ struct SolarEventsTests {
 
         let sunset = solarCrossing(-0.833, rising: false, localDate: date,
                                    timeZone: zone, latDeg: 78.2232, lonDeg: 15.65)
+        #expect(sunset != nil,
+                "Longyearbyen Aug 25 2026 has a real late sunset; the crossing must resolve within the civil day, not be dropped as nil")
         if let sunset {
             #expect(sunset >= dayStart && sunset < dayEnd,
                     "Longyearbyen Aug 25 2026 sunset \(sunset) must fall within the civil day, not on Aug 26")

@@ -312,6 +312,67 @@ struct HongKongTideClientTests {
         }
     }
 
+    /// Regression: an interior gap in an HLT row (pair 1 valid, pair 2
+    /// empty, pairs 3–4 populated) must be rejected as malformed before the
+    /// annual source is cached. The old `guard !time.isEmpty, !height.isEmpty
+    /// else { break }` treated any empty cell as end-of-row, silently
+    /// dropping the later events and persisting the truncated row as
+    /// validated source.
+    @Test func rejectsHLTRowWithInteriorGap() async throws {
+        let taiPoKau2026HourlyFixture = try fixture("HKO/tai-po-kau-2026-hourly.csv")
+        // Jan 1: pair 1 valid, pair 2 empty, pairs 3–4 populated (interior
+        // gap). Jan 2–5 are well-formed so only the gap row is at fault.
+        let text = "\u{feff}Month,Date,Time,Height(m),Time,Height(m),Time,Height(m),Time,Height(m)\n"
+            + "01,01,0313,1.10,,,0925,1.39,1734,2.26\n"
+            + "01,02,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            + "01,03,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            + "01,04,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            + "01,05,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+        let (session, _, cleanup) = makeSession(routes: [
+            Self.hourlyURL2026: .success((200, taiPoKau2026HourlyFixture)),
+            Self.hiloURL2026: .success((200, Data(text.utf8)))
+        ])
+        defer { cleanup() }
+        let client = HongKongTideClient(session: session, cache: try makeCache())
+
+        do {
+            _ = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+            Issue.record("Expected an interior-gap HLT rejection")
+        } catch {
+            #expect((error as? TideLoadError) == .invalidProviderResponse,
+                    "An HLT interior gap must be rejected, not cached as truncated source")
+        }
+    }
+
+    /// Regression: a one-sided empty HLT pair (time present, height empty) is
+    /// malformed, not a trailing omission. The old parser treated it as a
+    /// normal end-of-row and silently dropped the remaining pairs.
+    @Test func rejectsHLTRowWithOneSidedEmptyPair() async throws {
+        let taiPoKau2026HourlyFixture = try fixture("HKO/tai-po-kau-2026-hourly.csv")
+        // Jan 1: pair 2 has a time but no height (one-sided empty), with
+        // pairs 3–4 still populated.
+        let text = "\u{feff}Month,Date,Time,Height(m),Time,Height(m),Time,Height(m),Time,Height(m)\n"
+            + "01,01,0313,1.10,0925,,1150,1.31,1734,2.26\n"
+            + "01,02,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            + "01,03,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            + "01,04,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+            + "01,05,0313,1.10,0925,1.39,1150,1.31,1734,2.26\n"
+        let (session, _, cleanup) = makeSession(routes: [
+            Self.hourlyURL2026: .success((200, taiPoKau2026HourlyFixture)),
+            Self.hiloURL2026: .success((200, Data(text.utf8)))
+        ])
+        defer { cleanup() }
+        let client = HongKongTideClient(session: session, cache: try makeCache())
+
+        do {
+            _ = try await client.loadPredictions(station: try taiPoKau(), range: januaryRange(days: 1...5))
+            Issue.record("Expected a one-sided-empty HLT rejection")
+        } catch {
+            #expect((error as? TideLoadError) == .invalidProviderResponse,
+                    "A one-sided empty HLT pair must be rejected, not treated as a trailing omission")
+        }
+    }
+
     /// Empty HHOT cells remain intentionally-missing values (nil), not
     /// malformed — the regression must not break the empty-cell contract.
     @Test func emptyHHOTCellsRemainMissingValues() async throws {
