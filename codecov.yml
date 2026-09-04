@@ -1,0 +1,16 @@
+# Codecov provides coverage reporting and policy statuses; it is not a
+# branch-protection gate.
+coverage:
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 0%
+        informational: false
+        if_not_found: failure
+    patch:
+      default:
+        target: 90%
+        threshold: 0%
+        informational: false
+        if_not_found: failure
