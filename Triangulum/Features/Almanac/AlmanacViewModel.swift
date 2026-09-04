@@ -195,6 +195,16 @@ final class AlmanacViewModel: ObservableObject {
         // resets the calendar to the new destination's today (see
         // `currentModeAwaitingFirstFix`).
         currentModeAwaitingFirstFix = true
+        // A new Current-mode session must resolve its first fix even when the
+        // device hasn't moved: `stopCurrentLocationObservation` (called from
+        // `selectLocation` when leaving Current, and at the top of
+        // `startCurrentLocationObservation`) does NOT clear
+        // `lastResolvedCoordinate`, so without this reset the replayed
+        // current coordinate would be rejected by the <5 km reuse guard and
+        // `applyResolvedCurrentLocation` would never run — leaving the UI on
+        // the previous fixed location (and its calendar date) while
+        // preferences say Current until the device moves ≥5 km.
+        lastResolvedCoordinate = nil
         startCurrentLocationObservation()
         persistPreferences()
     }
@@ -251,23 +261,25 @@ final class AlmanacViewModel: ObservableObject {
         }
         // Also observe authorization/availability changes so a revocation
         // while already in Current mode (no coordinate change) still
-        // invalidates the display.
+        // invalidates the display. These sinks are invalidate-only: on a
+        // re-grant they must NOT forward `LocationManager`'s stored
+        // coordinate, because that stored value is the pre-revocation fix and
+        // resolving it would repopulate the display with a stale placemark
+        // before Core Location delivers a fresh fix. After invalidation the
+        // coordinate publisher drives resolution when the next real fix
+        // arrives; `invalidateCurrentLocationDisplay` already cleared
+        // `lastResolvedCoordinate`, so that first fresh fix is not suppressed
+        // by the <5 km reuse guard.
         authObservation = locationManager.$authorizationStatus
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
-                    self?.currentLocationObservationDidChange(
-                        latitude: self?.locationManager?.latitude ?? 0,
-                        longitude: self?.locationManager?.longitude ?? 0
-                    )
+                    self?.authorizationOrAvailabilityDidChange()
                 }
             }
         availabilityObservation = locationManager.$isAvailable
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
-                    self?.currentLocationObservationDidChange(
-                        latitude: self?.locationManager?.latitude ?? 0,
-                        longitude: self?.locationManager?.longitude ?? 0
-                    )
+                    self?.authorizationOrAvailabilityDidChange()
                 }
             }
     }
@@ -315,6 +327,27 @@ final class AlmanacViewModel: ObservableObject {
         // (0,0) is LocationManager's unfixed default, not a real fix.
         guard latitude != 0 || longitude != 0 else { return }
         scheduleCoordinateProcessing(latitude: latitude, longitude: longitude)
+    }
+
+    /// Authorization/availability change handler: invalidate-only. A
+    /// revocation (denied/restricted) or services-off transition clears the
+    /// Current-mode display so `AlmanacView` surfaces its remediation. A
+    /// re-grant or availability restore does nothing here — the coordinate
+    /// publisher delivers a fresh fix when Core Location resumes, and that
+    /// drives resolution. Forwarding `LocationManager`'s stored coordinate on
+    /// re-grant would resolve the pre-revocation fix (stale) before a new fix
+    /// arrives, and if the real post-grant fix moved <5 km the reuse guard
+    /// would then suppress it and leave the stale placemark indefinitely.
+    private func authorizationOrAvailabilityDidChange() {
+        guard locationMode == .current else { return }
+        let authorization = locationManager?.authorizationStatus ?? .notDetermined
+        let isAvailable = locationManager?.isAvailable ?? false
+        if authorization == .denied || authorization == .restricted || !isAvailable {
+            invalidateCurrentLocationDisplay()
+        }
+        // Re-grant / availability restore: wait for the coordinate publisher
+        // to emit a fresh fix before resolving. Do not forward the stored
+        // (pre-revocation) coordinate.
     }
 
     /// Clears the Current-mode display when the fix becomes invalid

@@ -309,7 +309,28 @@ struct HongKongTideClient: TideProviderClient {
             for pairIndex in 0..<4 {
                 let timeCell = row[2 + pairIndex * 2].trimmingCharacters(in: .whitespaces)
                 let heightCell = row[3 + pairIndex * 2].trimmingCharacters(in: .whitespaces)
-                guard !timeCell.isEmpty, !heightCell.isEmpty else { break }
+                let timeEmpty = timeCell.isEmpty
+                let heightEmpty = heightCell.isEmpty
+                if timeEmpty && heightEmpty {
+                    // An all-empty pair is a trailing omission ONLY when
+                    // every remaining pair is also empty. An interior gap
+                    // (a later non-empty pair) means later events would be
+                    // silently dropped and the malformed row cached as
+                    // validated source — reject it instead.
+                    let remainingHasData = (pairIndex + 1..<4).contains { other in
+                        !row[2 + other * 2].trimmingCharacters(in: .whitespaces).isEmpty
+                            || !row[3 + other * 2].trimmingCharacters(in: .whitespaces).isEmpty
+                    }
+                    if remainingHasData {
+                        throw TideLoadError.invalidProviderResponse
+                    }
+                    break
+                }
+                // A one-sided empty pair (time without height or height
+                // without time) is malformed, not a trailing omission.
+                if timeEmpty || heightEmpty {
+                    throw TideLoadError.invalidProviderResponse
+                }
                 // HHMM digits: 0116 is 01:16, i.e. 76 minutes, not 116.
                 // Height must be finite (Double("nan")/Double("inf") parse)
                 // so a non-finite HLT height is rejected before caching,

@@ -806,6 +806,52 @@ struct AlmanacViewModelTests {
         #expect(viewModel.location == nil)
     }
 
+    /// Regression (P1): re-granting permission must NOT resolve
+    /// `LocationManager`'s stored (pre-revocation) coordinate. The auth/
+    /// availability sinks are invalidate-only; after invalidation the
+    /// coordinate publisher drives resolution when Core Location delivers a
+    /// fresh fix. Forwarding the stored coordinate on re-grant would
+    /// repopulate the display with a stale placemark, and if the real
+    /// post-grant fix moved <5 km the reuse guard would then suppress it and
+    /// leave the stale placemark indefinitely.
+    @Test func regrantingPermissionDoesNotResolveTheStalePreRevocationCoordinate() async {
+        let harness = makeHarness()
+        let viewModel = harness.viewModel
+
+        // Establish a Current-mode fix.
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+        let callsBeforeRevoke = harness.resolver.currentCoordinateCalls.count
+
+        // Revoke permission: display clears (lastResolvedCoordinate is nil).
+        harness.locationManager.authorizationStatus = .denied
+        await waitUntil { viewModel.location == nil }
+        #expect(viewModel.location == nil)
+
+        // Re-grant permission. The stored coordinate is still the
+        // pre-revocation (49.0, -123.0); the auth sink must not forward it.
+        harness.locationManager.authorizationStatus = .authorizedWhenInUse
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        #expect(viewModel.location == nil,
+                "Re-granting permission must not resolve the stale pre-revocation coordinate")
+        #expect(harness.resolver.currentCoordinateCalls.count == callsBeforeRevoke,
+                "No new resolution should occur on re-grant until a fresh fix arrives")
+
+        // A fresh fix moved <5 km from the pre-revocation coordinate must now
+        // resolve — invalidateCurrentLocationDisplay cleared
+        // lastResolvedCoordinate, so the reuse guard must not suppress it.
+        harness.locationManager.latitude = 49.004  // ~0.4 km north, well under 5 km
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+
+        #expect(viewModel.location == Self.resolvedCurrent,
+                "A fresh post-grant fix under 5 km must resolve, not be suppressed by the reuse guard")
+        #expect(harness.resolver.currentCoordinateCalls.count > callsBeforeRevoke,
+                "The fresh post-grant fix must reach the resolver")
+    }
+
     // MARK: - Current-mode calendar reset on first fix (P1)
 
     /// Regression: switching to Current mode from an already-fixed location
@@ -859,5 +905,45 @@ struct AlmanacViewModelTests {
         await waitUntil { harness.resolver.currentCoordinateCalls.count == 2 }
         #expect(viewModel.selectedDate == chosen,
                 "Later Current-mode fixes must preserve the user's chosen date")
+    }
+
+    /// Regression (P1): Current → fixed → Current with UNCHANGED GPS
+    /// coordinates must resolve the first fix of the new session. Without
+    /// clearing `lastResolvedCoordinate` on re-entry, `stopCurrentLocationObservation`
+    /// (called from `selectLocation` when leaving Current) leaves the old
+    /// Current fix in `lastResolvedCoordinate`, so the replayed current
+    /// coordinate is rejected by the <5 km reuse guard and the UI stays on
+    /// the fixed location (and its calendar date) while preferences say
+    /// Current until the device moves ≥5 km.
+    @Test func currentToFixedToCurrentWithUnchangedGPSResolvesTheFirstFix() async {
+        let harness = makeHarness()  // resolverLocation = resolvedCurrent (49.0, -123.0)
+        let viewModel = harness.viewModel
+
+        // Current(Vancouver): first fix resolves.
+        harness.locationManager.latitude = 49.0
+        harness.locationManager.longitude = -123.0
+        viewModel.useCurrentLocation()
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+        #expect(viewModel.location == Self.resolvedCurrent)
+        let callsAfterFirstCurrent = harness.resolver.currentCoordinateCalls.count
+        #expect(callsAfterFirstCurrent >= 1)
+
+        // fixed(Tokyo): leave Current mode. stopCurrentLocationObservation
+        // does NOT clear lastResolvedCoordinate, so the Vancouver fix lingers.
+        viewModel.selectLocation(Self.tokyo)
+        #expect(viewModel.location == Self.tokyo)
+
+        // Current(Vancouver) again with UNCHANGED GPS coordinates. The
+        // replayed (49.0, -123.0) is <5 km from the lingering
+        // lastResolvedCoordinate; without the session-start reset the reuse
+        // guard would suppress it and the UI would stay on Tokyo.
+        viewModel.useCurrentLocation()
+        await waitUntil { harness.resolver.currentCoordinateCalls.count > callsAfterFirstCurrent }
+        await waitUntil { viewModel.location == Self.resolvedCurrent }
+
+        #expect(viewModel.location == Self.resolvedCurrent,
+                "Re-entering Current with unchanged GPS must resolve the first fix, not stay on the previous fixed location")
+        #expect(viewModel.selectedDate == Self.todayLocal,
+                "The new Current session must reset to the Current destination's today, not keep Tokyo's date")
     }
 }
