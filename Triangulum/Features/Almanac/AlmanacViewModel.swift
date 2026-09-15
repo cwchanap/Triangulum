@@ -530,7 +530,6 @@ final class AlmanacViewModel: ObservableObject {
         let context = try await tideService.resolveStation(for: location, override: stationOverride)
         guard requestGeneration == generation else { return }
         stationContext = context
-        tideWarning = nil
 
         if let publishedStale = try await publishCachedDay(station: context.selected, date: date, generation: generation),
            !publishedStale && !forceRefresh {
