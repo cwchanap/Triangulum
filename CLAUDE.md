@@ -37,6 +37,13 @@ xcodebuild test \
   -parallel-testing-enabled NO
 ```
 
+**Filtering a single test**: `-only-testing:` requires the trailing `()` on Swift
+Testing names — e.g.
+`-only-testing:'TriangulumTests/AlmanacViewModelTests/myTest()'`.
+Without `()` the filter silently matches nothing and xcodebuild reports
+"Executed 0 tests" + `TEST SUCCEEDED`, a vacuous pass. Always check the
+"Test run with N tests" line.
+
 ### Linting
 - **SwiftLint**: Install with `brew install swiftlint`, run with `swiftlint`
 - CI automatically runs SwiftLint on all pushes and PRs
