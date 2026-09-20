@@ -533,6 +533,10 @@ final class AlmanacViewModel: ObservableObject {
 
         if let publishedStale = try await publishCachedDay(station: context.selected, date: date, generation: generation),
            !publishedStale && !forceRefresh {
+            // The cache read above suspends; re-check the generation so a
+            // superseded load can't clear a newer request's warning.
+            guard requestGeneration == generation else { return }
+            tideWarning = nil
             return
         }
 
