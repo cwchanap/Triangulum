@@ -647,6 +647,50 @@ struct AlmanacViewModelTests {
         #expect(viewModel.tideWarning == .unsupportedRegion)
     }
 
+    /// Regression: concurrent loads can share one request generation — a
+    /// queued `Task` captures `requestGeneration` when its body runs, and a
+    /// pull-to-refresh adopts the current generation — so the generation
+    /// guard alone cannot order them. Only the most recently issued
+    /// invocation may publish: a fresh-cache load resuming after a sibling
+    /// refresh published a failure must not clear that warning or overwrite
+    /// its day.
+    @Test func concurrentFreshCacheLoadCannotClearAFailedRefreshsWarning() async {
+        let firstDay = Self.tideDay(date: Self.todayLocal, fetchedAt: Self.utcDate(2026, 9, 1))
+        let secondDay = Self.tideDay(date: Self.todayLocal, fetchedAt: Self.utcDate(2026, 9, 2))
+        var cacheReads = 0
+        let harness = cachedTideHarness { _, _ in
+            cacheReads += 1
+            return TideDaySnapshot(day: cacheReads == 1 ? firstDay : secondDay, isStale: false)
+        }
+        harness.tideService.refreshHandler = { _, _ in throw TideLoadError.networkUnavailable }
+        // Gate only the first cache read so the queued load stalls inside it
+        // while a same-generation force-refresh runs to failure beside it.
+        let gate = Gate()
+        harness.tideService.cachedGate = gate
+        harness.tideService.cachedGateBarrier = 2
+        let viewModel = harness.viewModel
+
+        viewModel.selectLocation(Self.vancouver)
+        // `reloadTidesIfNeeded` spawns `Task { await loadTides() }`; this
+        // mirrors that scheduling while keeping a handle to await.
+        let stalledLoad = Task { await viewModel.loadTides() }
+        await waitUntil { harness.tideService.cachedRequests.count == 1 }
+
+        // Same selection, same generation: the refresh publishes its failure
+        // while the earlier load is still suspended in the gated cache read.
+        await viewModel.loadTides(forceRefresh: true)
+        #expect(viewModel.tideWarning == .networkUnavailable)
+        #expect(viewModel.tideDay == firstDay)
+
+        // The stalled load's fresh-cache early return must not erase the
+        // sibling's warning when it resumes.
+        gate.open()
+        await stalledLoad.value
+
+        #expect(viewModel.tideWarning == .networkUnavailable)
+        #expect(viewModel.tideDay == firstDay)
+    }
+
     /// Regression (I3): selecting a fixed place stores it as the last fixed
     /// location even when the app was following the device.
     @Test func selectingAFixedPlaceUpdatesTheLastFixedLocation() {
