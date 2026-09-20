@@ -532,6 +532,32 @@ struct AlmanacViewModelTests {
         #expect(viewModel.tideWarning == .networkUnavailable)
     }
 
+    /// Regression: a same-selection reload that early-returns on a fresh
+    /// cached day must still clear a warning an earlier failed load
+    /// published, or the failure lingers over fresh predictions.
+    @Test func freshCacheRetryAfterFailedRefreshClearsTheWarning() async {
+        let day = Self.tideDay(date: Self.todayLocal)
+        let harness = cachedTideHarness { _, _ in TideDaySnapshot(day: day, isStale: false) }
+        let viewModel = harness.viewModel
+
+        viewModel.selectLocation(Self.vancouver)
+        viewModel.section = .tides
+        await viewModel.loadTides()
+        #expect(viewModel.tideDay == day)
+
+        // Pull-to-refresh skips the cache-first early return and fails: the
+        // warning publishes over the still-fresh day.
+        harness.tideService.refreshHandler = { _, _ in throw TideLoadError.networkUnavailable }
+        await viewModel.loadTides(forceRefresh: true)
+        #expect(viewModel.tideWarning == .networkUnavailable)
+
+        // A normal reload early-returns on the fresh cache; the warning must
+        // not survive that successful publish.
+        await viewModel.loadTides()
+        #expect(viewModel.tideDay == day)
+        #expect(viewModel.tideWarning == nil)
+    }
+
     // MARK: - Generation guard
 
     @Test func olderAsyncResponseCannotOverwriteNewerSelection() async {
