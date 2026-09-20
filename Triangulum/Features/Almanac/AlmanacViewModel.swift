@@ -10,8 +10,10 @@ import Foundation
 /// strip driving the Sun and Tides sections.
 ///
 /// Every location/station/range-changing action cancels superseded tasks and
-/// replaces `requestGeneration`; async results apply only when the generation
-/// still matches (the SatelliteManager token-checked application pattern).
+/// replaces `requestGeneration`; each load invocation also claims a
+/// `tideRequestOrdinal` at issue time, and async results apply only while
+/// both still match (the SatelliteManager token-checked application
+/// pattern).
 @MainActor
 final class AlmanacViewModel: ObservableObject {
     enum Section: String, CaseIterable { case sun, tides }
@@ -37,6 +39,14 @@ final class AlmanacViewModel: ObservableObject {
     @Published private(set) var lastFixedLocation: AlmanacLocation?
 
     private var requestGeneration = UUID()
+    /// Per-invocation ordinal claimed when a tide load is issued. The
+    /// generation alone cannot order concurrent `loadTides` invocations: a
+    /// queued `Task` reads `requestGeneration` when its body runs (a
+    /// late-starting task adopts the newer generation), and a same-selection
+    /// pull-to-refresh shares the generation outright. Async results apply
+    /// only while both the generation and the ordinal still match, so only
+    /// the most recently issued request may publish.
+    private var tideRequestOrdinal = 0
     /// Placemark resolutions track their own generation: starting one must
     /// not invalidate an in-flight tide load (and vice versa). Selection- and
     /// mode-changing paths still invalidate resolutions via
@@ -491,32 +501,65 @@ final class AlmanacViewModel: ObservableObject {
 
     // MARK: - Tide loading
 
+    /// Identity of a single tide-load invocation: the selection generation
+    /// it was issued under plus a monotonically increasing ordinal.
+    private struct TideRequest: Equatable {
+        var generation: UUID
+        var ordinal: Int
+    }
+
+    /// Issues the identity a new tide load must hold to publish: the current
+    /// selection generation plus a fresh ordinal that supersedes every
+    /// earlier same-generation invocation.
+    private func issueTideRequest() -> TideRequest {
+        tideRequestOrdinal += 1
+        return TideRequest(generation: requestGeneration, ordinal: tideRequestOrdinal)
+    }
+
+    /// True while `request` is still the latest issued invocation under a
+    /// still-current selection generation.
+    private func isCurrentTideRequest(_ request: TideRequest) -> Bool {
+        request.generation == requestGeneration && request.ordinal == tideRequestOrdinal
+    }
+
     /// Cancels superseded tide work, bumps the generation, and reloads only
     /// when the Tides section can need the data.
     private func reloadTidesIfNeeded() {
         tideTask?.cancel()
         requestGeneration = UUID()
         guard section == .tides else { return }
-        tideTask = Task { await loadTides() }
+        // The request is issued here, not inside the task body: a queued
+        // task that starts after a later selection change must keep the
+        // generation it was scheduled under instead of adopting the newer
+        // one.
+        let request = issueTideRequest()
+        tideTask = Task { await loadTides(request: request) }
     }
 
     /// Cache-first: resolve the station, publish any cached day immediately,
     /// stop on a fresh hit unless force-refreshing, otherwise refresh the
     /// current rolling seven-day strip and reload the selected day.
     func loadTides(forceRefresh: Bool = false) async {
+        guard location != nil, selectedDate != nil else { return }
+        await loadTides(forceRefresh: forceRefresh, request: issueTideRequest())
+    }
+
+    private func loadTides(forceRefresh: Bool = false, request: TideRequest) async {
         guard let location, let selectedDate else { return }
-        let generation = requestGeneration
+        // A queued task can start after a newer request superseded it; bail
+        // before any service call so it never publishes over its successor.
+        guard isCurrentTideRequest(request) else { return }
         do {
             try await performTideLoad(
                 location: location,
                 date: selectedDate,
-                generation: generation,
+                request: request,
                 forceRefresh: forceRefresh
             )
         } catch is CancellationError {
             return
         } catch {
-            guard requestGeneration == generation else { return }
+            guard isCurrentTideRequest(request) else { return }
             tideWarning = Self.tideWarning(from: error)
         }
     }
@@ -524,30 +567,30 @@ final class AlmanacViewModel: ObservableObject {
     private func performTideLoad(
         location: AlmanacLocation,
         date: LocalDate,
-        generation: UUID,
+        request: TideRequest,
         forceRefresh: Bool
     ) async throws {
         let context = try await tideService.resolveStation(for: location, override: stationOverride)
-        guard requestGeneration == generation else { return }
+        guard isCurrentTideRequest(request) else { return }
         stationContext = context
 
-        if let publishedStale = try await publishCachedDay(station: context.selected, date: date, generation: generation),
+        if let publishedStale = try await publishCachedDay(station: context.selected, date: date, request: request),
            !publishedStale && !forceRefresh {
-            // The cache read above suspends; re-check the generation so a
+            // The cache read above suspends; re-check the request so a
             // superseded load can't clear a newer request's warning.
-            guard requestGeneration == generation else { return }
+            guard isCurrentTideRequest(request) else { return }
             tideWarning = nil
             return
         }
 
         let range = try date.rollingSevenDays(in: context.timeZone)
         _ = try await tideService.refreshRange(station: context.selected, range: range)
-        guard requestGeneration == generation else { return }
+        guard isCurrentTideRequest(request) else { return }
 
-        let publishedAfterRefresh = try await publishCachedDay(station: context.selected, date: date, generation: generation)
+        let publishedAfterRefresh = try await publishCachedDay(station: context.selected, date: date, request: request)
         // The cache read above suspends; a newer request may have superseded
         // this load (and published its own warning) while it was in flight.
-        guard requestGeneration == generation else { return }
+        guard isCurrentTideRequest(request) else { return }
         if publishedAfterRefresh == nil {
             tideDay = nil
             tideIsStale = false
@@ -557,9 +600,9 @@ final class AlmanacViewModel: ObservableObject {
 
     /// Publishes the station's cached day for `date` when one exists, returning
     /// whether it was stale; nil means nothing was cached.
-    private func publishCachedDay(station: TideStation, date: LocalDate, generation: UUID) async throws -> Bool? {
+    private func publishCachedDay(station: TideStation, date: LocalDate, request: TideRequest) async throws -> Bool? {
         guard let cached = try await tideService.cachedDay(station: station, date: date) else { return nil }
-        guard requestGeneration == generation else { return cached.isStale }
+        guard isCurrentTideRequest(request) else { return cached.isStale }
         tideDay = cached.day
         tideIsStale = cached.isStale
         return cached.isStale
