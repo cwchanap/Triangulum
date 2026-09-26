@@ -6,13 +6,7 @@ import Foundation
 struct WeatherManagerFetchTests {
 
     @Test @MainActor func testFetchWeatherParsesSuccessfulResponse() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_fetch_success")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_fetch_success"
 
         let json = Data("""
         {
@@ -33,7 +27,8 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -45,13 +40,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherHandlesUnauthorizedResponse() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_fetch_unauthorized")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_fetch_unauthorized"
 
         let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
@@ -62,7 +51,8 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
         weatherManager.isMonitoringEnabled = true
         weatherManager.weatherCheckTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { _ in }
@@ -76,13 +66,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherHandlesGenericHTTPError() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_fetch_http_error")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_fetch_http_error"
 
         let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
@@ -93,7 +77,8 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -104,13 +89,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherHandlesNonHTTPResponse() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_fetch_non_http")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_fetch_non_http"
 
         let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
@@ -121,7 +100,8 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -132,13 +112,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherHandlesDecodingFailure() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_fetch_decode_failure")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_fetch_decode_failure"
 
         let (session, cleanup) = WeatherTestHelper.createMockSession { request in
             let url = try #require(request.url)
@@ -149,7 +123,8 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -160,13 +135,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherHandlesTransportFailure() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_fetch_transport_failure")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_fetch_transport_failure"
 
         let (session, cleanup) = WeatherTestHelper.createMockSession { _ in
             throw URLError(.timedOut)
@@ -175,7 +144,8 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -200,16 +170,13 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherRequiresAPIKey() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        _ = Config.deleteAPIKey()
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        // Injected empty key: exercises the no-API-key path without deleting the shared Keychain entry.
+        let apiKey = ""
 
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
-            skipMonitoring: true
+            skipMonitoring: true,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -220,20 +187,15 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testFetchWeatherRequiresLocationData() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_missing_location")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_missing_location"
 
         let locationManager = WeatherTestHelper.createValidLocationManager()
         locationManager.latitude = 0
         locationManager.longitude = 0
         let weatherManager = WeatherManager(
             locationManager: locationManager,
-            skipMonitoring: true
+            skipMonitoring: true,
+            apiKeyProvider: { apiKey }
         )
 
         await weatherManager.fetchWeather()
@@ -259,13 +221,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testRefreshWeatherStartsFetchTask() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_refresh_weather")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_refresh_weather"
 
         let json = Data("""
         {
@@ -283,13 +239,15 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         weatherManager.refreshWeather()
-        for _ in 0..<50 where weatherManager.currentWeather == nil && weatherManager.errorMessage.isEmpty {
-            try? await Task.sleep(for: .milliseconds(20))
-        }
+        // Await the spawned fetch directly rather than polling with a fixed budget,
+        // which could expire on a busy CI simulator before the fetch completed.
+        let fetchTask = try #require(weatherManager.pendingFetchTask)
+        await fetchTask.value
 
         #expect(weatherManager.currentWeather?.locationName == "San Francisco")
         #expect(weatherManager.errorMessage == "")
@@ -297,17 +255,11 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testRefreshAvailabilityReportsLocationServicesRequiredWhenUnavailable() throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_location_unavailable")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_location_unavailable"
 
         let locationManager = WeatherTestHelper.createValidLocationManager()
         locationManager.isAvailable = false
-        let weatherManager = WeatherManager(locationManager: locationManager, skipMonitoring: true)
+        let weatherManager = WeatherManager(locationManager: locationManager, skipMonitoring: true, apiKeyProvider: { apiKey })
 
         weatherManager.refreshAvailability()
 
@@ -318,18 +270,12 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testRefreshAvailabilityReportsGettingLocationWhenCoordinatesMissing() throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_getting_location")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_getting_location"
 
         let locationManager = WeatherTestHelper.createValidLocationManager()
         locationManager.latitude = 0
         locationManager.longitude = 0
-        let weatherManager = WeatherManager(locationManager: locationManager, skipMonitoring: true)
+        let weatherManager = WeatherManager(locationManager: locationManager, skipMonitoring: true, apiKeyProvider: { apiKey })
 
         weatherManager.refreshAvailability()
 
@@ -340,17 +286,12 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testRefreshAvailabilityStartsTimerWhenLoadingSuppressesFetch() throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_refresh_timer")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_refresh_timer"
 
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
-            skipMonitoring: true
+            skipMonitoring: true,
+            apiKeyProvider: { apiKey }
         )
         weatherManager.isLoading = true
 
@@ -366,13 +307,7 @@ struct WeatherManagerFetchTests {
     }
 
     @Test @MainActor func testRefreshAvailabilityAutoFetchesWeatherWhenConditionsBecomeValid() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_refresh_autofetch")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_refresh_autofetch"
 
         let json = Data("""
         {
@@ -390,13 +325,15 @@ struct WeatherManagerFetchTests {
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
             skipMonitoring: true,
-            urlSession: session
+            urlSession: session,
+            apiKeyProvider: { apiKey }
         )
 
         weatherManager.refreshAvailability()
-        for _ in 0..<50 where weatherManager.currentWeather == nil && weatherManager.errorMessage.isEmpty {
-            try? await Task.sleep(for: .milliseconds(20))
-        }
+        // Await the spawned fetch directly rather than polling with a fixed budget,
+        // which could expire on a busy CI simulator before the fetch completed.
+        let fetchTask = try #require(weatherManager.pendingFetchTask)
+        await fetchTask.value
 
         #expect(weatherManager.isMonitoringEnabled == true)
         #expect(weatherManager.isAvailable == true)

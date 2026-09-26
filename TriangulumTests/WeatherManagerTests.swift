@@ -178,15 +178,11 @@ struct WeatherManagerTests {
     }
 
     @Test @MainActor func testStartMonitoringWithExistingWeatherRevalidatesImmediately() throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        _ = Config.deleteAPIKey()
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        // Injected empty key: exercises the no-API-key path without deleting the shared Keychain entry.
+        let apiKey = ""
 
         let locationManager = LocationManager()
-        let weatherManager = WeatherManager(locationManager: locationManager)
+        let weatherManager = WeatherManager(locationManager: locationManager, apiKeyProvider: { apiKey })
         weatherManager.stopMonitoring()
 
         let json = Data("""
@@ -255,15 +251,9 @@ struct WeatherManagerTests {
         locationManager.latitude = 37.7749
         locationManager.longitude = -122.4194
 
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_coverage_only")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_coverage_only"
 
-        let weatherManager = WeatherManager(locationManager: locationManager)
+        let weatherManager = WeatherManager(locationManager: locationManager, apiKeyProvider: { apiKey })
         weatherManager.stopMonitoring()
 
         let json = Data("""
@@ -293,15 +283,9 @@ struct WeatherManagerTests {
         locationManager.latitude = 37.7749
         locationManager.longitude = -122.4194
 
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_coverage_only")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_coverage_only"
 
-        let weatherManager = WeatherManager(locationManager: locationManager)
+        let weatherManager = WeatherManager(locationManager: locationManager, apiKeyProvider: { apiKey })
         weatherManager.stopMonitoring()
 
         let json = Data("""
@@ -330,15 +314,9 @@ struct WeatherManagerTests {
         locationManager.latitude = 37.7749
         locationManager.longitude = -122.4194
 
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        let keyStored = Config.storeAPIKey("test_fake_key_no_duplicate_timer")
-        try #require(keyStored, "Config.storeAPIKey must succeed; Keychain unavailable in this environment")
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        let apiKey = "test_fake_key_no_duplicate_timer"
 
-        let weatherManager = WeatherManager(locationManager: locationManager)
+        let weatherManager = WeatherManager(locationManager: locationManager, apiKeyProvider: { apiKey })
         weatherManager.stopMonitoring()
 
         let json = Data("""
@@ -364,16 +342,13 @@ struct WeatherManagerTests {
     }
 
     @Test @MainActor func testStartMonitoringFallsBackToFrequentPollingWhenRevalidationFails() async throws {
-        let savedKey = Config.openWeatherAPIKey
-        let hadKey = !savedKey.isEmpty
-        _ = Config.deleteAPIKey()
-        defer {
-            if hadKey { _ = Config.storeAPIKey(savedKey) } else { _ = Config.deleteAPIKey() }
-        }
+        // Injected empty key: exercises the no-API-key path without deleting the shared Keychain entry.
+        let apiKey = ""
 
         let weatherManager = WeatherManager(
             locationManager: WeatherTestHelper.createValidLocationManager(),
-            skipMonitoring: true
+            skipMonitoring: true,
+            apiKeyProvider: { apiKey }
         )
         weatherManager.currentWeather = try WeatherTestHelper.createSampleWeather()
 

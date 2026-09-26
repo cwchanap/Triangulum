@@ -6,6 +6,11 @@ import os
 class WeatherManager: ObservableObject {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
     private let urlSession: URLSession
+    /// Supplies the OpenWeatherMap API key. Defaults to `Config.openWeatherAPIKey`
+    /// (env var, then Keychain). Unit tests inject a fixed value so they never
+    /// read or mutate the process-wide Keychain entry, which other suites
+    /// running in parallel also touch.
+    private let apiKeyProvider: () -> String
     var locationManager: LocationManager
     /// The repeating timer that drives availability checks and weather refreshes.
     /// Internal (not private) so unit tests can assert that exactly one timer is
@@ -23,14 +28,31 @@ class WeatherManager: ObservableObject {
     @Published var isAvailable: Bool = false
     @Published var isInitializing: Bool = true
 
+    /// The most recently spawned background fetch (from `refreshWeather()` or the
+    /// auto-fetch in `checkAndFetchWeather()`). Internal so unit tests can `await`
+    /// it deterministically instead of polling for a result.
+    private(set) var pendingFetchTask: Task<Void, Never>?
+
+    private var hasValidAPIKey: Bool {
+        !apiKeyProvider().isEmpty
+    }
+
     /// Designated initializer.
     /// - Parameters:
     ///   - locationManager: The shared `LocationManager` instance.
     ///   - skipMonitoring: When `true` the polling timer and initial fetch
     ///     task are not created, preventing background work in UI-test runs.
-    init(locationManager: LocationManager, skipMonitoring: Bool = false, urlSession: URLSession = .shared) {
+    ///   - urlSession: Session used for weather requests (mocked in tests).
+    ///   - apiKeyProvider: Returns the API key; defaults to `Config.openWeatherAPIKey`.
+    init(
+        locationManager: LocationManager,
+        skipMonitoring: Bool = false,
+        urlSession: URLSession = .shared,
+        apiKeyProvider: @escaping () -> String = { Config.openWeatherAPIKey }
+    ) {
         self.locationManager = locationManager
         self.urlSession = urlSession
+        self.apiKeyProvider = apiKeyProvider
 
         // Start with loading state
         isInitializing = true
@@ -88,7 +110,7 @@ class WeatherManager: ObservableObject {
     }
 
     private func checkAndFetchWeather() {
-        let hasAPIKey = Config.hasValidAPIKey
+        let hasAPIKey = hasValidAPIKey
         let locationAvailable = locationManager.isAvailable
         let coordinate = CLLocationCoordinate2D(latitude: locationManager.latitude, longitude: locationManager.longitude)
         // Require both latitude and longitude to be non-zero
@@ -126,7 +148,7 @@ class WeatherManager: ObservableObject {
         // Fetch weather if we don't have any data yet.
         if currentWeather == nil && !isLoading && isMonitoringEnabled {
             Logger.weather.debug("Auto-fetching weather data")
-            Task { @MainActor [weak self] in
+            pendingFetchTask = Task { @MainActor [weak self] in
                 guard let self, self.isMonitoringEnabled else {
                     Logger.weather.debug("Skipping queued weather fetch — monitoring is disabled")
                     return
@@ -145,7 +167,7 @@ class WeatherManager: ObservableObject {
             // while a fetch is already in flight.
             if !isLoading && isMonitoringEnabled {
                 Logger.weather.debug("Periodic refresh: re-fetching weather data on schedule")
-                Task { @MainActor [weak self] in
+                pendingFetchTask = Task { @MainActor [weak self] in
                     guard let self, self.isMonitoringEnabled else {
                         Logger.weather.debug("Skipping queued periodic refresh — monitoring is disabled")
                         return
@@ -165,7 +187,7 @@ class WeatherManager: ObservableObject {
             return
         }
 
-        guard Config.hasValidAPIKey else {
+        guard hasValidAPIKey else {
             errorMessage = "API key required"
             return
         }
@@ -182,7 +204,7 @@ class WeatherManager: ObservableObject {
 
         let lat = locationManager.latitude
         let lon = locationManager.longitude
-        let apiKey = Config.openWeatherAPIKey
+        let apiKey = apiKeyProvider()
 
         let urlString = "\(baseURL)?lat=\(lat)&lon=\(lon)&appid=\(apiKey)"
         Logger.weather.debug("Fetching weather for lat=\(lat), lon=\(lon)")
@@ -251,7 +273,7 @@ class WeatherManager: ObservableObject {
             Logger.weather.debug("refreshWeather skipped — fetch already in progress")
             return
         }
-        Task {
+        pendingFetchTask = Task {
             await fetchWeather()
         }
     }
